@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BigTicket — Portal Terceros</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main-portal.jsx"></script>
+  </body>
+</html>
+```
+
+4. Clic en **"Commit changes"**
+
+---
+
+**PASO 3 — Configurar el proyecto portal en Vercel**
+
+1. Ve al proyecto `bigticket-portal` en Vercel
+2. Clic en **"Settings"** → **"Build & Development Settings"**
+3. En **"Build Command"** pon:
+```
+vite build --config vite-portal.config.js
