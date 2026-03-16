@@ -22,8 +22,16 @@ const VARIABLES = [
 const SUPERADMIN_KEY = "PortalTerceros2026";
 
 const PAISES = {
-  Chile: { bandera: "🇨🇱", label: "Chile" },
-  México: { bandera: "🇲🇽", label: "México" },
+  Chile: { 
+    bandera: "https://flagcdn.com/w80/cl.png",
+    emoji: "🇨🇱",
+    label: "Chile" 
+  },
+  México: { 
+    bandera: "https://flagcdn.com/w80/mx.png",
+    emoji: "🇲🇽",
+    label: "México" 
+  },
 };
 
 function getCanal() {
@@ -143,7 +151,7 @@ const css = `
 
 // ─── COMPONENTS ───────────────────────────────────────────────────────────────
 
-function AdminLogin({ onSuccess }) {
+function AdminLogin({ onSuccess, onClose }) {
   const [clave, setClave] = useState("");
   const [error, setError] = useState("");
   const [show, setShow] = useState(false);
@@ -188,7 +196,7 @@ function AdminLogin({ onSuccess }) {
           Ingresar
         </button>
         <div style={{ textAlign: "center", marginTop: 16 }}>
-          <button className="btn-back" style={{ fontSize: 12, color: "#888", justifyContent: "center" }} onClick={() => window.history.back()}>
+          <button className="btn-back" style={{ fontSize: 12, color: "#888", justifyContent: "center" }} onClick={onClose}>
             ← Volver al portal
           </button>
         </div>
@@ -232,7 +240,13 @@ function ViewCountry({ op, onSelect }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           {Object.entries(PAISES).map(([key, p]) => (
             <div key={key} className="country-card" onClick={() => onSelect(key)}>
-              <span className="country-flag">{p.bandera}</span>
+              <img 
+                src={p.bandera} 
+                alt={p.label}
+                style={{ width: 64, height: 44, objectFit: "cover", borderRadius: 4, marginBottom: 12, display: "block", margin: "0 auto 12px" }}
+                onError={e => { e.target.style.display="none"; e.target.nextSibling.style.display="block"; }}
+              />
+              <span style={{ fontSize: 48, display: "none", marginBottom: 8, lineHeight: 1 }}>{p.emoji}</span>
               <div style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a" }}>{p.label}</div>
             </div>
           ))}
@@ -774,15 +788,14 @@ function CanalesView({ postulaciones, onLoad }) {
 // ─── APP ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [view, setView] = useState("portal");
-  const [op, setOp] = useState("Chile");
+  const [view, setView] = useState("country");
+  const [op, setOp] = useState(null);
   const [canal] = useState(getCanal);
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCamp, setSelectedCamp] = useState(null);
   const [formCamp, setFormCamp] = useState(null);
   const [showAdmin, setShowAdmin] = useState(false);
-
   const [adminAuth, setAdminAuth] = useState(!!sessionStorage.getItem("admin_auth"));
 
   useEffect(() => { loadCampaigns(); }, []);
@@ -794,18 +807,10 @@ export default function App() {
     setLoading(false);
   }
 
-  function handleAdminClick() {
-    if (adminAuth) {
-      setShowAdmin(true);
-    } else {
-      setShowAdmin(true);
-    }
-  }
-
   if (showAdmin && !adminAuth) return (
     <>
       <style>{css}</style>
-      <AdminLogin onSuccess={() => { setAdminAuth(true); }} />
+      <AdminLogin onSuccess={() => { setAdminAuth(true); }} onClose={() => setShowAdmin(false)} />
     </>
   );
 
@@ -820,7 +825,7 @@ export default function App() {
     <>
       <style>{css}</style>
       {view === "country" && <ViewCountry op={op} onSelect={c => { setOp(c); setView("portal"); }} />}
-      {view === "portal" && <ViewPortal op={op} canal={canal} campaigns={campaigns} loading={loading} onChangePais={() => setView("country")} onDetail={c => { setSelectedCamp(c); setView("detail"); }} onLibre={() => { setFormCamp(null); setView("form"); }} />}
+      {view === "portal" && op && <ViewPortal op={op} canal={canal} campaigns={campaigns} loading={loading} onChangePais={() => setView("country")} onDetail={c => { setSelectedCamp(c); setView("detail"); }} onLibre={() => { setFormCamp(null); setView("form"); }} />}
       {view === "detail" && selectedCamp && <ViewDetail camp={selectedCamp} canal={canal} onBack={() => setView("portal")} onPostular={() => { setFormCamp(selectedCamp); setView("form"); }} />}
       {view === "form" && <ViewForm camp={formCamp} canal={canal} op={op} onBack={() => setView(formCamp ? "detail" : "portal")} onSuccess={() => setView("success")} />}
       {view === "success" && <ViewSuccess onVolver={() => { setView("portal"); loadCampaigns(); }} />}
@@ -828,7 +833,7 @@ export default function App() {
         <div style={{ position: "fixed", bottom: 20, right: 20, zIndex: 99, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
           {adminAuth && (
             <button style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 11, color: "#888" }}
-              onClick={() => { sessionStorage.removeItem("admin_auth"); setAdminAuth(false); setShowAdmin(false); }}>
+              onClick={() => { sessionStorage.removeItem("admin_auth"); setAdminAuth(false); }}>
               Cerrar sesión
             </button>
           )}
