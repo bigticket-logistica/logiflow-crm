@@ -6,10 +6,10 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     rollupOptions: {
-      input: 'index-portal.html'
+      input: 'index-portal.html',
+      output: {
+        entryFileNames: 'assets/[name]-[hash].js',
+      }
     }
-  },
-  server: {
-    open: '/index-portal.html'
   }
 })
