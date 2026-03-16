@@ -19,6 +19,13 @@ const VARIABLES = [
   "Licencia vigente","Disponibilidad inmediata","Conocimiento de zona",
 ];
 
+const SUPERADMIN_KEY = "PortalTerceros2026";
+
+const PAISES = {
+  Chile: { bandera: "🇨🇱", label: "Chile" },
+  México: { bandera: "🇲🇽", label: "México" },
+};
+
 function getCanal() {
   if (typeof window === "undefined") return "portal";
   const p = new URLSearchParams(window.location.search);
@@ -119,13 +126,76 @@ const css = `
   .stat-label{font-size:12px;color:#888;margin-top:4px;}
   .url-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid #f0f0f0;}
   .url-text{font-size:11px;color:#888;font-family:'DM Mono',monospace;}
+  .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f0f2f5;padding:20px;}
+  .login-card{background:#fff;border-radius:16px;padding:40px 32px;width:100%;max-width:380px;border:0.5px solid #e4e7ec;}
+  .login-logo{text-align:center;margin-bottom:28px;}
+  .login-title{font-size:16px;font-weight:600;color:#1a1a1a;margin-bottom:6px;text-align:center;}
+  .login-sub{font-size:13px;color:#888;text-align:center;margin-bottom:24px;}
+  .login-error{background:#fee2e2;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;margin-bottom:14px;text-align:center;}
+  .input-wrap{position:relative;}
+  .input-wrap input{padding-right:40px;}
+  .eye-btn{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#888;font-size:16px;padding:0;}
+  .country-flag{font-size:48px;margin-bottom:10px;display:block;line-height:1;}
   .country-card{background:#fff;border:0.5px solid #e4e7ec;border-radius:14px;padding:28px 20px;text-align:center;cursor:pointer;transition:border-color 0.15s,transform 0.1s;}
   .country-card:hover{border-color:#F47B20;transform:translateY(-1px);}
-  .loading{text-align:center;padding:40px;color:#888;font-size:14px;}
   .empty{text-align:center;padding:32px;color:#888;font-size:13px;background:#fff;border-radius:12px;border:0.5px dashed #e4e7ec;}
 `;
 
 // ─── COMPONENTS ───────────────────────────────────────────────────────────────
+
+function AdminLogin({ onSuccess }) {
+  const [clave, setClave] = useState("");
+  const [error, setError] = useState("");
+  const [show, setShow] = useState(false);
+
+  function handleLogin() {
+    if (clave === SUPERADMIN_KEY) {
+      sessionStorage.setItem("admin_auth", "1");
+      onSuccess();
+    } else {
+      setError("Clave incorrecta. Intenta nuevamente.");
+      setClave("");
+    }
+  }
+
+  return (
+    <div className="login-wrap">
+      <div className="login-card">
+        <div className="login-logo">
+          <div style={{ background: "#1a3a6b", borderRadius: 10, padding: "10px 20px", display: "inline-flex", alignItems: "center" }}>
+            <span style={{ color: "#F47B20", fontSize: 20, fontWeight: 700 }}>big</span>
+            <span style={{ color: "#fff", fontSize: 20, fontWeight: 700 }}>ticket</span>
+          </div>
+        </div>
+        <div className="login-title">Acceso administrador</div>
+        <div className="login-sub">Solo para personal autorizado BigTicket</div>
+        {error && <div className="login-error">{error}</div>}
+        <div className="field-row">
+          <span className="field-label">Clave de acceso</span>
+          <div className="input-wrap">
+            <input
+              type={show ? "text" : "password"}
+              value={clave}
+              onChange={e => { setClave(e.target.value); setError(""); }}
+              onKeyDown={e => e.key === "Enter" && handleLogin()}
+              placeholder="Ingresa tu clave"
+              autoFocus
+            />
+            <button className="eye-btn" onClick={() => setShow(!show)}>{show ? "🙈" : "👁"}</button>
+          </div>
+        </div>
+        <button className="btn-blue" onClick={handleLogin} style={{ width: "100%", marginTop: 8 }}>
+          Ingresar
+        </button>
+        <div style={{ textAlign: "center", marginTop: 16 }}>
+          <button className="btn-back" style={{ fontSize: 12, color: "#888", justifyContent: "center" }} onClick={() => window.history.back()}>
+            ← Volver al portal
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function CanalInfo({ canal }) {
   const c = CANALES[canal] || CANALES.portal;
@@ -160,10 +230,10 @@ function ViewCountry({ op, onSelect }) {
         <div className="sec-title" style={{ textAlign: "center", marginBottom: 6 }}>Selecciona tu operación</div>
         <div className="sec-sub" style={{ textAlign: "center" }}>¿En qué país trabajarás?</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-          {["Chile", "México"].map(c => (
-            <div key={c} className="country-card" onClick={() => onSelect(c)}>
-              <div style={{ fontSize: 36, marginBottom: 10 }}>{c === "Chile" ? "🇨🇱" : "🇲🇽"}</div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a" }}>{c}</div>
+          {Object.entries(PAISES).map(([key, p]) => (
+            <div key={key} className="country-card" onClick={() => onSelect(key)}>
+              <span className="country-flag">{p.bandera}</span>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a" }}>{p.label}</div>
             </div>
           ))}
         </div>
@@ -713,6 +783,8 @@ export default function App() {
   const [formCamp, setFormCamp] = useState(null);
   const [showAdmin, setShowAdmin] = useState(false);
 
+  const [adminAuth, setAdminAuth] = useState(!!sessionStorage.getItem("admin_auth"));
+
   useEffect(() => { loadCampaigns(); }, []);
 
   async function loadCampaigns() {
@@ -722,7 +794,22 @@ export default function App() {
     setLoading(false);
   }
 
-  if (showAdmin) return (
+  function handleAdminClick() {
+    if (adminAuth) {
+      setShowAdmin(true);
+    } else {
+      setShowAdmin(true);
+    }
+  }
+
+  if (showAdmin && !adminAuth) return (
+    <>
+      <style>{css}</style>
+      <AdminLogin onSuccess={() => { setAdminAuth(true); }} />
+    </>
+  );
+
+  if (showAdmin && adminAuth) return (
     <>
       <style>{css}</style>
       <AdminPanel onClose={() => setShowAdmin(false)} campaigns={campaigns} setCampaigns={setCampaigns} />
@@ -738,7 +825,13 @@ export default function App() {
       {view === "form" && <ViewForm camp={formCamp} canal={canal} op={op} onBack={() => setView(formCamp ? "detail" : "portal")} onSuccess={() => setView("success")} />}
       {view === "success" && <ViewSuccess onVolver={() => { setView("portal"); loadCampaigns(); }} />}
       {view === "portal" && (
-        <div style={{ position: "fixed", bottom: 20, right: 20, zIndex: 99 }}>
+        <div style={{ position: "fixed", bottom: 20, right: 20, zIndex: 99, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+          {adminAuth && (
+            <button style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 11, color: "#888" }}
+              onClick={() => { sessionStorage.removeItem("admin_auth"); setAdminAuth(false); setShowAdmin(false); }}>
+              Cerrar sesión
+            </button>
+          )}
           <button className="btn-blue" onClick={() => setShowAdmin(true)}>Admin ⚙</button>
         </div>
       )}
