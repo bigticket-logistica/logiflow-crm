@@ -392,7 +392,7 @@ function ViewDetail({ camp, canal, onBack, onPostular }) {
 }
 
 function ViewForm({ camp, canal, op, onBack, onSuccess }) {
-  const [form,setForm]=useState({nombre:"",rut:"",telefono:"",email:""});
+  const [form,setForm]=useState({nombre:"",rut:"",telefono:"",email:"",fuente_contacto:""});
   const [respuestas,setRespuestas]=useState({});
   const [vars,setVars]=useState([]);
   const [loading,setLoading]=useState(false);
@@ -411,6 +411,7 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
 
   async function submit() {
     if(!form.nombre||!form.telefono){alert("Completa nombre y teléfono.");return;}
+    if(!form.fuente_contacto){alert("Indica cómo nos conociste.");return;}
     setLoading(true);
     try {
       const score=isLibre?0:calcScoreRespuestas(vars,respuestas);
@@ -432,6 +433,7 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
         campana_id: camp?.id||null,
         campana_nombre: camp?.nombre||null,
         tipo_postulacion: isLibre?"libre":"campaña",
+        fuente_contacto: form.fuente_contacto||null,
         respuestas: isLibre?respuestas:Object.fromEntries(
           vars.map(v=>([v.pregunta, respuestas[v.id]||""]))
         ),
@@ -442,7 +444,7 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
         nombre:form.nombre,telefono:form.telefono,email:form.email||null,
         canal,pais:op,score,clasificacion,etapa:"Nuevo",
         origen:isLibre?"Postulación libre":`Campaña: ${camp?.nombre||""}`,
-        campana_id:camp?.id||null,
+        campana_id:camp?.id||null,fuente_contacto:form.fuente_contacto||null,
       }).select().single();
       if(le) throw le;
       await sb.from("postulaciones").insert({
@@ -467,6 +469,7 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
             clasificacion,
             campana_nombre: camp?.nombre||"Postulación libre",
             origen: isLibre?"Postulación libre":`Campaña: ${camp?.nombre||""}`,
+            fuente_contacto: form.fuente_contacto||null,
           }),
         });
       } catch(fetchErr) {
@@ -495,6 +498,20 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
           <div className="two-col">
             <div className="field-row"><span className="field-label">Teléfono WhatsApp *</span><input value={form.telefono} onChange={e=>setForm({...form,telefono:e.target.value})} placeholder="+56 9..."/></div>
             <div className="field-row"><span className="field-label">Correo electrónico</span><input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="correo@..."/></div>
+          </div>
+          <div className="field-row">
+            <span className="field-label">¿Cómo nos conociste? *</span>
+            <select value={form.fuente_contacto} onChange={e=>setForm({...form,fuente_contacto:e.target.value})}
+              style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #e4e7ec",background:"#f8f9fa",fontSize:14,color:form.fuente_contacto?"#1a1a1a":"#888888",cursor:"pointer"}}>
+              <option value="">Selecciona una opción...</option>
+              <option value="Instagram">📸 Instagram</option>
+              <option value="Facebook">📘 Facebook</option>
+              <option value="WhatsApp">💬 WhatsApp</option>
+              <option value="Referido">🤝 Me lo recomendó alguien</option>
+              <option value="Google">🔍 Google / Búsqueda web</option>
+              <option value="Portal web">🌐 Entré directo al portal</option>
+              <option value="Otro">💬 Otro</option>
+            </select>
           </div>
         </div>
         {!isLibre && vars.length>0 && (
