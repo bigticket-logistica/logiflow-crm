@@ -85,7 +85,7 @@ const css = `
   .canal-badge{font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(255,255,255,0.15);color:#fff;}
   .btn-gw{background:transparent;color:#fff;border:0.5px solid rgba(255,255,255,0.3);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;}
   .btn-gw:hover{background:rgba(255,255,255,0.1);}
-  .pg{padding:20px;max-width:960px;margin:0 auto;}
+  .pg{padding:20px;max-width:960px;margin:0 auto;} .pg-form{padding:20px;max-width:960px;margin:0 auto;padding-top:16px;}
   .sec-title{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:4px;}
   .sec-sub{font-size:13px;color:#666;margin-bottom:20px;}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:28px;}
@@ -103,7 +103,7 @@ const css = `
   .btn-back{background:transparent;border:none;cursor:pointer;font-size:13px;color:#1a3a6b;font-weight:600;font-family:'DM Sans',sans-serif;padding:0;}
   .btn-danger{background:transparent;color:#c0392b;border:0.5px solid #f5a7a7;border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;}
   .btn-danger:hover{background:#fff5f5;}
-  .detail-header{background:#fff;border-bottom:0.5px solid #e4e7ec;padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:56px;z-index:9;}
+  .detail-header{background:#fff;border-bottom:0.5px solid #e4e7ec;padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:9;}
   .form-card{background:#fff;border:0.5px solid #e4e7ec;border-radius:14px;padding:20px;margin-bottom:16px;}
   .form-title{font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:14px;}
   .field-row{margin-bottom:14px;}
@@ -112,7 +112,7 @@ const css = `
   input:focus,select:focus,textarea:focus{border-color:#1a3a6b;}
   textarea{height:80px;resize:none;}
   .two-col{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;}
-  .canal-info{background:#eef2ff;border-radius:10px;padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;gap:10px;}
+  .canal-info{background:#eef2ff;border-radius:10px;padding:10px 14px;margin-bottom:16px;margin-top:0;display:flex;align-items:center;gap:10px;}
   .canal-icon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#fff;flex-shrink:0;}
   .radio-group{display:flex;flex-direction:column;gap:8px;}
   .radio-opt{display:flex;align-items:center;gap:8px;padding:9px 12px;border:0.5px solid #e4e7ec;border-radius:8px;cursor:pointer;transition:border-color 0.15s;}
@@ -695,14 +695,23 @@ function NuevaCampana({ campaigns, setCampaigns, onDone }) {
       if(error)throw error;
       const valid=scoreFields.filter(sf=>sf.variable&&sf.pregunta);
       if(valid.length>0){
-        await sb.from("campana_variables").insert(valid.map((sf,i)=>({
-          campana_id:camp.id,variable:sf.variable,pregunta:sf.pregunta,
-          tipo:sf.tipo,opciones:sf.opciones,
-          puntos:maxScoreField(sf),orden:i,
-        })));
+        const varsToInsert=valid.map((sf,i)=>({
+          campana_id:camp.id,
+          variable:sf.variable,
+          pregunta:sf.pregunta,
+          tipo:sf.tipo,
+          opciones:JSON.stringify(sf.opciones),
+          puntos:maxScoreField(sf),
+          orden:i,
+        }));
+        const {error:ve}=await sb.from("campana_variables").insert(varsToInsert);
+        if(ve){
+          await sb.from("campanas").delete().eq("id",camp.id);
+          throw new Error("Error guardando preguntas: "+ve.message);
+        }
       }
       setCampaigns([...campaigns,camp]);
-      alert(`Campaña "${f.nombre}" creada exitosamente.`);
+      alert(`Campaña "${f.nombre}" creada con ${valid.length} pregunta(s) de scoring.`);
       onDone();
     } catch(e){alert("Error: "+e.message);}
     finally{setSaving(false);}
