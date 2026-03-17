@@ -415,20 +415,50 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
     try {
       const score=isLibre?0:calcScoreRespuestas(vars,respuestas);
       const scoreMax=isLibre?0:(camp.score_max||0);
-      const {data:lead,error:le}=await sb.from("leads").insert({
-        nombre:form.nombre,telefono:form.telefono,email:form.email||null,
-        canal,pais:op,score,
-        clasificacion:calcClasificacion(score,scoreMax),
-        etapa:"Nuevo",
-        origen:isLibre?"Postulación libre":`Campaña: ${camp.nombre}`,
-        campana_id:camp?.id||null,
-      }).select().single();
-      if(le) throw le;
-      await sb.from("postulaciones").insert({
-        campana_id:camp?.id||null,lead_id:lead.id,
-        tipo:isLibre?"libre":"campaña",canal,pais:op,
-        score_calculado:score,respuestas,
+      const clasificacion=calcClasificacion(score,scoreMax);
+
+      // Enviar al webhook de N8N — N8N guarda en Supabase y envía WhatsApp
+      const payload = {
+        nombre: form.nombre,
+        telefono: form.telefono,
+        email: form.email||null,
+        rut: form.rut||null,
+        canal,
+        pais: op,
+        score,
+        clasificacion,
+        etapa: "Nuevo",
+        origen: isLibre?"Postulación libre":`Campaña: ${camp?.nombre||""}`,
+        campana_id: camp?.id||null,
+        campana_nombre: camp?.nombre||null,
+        tipo_postulacion: isLibre?"libre":"campaña",
+        respuestas: isLibre?respuestas:Object.fromEntries(
+          vars.map(v=>([v.pregunta, respuestas[v.id]||""]))
+        ),
+      };
+
+      const res = await fetch("https://bigticket2026.app.n8n.cloud/webhook/nuevo-lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
+
+      if(!res.ok) {
+        // Si N8N falla, guardar directo en Supabase como respaldo
+        const {data:lead,error:le}=await sb.from("leads").insert({
+          nombre:form.nombre,telefono:form.telefono,email:form.email||null,
+          canal,pais:op,score,clasificacion,etapa:"Nuevo",
+          origen:isLibre?"Postulación libre":`Campaña: ${camp?.nombre||""}`,
+          campana_id:camp?.id||null,
+        }).select().single();
+        if(le) throw le;
+        await sb.from("postulaciones").insert({
+          campana_id:camp?.id||null,lead_id:lead.id,
+          tipo:isLibre?"libre":"campaña",canal,pais:op,
+          score_calculado:score,respuestas,
+        });
+      }
+
       onSuccess();
     } catch(e){alert("Error al enviar: "+e.message);}
     finally{setLoading(false);}
