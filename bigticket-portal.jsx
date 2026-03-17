@@ -184,7 +184,6 @@ function PreguntaDinamica({ variable: v, value, onChange }) {
           <label key={o.valor} className={`radio-opt ${value===o.valor?"sel":""}`}>
             <input type="radio" value={o.valor} checked={value===o.valor} onChange={()=>onChange(o.valor)} style={{width:"auto"}}/>
             <span style={{fontSize:13,flex:1}}>{o.label}</span>
-            {o.valor==="si" && <span style={{fontSize:11,color:"#1a3a6b",fontWeight:600}}>{opts[0]?.puntos||0} pts</span>}
           </label>
         ))}
       </div>
@@ -403,7 +402,11 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
 
   async function loadVars() {
     const {data}=await sb.from("campana_variables").select("*").eq("campana_id",camp.id).order("orden");
-    setVars(data||[]);
+    const parsed=(data||[]).map(v=>({
+      ...v,
+      opciones: typeof v.opciones==="string" ? JSON.parse(v.opciones) : (v.opciones||[])
+    }));
+    setVars(parsed);
   }
 
   async function submit() {
