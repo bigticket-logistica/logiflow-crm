@@ -437,26 +437,40 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
         ),
       };
 
-      const res = await fetch("https://bigticket2026.app.n8n.cloud/webhook/nuevo-lead", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+      // 1. Guardar en Supabase (fuente de verdad)
+      const {data:lead,error:le}=await sb.from("leads").insert({
+        nombre:form.nombre,telefono:form.telefono,email:form.email||null,
+        canal,pais:op,score,clasificacion,etapa:"Nuevo",
+        origen:isLibre?"Postulación libre":`Campaña: ${camp?.nombre||""}`,
+        campana_id:camp?.id||null,
+      }).select().single();
+      if(le) throw le;
+      await sb.from("postulaciones").insert({
+        campana_id:camp?.id||null,lead_id:lead.id,
+        tipo:isLibre?"libre":"campaña",canal,pais:op,
+        score_calculado:score,respuestas,
       });
 
-      if(!res.ok) {
-        // Si N8N falla, guardar directo en Supabase como respaldo
-        const {data:lead,error:le}=await sb.from("leads").insert({
-          nombre:form.nombre,telefono:form.telefono,email:form.email||null,
-          canal,pais:op,score,clasificacion,etapa:"Nuevo",
-          origen:isLibre?"Postulación libre":`Campaña: ${camp?.nombre||""}`,
-          campana_id:camp?.id||null,
-        }).select().single();
-        if(le) throw le;
-        await sb.from("postulaciones").insert({
-          campana_id:camp?.id||null,lead_id:lead.id,
-          tipo:isLibre?"libre":"campaña",canal,pais:op,
-          score_calculado:score,respuestas,
+      // 2. Llamar a N8N para enviar WhatsApp de confirmación
+      try {
+        await fetch("https://bigticket2026.app.n8n.cloud/webhook/confirmacion-postulacion", {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nombre: form.nombre,
+            telefono: form.telefono,
+            email: form.email||null,
+            canal,
+            pais: op,
+            score,
+            clasificacion,
+            campana_nombre: camp?.nombre||"Postulación libre",
+            origen: isLibre?"Postulación libre":`Campaña: ${camp?.nombre||""}`,
+          }),
         });
+      } catch(fetchErr) {
+        console.log("N8N WhatsApp error:", fetchErr);
       }
 
       onSuccess();
