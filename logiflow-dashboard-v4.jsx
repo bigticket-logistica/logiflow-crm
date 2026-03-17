@@ -727,7 +727,12 @@ const Pipeline = ({ leads, onSelect, onEtapaChange }) => {
   const [dragOver,setDragOver]=useState(null);
   const handleDragStart=(e,lead)=>{setDragLead(lead);e.dataTransfer.effectAllowed="move";};
   const handleDrop=async(e,nuevaEtapa)=>{e.preventDefault();if(!dragLead||dragLead.etapa===nuevaEtapa)return;await onEtapaChange(dragLead,nuevaEtapa);setDragLead(null);};
-  const lpe=(etapa)=>leads.filter(l=>(l.etapa||"Nuevo Lead")===etapa);
+  const normalizarEtapa=(e)=>{
+    if(!e) return "Nuevo Lead";
+    const mapa={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Contactado","reunión agendada":"Reunión Agendada","reunion agendada":"Reunión Agendada","propuesta enviada":"Propuesta Enviada","negociación":"Negociación","negociacion":"Negociación","ganado":"Ganado","perdido":"Perdido"};
+    return mapa[e.toLowerCase().trim()]||e;
+  };
+  const lpe=(etapa)=>leads.filter(l=>normalizarEtapa(l.etapa)===etapa);
   return (
     <div style={{overflowX:"auto",paddingBottom:12}}>
       <div style={{display:"flex",gap:10,minWidth:"fit-content"}}>
