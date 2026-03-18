@@ -681,7 +681,7 @@ const LeadCard = ({ lead, onSelect, onDragStart }) => {
         </div>
         <ScoreDot score={lead.score}/>
       </div>
-      <div style={{marginBottom:6}}><CanalTag canal={lead.fuente_contacto||lead.canal}/></div>
+      <div style={{marginBottom:6}}><CanalTag canal={lead.canal}/></div>
       {lead.volumen&&<div style={{fontSize:10,color:"#555555"}}>📦 {lead.volumen}</div>}
       <div style={{fontSize:10,color:"#aaaaaa",marginTop:3}}>⏱ {formatFecha(lead.updated_at)}</div>
       {lead.clasificacion&&(
@@ -755,7 +755,7 @@ const KPIsView = ({ leads }) => {
   const tiempos=ganados.map(l=>diasEntre(l.created_at,l.updated_at)).filter(d=>d!==null);
   const tiempoPromedio=tiempos.length?Math.round(tiempos.reduce((a,b)=>a+b,0)/tiempos.length):null;
   const canales={};
-  leads.forEach(l=>{const c=(l.fuente_contacto||l.canal||"desconocido").toLowerCase();if(!canales[c])canales[c]={total:0,ganados:0};canales[c].total++;if(l.etapa==="Ganado")canales[c].ganados++;});
+  leads.forEach(l=>{const c=(l.canal||"desconocido").toLowerCase();if(!canales[c])canales[c]={total:0,ganados:0};canales[c].total++;if(l.etapa==="Ganado")canales[c].ganados++;});
   const canalStats=Object.entries(canales).map(([canal,d])=>({canal,total:d.total,ganados:d.ganados,eficacia:d.total>0?Math.round((d.ganados/d.total)*100):0})).sort((a,b)=>b.eficacia-a.eficacia);
   const canalEficaz=canalStats[0],canalMenos=canalStats[canalStats.length-1],canalVol=[...canalStats].sort((a,b)=>b.total-a.total)[0];
   const scoreEtapa=ETAPAS_TODAS.map(e=>{const ls=leads.filter(l=>(l.etapa||"Nuevo Lead")===e);return{etapa:e,score:ls.length?Math.round(ls.reduce((a,l)=>a+(l.score||0),0)/ls.length):0,count:ls.length};}).filter(e=>e.count>0);
@@ -836,7 +836,7 @@ const LeadPanel = ({ lead, onClose, onUpdate }) => {
             <div style={{fontSize:18,fontWeight:800,color:"#1a1a1a"}}>{lead.nombre||"Sin nombre"}</div>
             <div style={{fontSize:12,color:"#888888",marginTop:2}}>{lead.cargo?`${lead.cargo} · `:""}{lead.empresa||"Sin empresa"}</div>
             <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
-              <CanalTag canal={lead.fuente_contacto||lead.canal}/>
+              <CanalTag canal={lead.canal}/>
               {lead.clasificacion&&<Tag label={`${lead.emoji||""} ${lead.clasificacion}`} color={lead.clasificacion?.includes("Caliente")?"#EF4444":lead.clasificacion?.includes("Candidato")?"#F59E0B":"#F97316"}/>}
             </div>
           </div>
@@ -864,7 +864,7 @@ const LeadPanel = ({ lead, onClose, onUpdate }) => {
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
             <div style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:10,padding:14}}>
               <div style={{fontSize:10,fontWeight:800,color:"#555555",letterSpacing:1,marginBottom:10,textTransform:"uppercase"}}>Datos de contacto</div>
-              {[["📞","Teléfono",lead.telefono],["📧","Email",lead.email],["📍","Zona",lead.zona],["📦","Volumen",lead.volumen],["🔗","Canal",lead.fuente_contacto||lead.canal],["📅","Captado",formatFecha(lead.created_at)],["🔄","Actualizado",formatFecha(lead.updated_at)]].filter(([,,v])=>v).map(([icon,k,v])=>(
+              {[["📞","Teléfono",lead.telefono],["📧","Email",lead.email],["📍","Zona",lead.zona],["📦","Volumen",lead.volumen],["🔗","Canal",lead.canal],["📅","Captado",formatFecha(lead.created_at)],["🔄","Actualizado",formatFecha(lead.updated_at)]].filter(([,,v])=>v).map(([icon,k,v])=>(
                 <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #f4f5f7"}}>
                   <span style={{fontSize:12,color:"#555555"}}>{icon} {k}</span>
                   <span style={{fontSize:12,color:"#1a1a1a",fontWeight:600}}>{v}</span>
@@ -893,7 +893,7 @@ const LeadPanel = ({ lead, onClose, onUpdate }) => {
         )}
         {tab==="timeline"&&(
           <div>
-            {[{icon:"🎯",label:`Captado vía ${lead.fuente_contacto||lead.canal||"desconocido"}`,fecha:formatFecha(lead.created_at),color:"#3B82F6"},
+            {[{icon:"🎯",label:`Captado vía ${lead.canal||"desconocido"}`,fecha:formatFecha(lead.created_at),color:"#3B82F6"},
               lead.score>0&&{icon:"⭐",label:`Score: ${lead.score} pts → ${lead.clasificacion||""}`,fecha:formatFecha(lead.updated_at),color:getScoreColor(lead.score)},
               lead.etapa!=="Nuevo Lead"&&{icon:ETAPA_CFG[lead.etapa]?.icon||"📊",label:`Etapa: ${lead.etapa}`,fecha:formatFecha(lead.updated_at),color:ETAPA_CFG[lead.etapa]?.color||"#64748b"}
             ].filter(Boolean).map((ev,i)=>(
@@ -918,7 +918,7 @@ const DashboardMetrics = ({ leads }) => {
   const ganados=leads.filter(l=>l.etapa==="Ganado").length;
   const cerrados=ganados+leads.filter(l=>l.etapa==="Perdido").length;
   const tasaCierre=cerrados>0?Math.round((ganados/cerrados)*100):0;
-  const canalData=Object.entries(leads.reduce((a,l)=>{const c=(l.fuente_contacto||l.canal)?.toLowerCase()||"otro";a[c]=(a[c]||0)+1;return a},{})).sort((a,b)=>b[1]-a[1]);
+  const canalData=Object.entries(leads.reduce((a,l)=>{const c=l.canal?.toLowerCase()||"otro";a[c]=(a[c]||0)+1;return a},{})).sort((a,b)=>b[1]-a[1]);
   const etapaData=ETAPAS_TODAS.map(e=>({etapa:e,count:leads.filter(l=>(l.etapa||"Nuevo Lead")===e).length}));
   return (
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
@@ -1031,13 +1031,33 @@ export default function App() {
     if(selectedLead?.id===updated.id)setSelectedLead(updated);
   };
 
-  const filtered=leads.filter(l=>(l.nombre||"").toLowerCase().includes(busqueda.toLowerCase())||(l.empresa||"").toLowerCase().includes(busqueda.toLowerCase())||(l.email||"").toLowerCase().includes(busqueda.toLowerCase()));
+  const scoreOrden=(l)=>{
+    const c=(l.clasificacion||"").toLowerCase();
+    if(c.includes("caliente")) return 0;
+    if(c.includes("tibio"))    return 1;
+    return 2;
+  };
+
+  const leadsCampana=[...leads]
+    .filter(l=>l.tipo_postulacion==="campaña"||(l.campana_id&&!l.tipo_postulacion))
+    .filter(l=>(l.nombre||"").toLowerCase().includes(busqueda.toLowerCase())||(l.empresa||"").toLowerCase().includes(busqueda.toLowerCase())||(l.email||"").toLowerCase().includes(busqueda.toLowerCase()))
+    .sort((a,b)=>{
+      const fechaDiff=new Date(b.created_at)-new Date(a.created_at);
+      if(fechaDiff!==0) return fechaDiff;
+      return scoreOrden(a)-scoreOrden(b);
+    });
+
+  const leadsLibre=[...leads]
+    .filter(l=>l.tipo_postulacion==="libre"||(!l.campana_id&&!l.tipo_postulacion))
+    .filter(l=>(l.nombre||"").toLowerCase().includes(busqueda.toLowerCase())||(l.empresa||"").toLowerCase().includes(busqueda.toLowerCase())||(l.email||"").toLowerCase().includes(busqueda.toLowerCase()))
+    .sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
 
   const NAV=[
-    {id:"dashboard",icon:"◈",label:"Dashboard"},
-    {id:"leads",icon:"◉",label:"Leads"},
-    {id:"kpis",icon:"📊",label:"KPIs"},
-    {id:"plantillas",icon:"💬",label:"Plantillas"},
+    {id:"dashboard",    icon:"◈", label:"Dashboard"},
+    {id:"campana",      icon:"🎯",label:"Leads Campaña",    count:leadsCampana.length},
+    {id:"libre",        icon:"📋",label:"Leads Libre",       count:leadsLibre.length},
+    {id:"kpis",         icon:"📊",label:"KPIs"},
+    {id:"plantillas",   icon:"💬",label:"Plantillas"},
   ];
 
   return (
@@ -1067,7 +1087,7 @@ export default function App() {
                 fontWeight:seccion===item.id?700:500,marginBottom:3,transition:"all .2s",textAlign:"left",fontFamily:"'Outfit',sans-serif"}}>
               <span style={{fontSize:14,color:seccion===item.id?"#ffffff":"#aac3e8"}}>{item.icon}</span>
               {item.label}
-              {item.id==="leads"&&<span style={{marginLeft:"auto",background:"#3B82F622",color:"#3B82F6",fontSize:9,fontWeight:800,padding:"1px 6px",borderRadius:20}}>{leads.length}</span>}
+              {item.count!==undefined&&<span style={{marginLeft:"auto",background:"#3B82F622",color:"#3B82F6",fontSize:9,fontWeight:800,padding:"1px 6px",borderRadius:20}}>{item.count}</span>}
             </button>
           ))}
         </nav>
@@ -1090,7 +1110,7 @@ export default function App() {
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
         <div style={{height:56,background:"#1a3a6b",borderBottom:"1px solid #ffffff20",display:"flex",alignItems:"center",padding:"0 20px",gap:12,flexShrink:0}}>
           <div style={{flex:1,display:"flex",gap:10,alignItems:"center"}}>
-            {seccion==="leads"&&(
+            {(seccion==="campana"||seccion==="libre")&&(
               <>
                 <input value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="🔍 Buscar leads..."
                   style={{background:"#ffffff",color:"#1a1a1a",border:"1px solid #e4e7ec",borderRadius:7,padding:"6px 12px",fontSize:12,width:220}}/>
@@ -1102,9 +1122,10 @@ export default function App() {
               </>
             )}
             <div style={{fontSize:11,color:"#888888"}}>
-              {seccion==="dashboard"&&"📊 Resumen en tiempo real"}
-              {seccion==="leads"&&`${filtered.length} leads`}
-              {seccion==="kpis"&&"📊 Análisis de performance"}
+              {seccion==="dashboard" &&"📊 Resumen en tiempo real"}
+              {seccion==="campana"  &&`🎯 ${leadsCampana.length} leads de campaña · ordenados por fecha y puntaje`}
+              {seccion==="libre"    &&`📋 ${leadsLibre.length} leads postulación libre · ordenados por fecha`}
+              {seccion==="kpis"     &&"📊 Análisis de performance"}
               {seccion==="plantillas"&&"💬 Plantillas de mensajes"}
             </div>
           </div>
@@ -1120,9 +1141,10 @@ export default function App() {
             </div>
           ):(
             <>
-              {seccion==="dashboard"&&<DashboardMetrics leads={leads}/>}
-              {seccion==="leads"&&(vista==="pipeline"?<Pipeline leads={filtered} onSelect={setSelectedLead} onEtapaChange={handleEtapaChange}/>:<TablaLeads leads={filtered} onSelect={setSelectedLead}/>)}
-              {seccion==="kpis"&&<KPIsView leads={leads}/>}
+              {seccion==="dashboard" &&<DashboardMetrics leads={leads}/>}
+              {seccion==="campana"  &&(vista==="pipeline"?<Pipeline leads={leadsCampana} onSelect={setSelectedLead} onEtapaChange={handleEtapaChange}/>:<TablaLeads leads={leadsCampana} onSelect={setSelectedLead}/>)}
+              {seccion==="libre"    &&(vista==="pipeline"?<Pipeline leads={leadsLibre}   onSelect={setSelectedLead} onEtapaChange={handleEtapaChange}/>:<TablaLeads leads={leadsLibre}   onSelect={setSelectedLead}/>)}
+              {seccion==="kpis"     &&<KPIsView leads={leads}/>}
               {seccion==="plantillas"&&<PlantillasView/>}
             </>
           )}
