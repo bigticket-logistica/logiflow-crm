@@ -75,11 +75,15 @@ const getScoreColor = (s) => s>=80?"#10B981":s>=60?"#F59E0B":s>=40?"#F97316":"#E
 
 const formatFecha = (iso) => {
   if (!iso) return "—";
-  const d = new Date(iso), diff = (Date.now()-d)/1000;
-  if (diff<3600)   return `Hace ${Math.floor(diff/60)}m`;
-  if (diff<86400)  return `Hace ${Math.floor(diff/3600)}h`;
-  if (diff<604800) return `Hace ${Math.floor(diff/86400)}d`;
-  return d.toLocaleDateString("es-CL",{day:"2-digit",month:"short"});
+  const d = new Date(iso);
+  const now = new Date();
+  const esHoy = d.toDateString() === now.toDateString();
+  const ayer = new Date(now); ayer.setDate(now.getDate()-1);
+  const esAyer = d.toDateString() === ayer.toDateString();
+  const hora = d.toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"});
+  if (esHoy)  return `Hoy ${hora}`;
+  if (esAyer) return `Ayer ${hora}`;
+  return `${d.toLocaleDateString("es-CL",{day:"2-digit",month:"short"})} ${hora}`;
 };
 
 const diasEntre = (a,b) => (!a||!b)?null:Math.round(Math.abs(new Date(b)-new Date(a))/86400000);
