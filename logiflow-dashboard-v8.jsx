@@ -34,18 +34,19 @@ const sb = {
 };
 
 // ─── CONSTANTES ───────────────────────────────────────────────────────────────
-const ETAPAS_PIPELINE = ["Nuevo Lead","Contactado","Reunión Agendada","Propuesta Enviada","Negociación"];
-const ETAPAS_CIERRE   = ["Ganado","Perdido"];
+const ETAPAS_PIPELINE = ["Nuevo Lead","Propuesta Enviada","Propuesta Aceptada","Propuesta Rechazada"];
+const ETAPAS_CIERRE   = ["Contrato Firmado","Contrato No Firmado"];
 const ETAPAS_TODAS    = [...ETAPAS_PIPELINE, ...ETAPAS_CIERRE];
+const ETAPAS_BASE_DATOS = ["Base Datos Leads"]; // leads tibios y fríos
 
 const ETAPA_CFG = {
-  "Nuevo Lead":        { color:"#3B82F6", icon:"🎯" },
-  "Contactado":        { color:"#8B5CF6", icon:"📞" },
-  "Reunión Agendada":  { color:"#F59E0B", icon:"📅" },
-  "Propuesta Enviada": { color:"#F97316", icon:"📄" },
-  "Negociación":       { color:"#EC4899", icon:"🤝" },
-  "Ganado":            { color:"#10B981", icon:"✅" },
-  "Perdido":           { color:"#EF4444", icon:"❌" },
+  "Nuevo Lead":          { color:"#3B82F6", icon:"🎯" },
+  "Propuesta Enviada":   { color:"#F97316", icon:"📄" },
+  "Propuesta Aceptada":  { color:"#10B981", icon:"✅" },
+  "Propuesta Rechazada": { color:"#EF4444", icon:"❌" },
+  "Contrato Firmado":    { color:"#059669", icon:"📝" },
+  "Contrato No Firmado": { color:"#DC2626", icon:"🚫" },
+  "Base Datos Leads":    { color:"#8B5CF6", icon:"🗄️" },
 };
 
 const CANAL_CFG = {
@@ -727,7 +728,7 @@ const Pipeline = ({ leads, onSelect, onEtapaChange }) => {
   const handleDrop=async(e,nuevaEtapa)=>{e.preventDefault();if(!dragLead||dragLead.etapa===nuevaEtapa)return;await onEtapaChange(dragLead,nuevaEtapa);setDragLead(null);};
   const normalizarEtapa=(e)=>{
     if(!e) return "Nuevo Lead";
-    const mapa={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Contactado","reunión agendada":"Reunión Agendada","reunion agendada":"Reunión Agendada","propuesta enviada":"Propuesta Enviada","negociación":"Negociación","negociacion":"Negociación","ganado":"Ganado","perdido":"Perdido"};
+    const mapa={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Contrato Firmado","contrato no firmado":"Contrato No Firmado","ganado":"Contrato Firmado","perdido":"Contrato No Firmado","base datos leads":"Base Datos Leads"};
     return mapa[e.toLowerCase().trim()]||e;
   };
   const lpe=(etapa)=>leads.filter(l=>normalizarEtapa(l.etapa)===etapa);
@@ -749,7 +750,7 @@ const Pipeline = ({ leads, onSelect, onEtapaChange }) => {
 
 // ─── KPIs ─────────────────────────────────────────────────────────────────────
 const KPIsView = ({ leads }) => {
-  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Contactado","reunión agendada":"Reunión Agendada","reunion agendada":"Reunión Agendada","propuesta enviada":"Propuesta Enviada","negociación":"Negociación","negociacion":"Negociación","ganado":"Ganado","perdido":"Perdido"};return m[e.toLowerCase().trim()]||e;};
+  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Contrato Firmado","contrato no firmado":"Contrato No Firmado","ganado":"Contrato Firmado","perdido":"Contrato No Firmado","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
   const ganados=leads.filter(l=>norm(l.etapa)==="Ganado"),perdidos=leads.filter(l=>norm(l.etapa)==="Perdido");
   const cerrados=ganados.length+perdidos.length;
   const tasaCierre=cerrados>0?Math.round((ganados.length/cerrados)*100):0;
@@ -967,7 +968,7 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 const DashboardMetrics = ({ leads }) => {
-  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Contactado","reunión agendada":"Reunión Agendada","reunion agendada":"Reunión Agendada","propuesta enviada":"Propuesta Enviada","negociación":"Negociación","negociacion":"Negociación","ganado":"Ganado","perdido":"Perdido"};return m[e.toLowerCase().trim()]||e;};
+  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Contrato Firmado","contrato no firmado":"Contrato No Firmado","ganado":"Contrato Firmado","perdido":"Contrato No Firmado","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
   const hoy=new Date();hoy.setHours(0,0,0,0);
   const nuevosHoy=leads.filter(l=>l.created_at&&new Date(l.created_at)>=hoy).length;
   const scorePromedio=leads.length?Math.round(leads.reduce((a,l)=>a+(l.score||0),0)/leads.length):0;
@@ -1054,12 +1055,12 @@ const TablaLeads = ({ leads, onSelect }) => (
 );
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
-const ETAPAS_MONITOR=["Nuevo Lead","Contactado","Reunión Agendada","Propuesta Enviada","Negociación"];
+const ETAPAS_MONITOR=["Nuevo Lead","Propuesta Enviada","Propuesta Aceptada"];
 const HORAS_OLVIDADO=24;
 const HORAS_ESTANCADO=48;
 
 const calcAlertas=(leads)=>{
-  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Contactado","reunión agendada":"Reunión Agendada","reunion agendada":"Reunión Agendada","propuesta enviada":"Propuesta Enviada","negociación":"Negociación","negociacion":"Negociación","ganado":"Ganado","perdido":"Perdido"};return m[e.toLowerCase().trim()]||e;};
+  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Contrato Firmado","contrato no firmado":"Contrato No Firmado","ganado":"Contrato Firmado","perdido":"Contrato No Firmado","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
   const ahora=Date.now();
   const olvidados=[];
   const estancados=[];
@@ -1171,7 +1172,7 @@ export default function App() {
   const alertasMostradas=useRef(false);
 
   const fetchLeads=async()=>{
-    const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Contactado","reunión agendada":"Reunión Agendada","reunion agendada":"Reunión Agendada","propuesta enviada":"Propuesta Enviada","negociación":"Negociación","negociacion":"Negociación","ganado":"Ganado","perdido":"Perdido"};return m[e.toLowerCase().trim()]||e;};
+    const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Contrato Firmado","contrato no firmado":"Contrato No Firmado","ganado":"Contrato Firmado","perdido":"Contrato No Firmado","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
     try{const data=await sb.from("leads").select("*",{order:"created_at.desc"});
       if(Array.isArray(data)){
         const normalized=data.map(l=>({...l,etapa:norm(l.etapa)}));
@@ -1189,7 +1190,7 @@ export default function App() {
 
   useEffect(()=>{fetchLeads();refreshInterval.current=setInterval(fetchLeads,30000);return()=>clearInterval(refreshInterval.current);},[]);
 
-  const NORM=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Contactado","reunión agendada":"Reunión Agendada","reunion agendada":"Reunión Agendada","propuesta enviada":"Propuesta Enviada","negociación":"Negociación","negociacion":"Negociación","ganado":"Ganado","perdido":"Perdido"};return m[e.toLowerCase().trim()]||e;};
+  const NORM=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Contrato Firmado","contrato no firmado":"Contrato No Firmado","ganado":"Contrato Firmado","perdido":"Contrato No Firmado","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
 
   const [confirmModal,setConfirmModal]=useState(null); // {lead, nuevaEtapa}
 
@@ -1216,6 +1217,12 @@ export default function App() {
     if(selectedLead?.id===updated.id)setSelectedLead(updated);
   };
 
+  const esCaliente=(l)=>(l.clasificacion||"").toLowerCase().includes("caliente");
+  const esBaseDatos=(l)=>{
+    const e=NORM(l.etapa);
+    return e==="Base Datos Leads"||(!esCaliente(l)&&e==="Nuevo Lead"&&l.tipo_postulacion==="libre");
+  };
+
   const scoreOrden=(l)=>{
     const c=(l.clasificacion||"").toLowerCase();
     if(c.includes("caliente")) return 0;
@@ -1223,26 +1230,33 @@ export default function App() {
     return 2;
   };
 
+  const busquedaFilter=(l)=>(l.nombre||"").toLowerCase().includes(busqueda.toLowerCase())||(l.empresa||"").toLowerCase().includes(busqueda.toLowerCase())||(l.email||"").toLowerCase().includes(busqueda.toLowerCase());
+
   const leadsCampana=[...leads]
     .filter(l=>l.tipo_postulacion==="campaña"||(l.campana_id&&!l.tipo_postulacion))
-    .filter(l=>(l.nombre||"").toLowerCase().includes(busqueda.toLowerCase())||(l.empresa||"").toLowerCase().includes(busqueda.toLowerCase())||(l.email||"").toLowerCase().includes(busqueda.toLowerCase()))
-    .sort((a,b)=>{
-      const fechaDiff=new Date(b.created_at)-new Date(a.created_at);
-      if(fechaDiff!==0) return fechaDiff;
-      return scoreOrden(a)-scoreOrden(b);
-    });
+    .filter(l=>NORM(l.etapa)!=="Base Datos Leads")
+    .filter(busquedaFilter)
+    .sort((a,b)=>{const d=new Date(b.created_at)-new Date(a.created_at);return d!==0?d:scoreOrden(a)-scoreOrden(b);});
 
   const leadsLibre=[...leads]
     .filter(l=>l.tipo_postulacion==="libre"||(!l.campana_id&&!l.tipo_postulacion))
-    .filter(l=>(l.nombre||"").toLowerCase().includes(busqueda.toLowerCase())||(l.empresa||"").toLowerCase().includes(busqueda.toLowerCase())||(l.email||"").toLowerCase().includes(busqueda.toLowerCase()))
+    .filter(l=>NORM(l.etapa)!=="Base Datos Leads")
+    .filter(busquedaFilter)
+    .sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+
+  const leadsBaseDatos=[...leads]
+    .filter(l=>NORM(l.etapa)==="Base Datos Leads"||
+      (!esCaliente(l)&&["Contactado","Reunión Agendada","Negociación"].includes(l.etapa)))
+    .filter(busquedaFilter)
     .sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
 
   const NAV=[
-    {id:"dashboard",    icon:"◈", label:"Dashboard"},
-    {id:"campana",      icon:"🎯",label:"Leads Campaña",    count:leadsCampana.length},
-    {id:"libre",        icon:"📋",label:"Leads Libre",       count:leadsLibre.length},
-    {id:"kpis",         icon:"📊",label:"KPIs"},
-    {id:"plantillas",   icon:"💬",label:"Plantillas"},
+    {id:"dashboard",   icon:"◈", label:"Dashboard"},
+    {id:"campana",     icon:"🎯",label:"Leads Campaña",      count:leadsCampana.length},
+    {id:"libre",       icon:"📋",label:"Leads Libre",         count:leadsLibre.length},
+    {id:"basedatos",   icon:"🗄️",label:"Base Datos Leads",   count:leadsBaseDatos.length},
+    {id:"kpis",        icon:"📊",label:"KPIs"},
+    {id:"plantillas",  icon:"💬",label:"Plantillas"},
   ];
 
   return (
@@ -1306,12 +1320,17 @@ export default function App() {
                 </div>
               </>
             )}
+            {seccion==="basedatos"&&(
+              <input value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="🔍 Buscar leads..."
+                style={{background:"#ffffff",color:"#1a1a1a",border:"1px solid #e4e7ec",borderRadius:7,padding:"6px 12px",fontSize:12,width:220}}/>
+            )}
             <div style={{fontSize:11,color:"#888888"}}>
-              {seccion==="dashboard" &&"📊 Resumen en tiempo real"}
-              {seccion==="campana"  &&`🎯 ${leadsCampana.length} leads de campaña · ordenados por fecha y puntaje`}
-              {seccion==="libre"    &&`📋 ${leadsLibre.length} leads postulación libre · ordenados por fecha`}
-              {seccion==="kpis"     &&"📊 Análisis de performance"}
-              {seccion==="plantillas"&&"💬 Plantillas de mensajes"}
+              {seccion==="dashboard"  &&"📊 Resumen en tiempo real"}
+              {seccion==="campana"    &&`🎯 ${leadsCampana.length} leads de campaña · ordenados por fecha y puntaje`}
+              {seccion==="libre"      &&`📋 ${leadsLibre.length} leads postulación libre · ordenados por fecha`}
+              {seccion==="basedatos"  &&`🗄️ ${leadsBaseDatos.length} leads · tibios y fríos`}
+              {seccion==="kpis"       &&"📊 Análisis de performance"}
+              {seccion==="plantillas" &&"💬 Plantillas de mensajes"}
             </div>
           </div>
           <div style={{background:"#dcfce7",border:"1px solid #86efac",borderRadius:7,padding:"5px 10px",fontSize:10,color:"#166534",fontWeight:700}}>⚡ N8N Activo</div>
@@ -1332,11 +1351,12 @@ export default function App() {
             </div>
           ):(
             <div style={{flex:1,display:"flex",flexDirection:"column",minHeight:0}}>
-              {seccion==="dashboard" &&<DashboardMetrics leads={leads}/>}
-              {seccion==="campana"  &&(vista==="pipeline"?<Pipeline leads={leadsCampana} onSelect={setSelectedLead} onEtapaChange={handleEtapaChange}/>:<TablaLeads leads={leadsCampana} onSelect={setSelectedLead}/>)}
-              {seccion==="libre"    &&(vista==="pipeline"?<Pipeline leads={leadsLibre}   onSelect={setSelectedLead} onEtapaChange={handleEtapaChange}/>:<TablaLeads leads={leadsLibre}   onSelect={setSelectedLead}/>)}
-              {seccion==="kpis"     &&<KPIsView leads={leads}/>}
-              {seccion==="plantillas"&&<PlantillasView/>}
+              {seccion==="dashboard"  &&<DashboardMetrics leads={leads}/>}
+              {seccion==="campana"    &&(vista==="pipeline"?<Pipeline leads={leadsCampana} onSelect={setSelectedLead} onEtapaChange={handleEtapaChange}/>:<TablaLeads leads={leadsCampana} onSelect={setSelectedLead}/>)}
+              {seccion==="libre"      &&(vista==="pipeline"?<Pipeline leads={leadsLibre}   onSelect={setSelectedLead} onEtapaChange={handleEtapaChange}/>:<TablaLeads leads={leadsLibre}   onSelect={setSelectedLead}/>)}
+              {seccion==="basedatos"  &&<TablaLeads leads={leadsBaseDatos} onSelect={setSelectedLead}/>}
+              {seccion==="kpis"       &&<KPIsView leads={leads}/>}
+              {seccion==="plantillas" &&<PlantillasView/>}
             </div>
           )}
         </div>
