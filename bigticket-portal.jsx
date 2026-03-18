@@ -718,6 +718,7 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
   const [tab,setTab]=useState("camps");
   const [postulaciones,setPostulaciones]=useState([]);
   const [loadingPost,setLoadingPost]=useState(false);
+  const [uploadingId,setUploadingId]=useState(null);
 
   useEffect(()=>{if(tab==="postulaciones")loadPost();},[tab]);
 
@@ -735,6 +736,22 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
     if(!confirm("¿Eliminar esta campaña?"))return;
     await sb.from("campanas").delete().eq("id",id);
     setCampaigns(campaigns.filter(c=>c.id!==id));
+  }
+  async function subirPropuesta(camp, file) {
+    if(!file) return;
+    if(file.type!=="application/pdf"){alert("Solo se permiten archivos PDF.");return;}
+    setUploadingId(camp.id);
+    try {
+      const path=`campana_${camp.id}.pdf`;
+      const {error:upErr}=await sb.storage.from("propuestas").upload(path, file, {upsert:true, contentType:"application/pdf"});
+      if(upErr) throw upErr;
+      const {data:urlData}=sb.storage.from("propuestas").getPublicUrl(path);
+      const url=urlData.publicUrl;
+      await sb.from("campanas").update({propuesta_url:url}).eq("id",camp.id);
+      setCampaigns(campaigns.map(c=>c.id===camp.id?{...c,propuesta_url:url}:c));
+      alert("✅ Propuesta cargada correctamente.");
+    } catch(e){alert("Error subiendo PDF: "+e.message);}
+    finally{setUploadingId(null);}
   }
 
   return (
@@ -759,16 +776,37 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
               campaigns.map(c=>{
                 const active=isCampActive(c);
                 return (
-                  <div key={c.id} className="camp-row">
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:14,fontWeight:600,color:"#1a1a1a"}}>{c.nombre}
-                        <span style={{fontSize:11,padding:"2px 8px",borderRadius:20,marginLeft:8,background:active?"#dcfce7":"#fee2e2",color:active?"#166534":"#c0392b"}}>{active?"Activa":"Inactiva"}</span>
+                  <div key={c.id} className="camp-row" style={{flexDirection:"column",alignItems:"flex-start",gap:12}}>
+                    <div style={{display:"flex",width:"100%",alignItems:"center",gap:10}}>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:14,fontWeight:600,color:"#1a1a1a"}}>{c.nombre}
+                          <span style={{fontSize:11,padding:"2px 8px",borderRadius:20,marginLeft:8,background:active?"#dcfce7":"#fee2e2",color:active?"#166534":"#c0392b"}}>{active?"Activa":"Inactiva"}</span>
+                        </div>
+                        <div style={{fontSize:12,color:"#888",marginTop:2}}>{c.pais} · {c.vehiculo} · Score máx: {c.score_max} pts{c.fecha_inicio?` · ${c.fecha_inicio} → ${c.fecha_fin}`:""}</div>
                       </div>
-                      <div style={{fontSize:12,color:"#888",marginTop:2}}>{c.pais} · {c.vehiculo} · Score máx: {c.score_max} pts{c.fecha_inicio?` · ${c.fecha_inicio} → ${c.fecha_fin}`:""}</div>
+                      <div style={{display:"flex",alignItems:"center",gap:10}}>
+                        <Toggle on={c.toggle_activo} onChange={()=>toggleCamp(c)}/>
+                        <button className="btn-danger" onClick={()=>deleteCamp(c.id)}>Eliminar</button>
+                      </div>
                     </div>
-                    <div style={{display:"flex",alignItems:"center",gap:10}}>
-                      <Toggle on={c.toggle_activo} onChange={()=>toggleCamp(c)}/>
-                      <button className="btn-danger" onClick={()=>deleteCamp(c.id)}>Eliminar</button>
+                    {/* Propuesta PDF */}
+                    <div style={{width:"100%",background:"#f8f9fa",borderRadius:10,padding:"12px 14px",border:"1px solid #e4e7ec"}}>
+                      <div style={{fontSize:12,fontWeight:700,color:"#1a1a1a",marginBottom:8}}>📄 Propuesta económica</div>
+                      {c.propuesta_url?(
+                        <div style={{display:"flex",alignItems:"center",gap:10}}>
+                          <span style={{fontSize:12,color:"#10B981"}}>✅ PDF cargado</span>
+                          <a href={c.propuesta_url} target="_blank" style={{fontSize:12,color:"#1a3a6b",fontWeight:600}}>Ver PDF</a>
+                          <label style={{fontSize:12,color:"#F47B20",fontWeight:600,cursor:"pointer"}}>
+                            Reemplazar
+                            <input type="file" accept=".pdf" style={{display:"none"}} onChange={e=>subirPropuesta(c,e.target.files[0])}/>
+                          </label>
+                        </div>
+                      ):(
+                        <label style={{display:"inline-flex",alignItems:"center",gap:8,background:"#F47B20",color:"#fff",borderRadius:8,padding:"8px 16px",fontSize:12,fontWeight:700,cursor:"pointer",opacity:uploadingId===c.id?0.6:1}}>
+                          {uploadingId===c.id?"Subiendo...":"⬆ Subir propuesta PDF"}
+                          <input type="file" accept=".pdf" style={{display:"none"}} disabled={uploadingId===c.id} onChange={e=>subirPropuesta(c,e.target.files[0])}/>
+                        </label>
+                      )}
                     </div>
                   </div>
                 );
@@ -972,7 +1010,109 @@ function CanalesView({ postulaciones, onLoad }) {
   );
 }
 
+function ViewPropuesta() {
+  const [lead,setLead]=useState(null);
+  const [campana,setCampana]=useState(null);
+  const [loading,setLoading]=useState(true);
+  const [enviando,setEnviando]=useState(false);
+  const [respuesta,setRespuesta]=useState(null);
+  const [enviado,setEnviado]=useState(false);
+
+  useEffect(()=>{
+    const params=new URLSearchParams(window.location.search);
+    const leadId=params.get("lead");
+    if(!leadId){setLoading(false);return;}
+    const fetch=async()=>{
+      const {data:l}=await sb.from("leads").select("*").eq("id",leadId).single();
+      if(!l){setLoading(false);return;}
+      setLead(l);
+      if(l.respuesta_propuesta) setRespuesta(l.respuesta_propuesta);
+      if(l.campana_id){
+        const {data:c}=await sb.from("campanas").select("*").eq("id",l.campana_id).single();
+        setCampana(c);
+      }
+      setLoading(false);
+    };
+    fetch();
+  },[]);
+
+  const responder=async(decision)=>{
+    if(!lead) return;
+    setEnviando(true);
+    const nuevaEtapa=decision==="si"?"Propuesta Aceptada":"Propuesta Rechazada";
+    await sb.from("leads").update({etapa:nuevaEtapa,respuesta_propuesta:decision}).eq("id",lead.id);
+    await sb.from("lead_historial").insert({lead_id:lead.id,etapa_anterior:lead.etapa,etapa_nueva:nuevaEtapa});
+    setRespuesta(decision);
+    setEnviado(true);
+    setEnviando(false);
+  };
+
+  if(loading) return <div style={{padding:40,textAlign:"center",color:"#888"}}>Cargando propuesta...</div>;
+  if(!lead) return <div style={{padding:40,textAlign:"center",color:"#888"}}>Propuesta no encontrada.</div>;
+
+  return(
+    <div>
+      <div className="topbar">
+        <span className="logo"><span>big</span>ticket</span>
+        <span style={{fontSize:13,color:"#888"}}>Propuesta económica</span>
+      </div>
+      <div style={{maxWidth:700,margin:"0 auto",padding:"20px 16px"}}>
+        <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",padding:"16px 20px",marginBottom:16}}>
+          <div style={{fontSize:13,color:"#888",marginBottom:2}}>Hola, <strong style={{color:"#1a1a1a"}}>{lead.nombre}</strong></div>
+          <div style={{fontSize:13,color:"#555"}}>A continuación encontrarás la propuesta económica para la campaña <strong>{campana?.nombre||"BigTicket"}</strong>. Por favor revísala y responde al final.</div>
+        </div>
+
+        {campana?.propuesta_url?(
+          <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",overflow:"hidden",marginBottom:16}}>
+            <iframe src={campana.propuesta_url} style={{width:"100%",height:600,border:"none"}} title="Propuesta económica"/>
+          </div>
+        ):(
+          <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",padding:40,textAlign:"center",marginBottom:16,color:"#888"}}>
+            La propuesta aún no ha sido cargada. Contacta al equipo BigTicket.
+          </div>
+        )}
+
+        {enviado?(
+          <div style={{background:respuesta==="si"?"#dcfce7":"#fee2e2",border:`1px solid ${respuesta==="si"?"#86efac":"#fca5a5"}`,borderRadius:16,padding:"20px 24px",textAlign:"center"}}>
+            <div style={{fontSize:20,marginBottom:8}}>{respuesta==="si"?"✅":"❌"}</div>
+            <div style={{fontSize:15,fontWeight:700,color:respuesta==="si"?"#166534":"#c0392b"}}>
+              {respuesta==="si"?"¡Propuesta aceptada!":"Propuesta rechazada"}
+            </div>
+            <div style={{fontSize:13,color:"#555",marginTop:6}}>
+              {respuesta==="si"?"Nuestro equipo se pondrá en contacto contigo para coordinar los siguientes pasos.":"Gracias por tu tiempo. Puedes postular a otras campañas disponibles."}
+            </div>
+          </div>
+        ):respuesta?(
+          <div style={{background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:16,padding:"20px 24px",textAlign:"center"}}>
+            <div style={{fontSize:13,color:"#0369a1",fontWeight:600}}>Ya respondiste esta propuesta anteriormente: {respuesta==="si"?"Aceptada ✅":"Rechazada ❌"}</div>
+          </div>
+        ):(
+          <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",padding:"20px 24px"}}>
+            <div style={{fontSize:14,fontWeight:700,color:"#1a1a1a",marginBottom:6}}>¿Aceptas esta propuesta económica?</div>
+            <div style={{fontSize:12,color:"#888",marginBottom:16}}>Tu respuesta actualizará automáticamente el estado de tu postulación.</div>
+            <div style={{display:"flex",gap:12}}>
+              <button onClick={()=>responder("si")} disabled={enviando}
+                style={{flex:1,background:"#10B981",color:"#fff",border:"none",borderRadius:10,padding:"14px",fontSize:14,fontWeight:700,cursor:"pointer",opacity:enviando?0.6:1}}>
+                ✅ Sí, acepto la propuesta
+              </button>
+              <button onClick={()=>responder("no")} disabled={enviando}
+                style={{flex:1,background:"#EF4444",color:"#fff",border:"none",borderRadius:10,padding:"14px",fontSize:14,fontWeight:700,cursor:"pointer",opacity:enviando?0.6:1}}>
+                ❌ No acepto
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
+  // Detectar si es una URL de propuesta
+  const params=new URLSearchParams(window.location.search);
+  if(params.get("lead")&&params.get("propuesta")==="1"){
+    return <><style>{css}</style><ViewPropuesta/></>;
+  }
   const [view,setView]=useState("country");
   const [op,setOp]=useState(null);
   const [canal]=useState(getCanal);
