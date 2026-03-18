@@ -826,13 +826,75 @@ const KPIsView = ({ leads }) => {
   );
 };
 
+// ─── TIMELINE VIEW ────────────────────────────────────────────────────────────
+const TimelineView = ({ lead, onEtapaChange }) => {
+  const [historial,setHistorial]=useState([]);
+  const [loading,setLoading]=useState(true);
+
+  useEffect(()=>{
+    const fetch=async()=>{
+      const data=await sb.from("lead_historial").select("*",{filter:`lead_id=eq.${lead.id}`,order:"created_at.asc"});
+      if(Array.isArray(data)) setHistorial(data);
+      setLoading(false);
+    };
+    fetch();
+  },[lead.id]);
+
+  const eventos=[
+    {icon:"🎯",label:`Captado vía ${lead.fuente_contacto||lead.canal||"desconocido"}`,fecha:lead.created_at,color:"#3B82F6"},
+    lead.score>0&&{icon:"⭐",label:`Score calculado: ${lead.score} pts → ${lead.clasificacion||""}`,fecha:lead.created_at,color:getScoreColor(lead.score)},
+    ...historial.map(h=>({
+      icon:ETAPA_CFG[h.etapa_nueva]?.icon||"📊",
+      label:`Cambio de etapa: ${h.etapa_anterior} → ${h.etapa_nueva}`,
+      fecha:h.created_at,
+      color:ETAPA_CFG[h.etapa_nueva]?.color||"#64748b"
+    }))
+  ].filter(Boolean).sort((a,b)=>new Date(a.fecha)-new Date(b.fecha));
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:0}}>
+      <div style={{fontSize:10,fontWeight:800,color:"#555555",letterSpacing:1,marginBottom:12,textTransform:"uppercase"}}>Historia del lead</div>
+      {loading?<div style={{color:"#aaaaaa",fontSize:12}}>Cargando historial...</div>:(
+        <div style={{position:"relative"}}>
+          <div style={{position:"absolute",left:15,top:0,bottom:0,width:2,background:"#e4e7ec"}}/>
+          {eventos.map((ev,i)=>(
+            <div key={i} style={{display:"flex",gap:14,paddingBottom:16,position:"relative"}}>
+              <div style={{width:32,height:32,borderRadius:"50%",background:ev.color+"22",border:`2px solid ${ev.color}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0,zIndex:1,background:"#ffffff"}}>
+                {ev.icon}
+              </div>
+              <div style={{flex:1,paddingTop:4}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#1a1a1a",lineHeight:1.4}}>{ev.label}</div>
+                <div style={{fontSize:10,color:"#888888",marginTop:3}}>{formatFecha(ev.fecha)}</div>
+              </div>
+            </div>
+          ))}
+          {eventos.length===0&&<div style={{color:"#aaaaaa",fontSize:12,paddingLeft:46}}>Sin movimientos aún</div>}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── PANEL DETALLE ────────────────────────────────────────────────────────────
 const LeadPanel = ({ lead, onClose, onUpdate }) => {
   const [tab,setTab]=useState("info");
   const [etapa,setEtapa]=useState(lead.etapa||"Nuevo Lead");
   const [saving,setSaving]=useState(false);
   const [saved,setSaved]=useState(false);
-  const handleEtapaChange=async(newEtapa)=>{setEtapa(newEtapa);setSaving(true);try{await sb.from("leads").update({etapa:newEtapa},`id=eq.${lead.id}`);onUpdate&&onUpdate({...lead,etapa:newEtapa});setSaved(true);setTimeout(()=>setSaved(false),2000);}finally{setSaving(false);}};
+  const handleEtapaChange=async(newEtapa)=>{
+    const etapaActual=etapa;
+    if(etapaActual===newEtapa) return;
+    const ok=window.confirm(`¿Confirmar cambio de etapa?\n\n${etapaActual}  →  ${newEtapa}\n\nLead: ${lead.nombre||"Sin nombre"}`);
+    if(!ok) return;
+    setSaving(true);
+    try{
+      await sb.from("leads").update({etapa:newEtapa},`id=eq.${lead.id}`);
+      await sb.from("lead_historial").insert({lead_id:lead.id,etapa_anterior:etapaActual,etapa_nueva:newEtapa});
+      setEtapa(newEtapa);
+      onUpdate&&onUpdate({...lead,etapa:newEtapa});
+      setSaved(true);setTimeout(()=>setSaved(false),2000);
+    }finally{setSaving(false);}
+  };
   const etapaCfg=ETAPA_CFG[etapa]||{color:"#888888"};
   const scoreColor=getScoreColor(lead.score||0);
   return (
@@ -899,18 +961,20 @@ const LeadPanel = ({ lead, onClose, onUpdate }) => {
           </div>
         )}
         {tab==="timeline"&&(
-          <div>
-            {[{icon:"🎯",label:`Captado vía ${lead.canal||"desconocido"}`,fecha:formatFecha(lead.created_at),color:"#3B82F6"},
-              lead.score>0&&{icon:"⭐",label:`Score: ${lead.score} pts → ${lead.clasificacion||""}`,fecha:formatFecha(lead.updated_at),color:getScoreColor(lead.score)},
-              lead.etapa!=="Nuevo Lead"&&{icon:ETAPA_CFG[lead.etapa]?.icon||"📊",label:`Etapa: ${lead.etapa}`,fecha:formatFecha(lead.updated_at),color:ETAPA_CFG[lead.etapa]?.color||"#64748b"}
-            ].filter(Boolean).map((ev,i)=>(
-              <div key={i} style={{display:"flex",gap:12,padding:"12px 0",borderBottom:"1px solid #f4f5f7"}}>
-                <div style={{fontSize:18}}>{ev.icon}</div>
-                <div style={{flex:1}}><div style={{fontSize:12,color:"#1a1a1a",fontWeight:600}}>{ev.label}</div><div style={{fontSize:10,color:"#555555",marginTop:2}}>{ev.fecha}</div></div>
-                <div style={{width:8,height:8,borderRadius:"50%",background:ev.color,marginTop:6,flexShrink:0}}/>
-              </div>
-            ))}
-          </div>
+          <TimelineView lead={lead} onEtapaChange={async(newEtapa)=>{
+            const etapaActual=lead.etapa||"Nuevo Lead";
+            if(etapaActual===newEtapa) return;
+            const ok=window.confirm(`¿Confirmar cambio de etapa?\n\n${etapaActual}  →  ${newEtapa}\n\nLead: ${lead.nombre||"Sin nombre"}`);
+            if(!ok) return;
+            setSaving(true);
+            try{
+              await sb.from("leads").update({etapa:newEtapa},`id=eq.${lead.id}`);
+              await sb.from("lead_historial").insert({lead_id:lead.id,etapa_anterior:etapaActual,etapa_nueva:newEtapa});
+              setEtapa(newEtapa);
+              onUpdate&&onUpdate({...lead,etapa:newEtapa});
+              setSaved(true);setTimeout(()=>setSaved(false),2000);
+            }finally{setSaving(false);}
+          }}/>
         )}
       </div>
     </div>
@@ -1123,11 +1187,13 @@ export default function App() {
   const alertasMostradas=useRef(false);
 
   const fetchLeads=async()=>{
+    const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Contactado","reunión agendada":"Reunión Agendada","reunion agendada":"Reunión Agendada","propuesta enviada":"Propuesta Enviada","negociación":"Negociación","negociacion":"Negociación","ganado":"Ganado","perdido":"Perdido"};return m[e.toLowerCase().trim()]||e;};
     try{const data=await sb.from("leads").select("*",{order:"created_at.desc"});
       if(Array.isArray(data)){
-        setLeads(data);setLastUpdate(new Date());setError(null);
+        const normalized=data.map(l=>({...l,etapa:norm(l.etapa)}));
+        setLeads(normalized);setLastUpdate(new Date());setError(null);
         if(!alertasMostradas.current){
-          const {olvidados,estancados}=calcAlertas(data);
+          const {olvidados,estancados}=calcAlertas(normalized);
           if(olvidados.length+estancados.length>0){setShowAlertas(true);}
           alertasMostradas.current=true;
         }
@@ -1139,8 +1205,16 @@ export default function App() {
 
   useEffect(()=>{fetchLeads();refreshInterval.current=setInterval(fetchLeads,30000);return()=>clearInterval(refreshInterval.current);},[]);
 
+  const NORM=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Contactado","reunión agendada":"Reunión Agendada","reunion agendada":"Reunión Agendada","propuesta enviada":"Propuesta Enviada","negociación":"Negociación","negociacion":"Negociación","ganado":"Ganado","perdido":"Perdido"};return m[e.toLowerCase().trim()]||e;};
+
   const handleEtapaChange=async(lead,nuevaEtapa)=>{
-    try{await sb.from("leads").update({etapa:nuevaEtapa},`id=eq.${lead.id}`);
+    const etapaActual=NORM(lead.etapa);
+    if(etapaActual===nuevaEtapa) return;
+    const confirm=window.confirm(`¿Confirmar cambio de etapa?\n\n${etapaActual}  →  ${nuevaEtapa}\n\nLead: ${lead.nombre||"Sin nombre"}`);
+    if(!confirm) return;
+    try{
+      await sb.from("leads").update({etapa:nuevaEtapa},`id=eq.${lead.id}`);
+      await sb.from("lead_historial").insert({lead_id:lead.id,etapa_anterior:etapaActual,etapa_nueva:nuevaEtapa});
       setLeads(prev=>prev.map(l=>l.id===lead.id?{...l,etapa:nuevaEtapa}:l));
       if(selectedLead?.id===lead.id)setSelectedLead(p=>({...p,etapa:nuevaEtapa}));
     }catch(e){console.error(e);}
