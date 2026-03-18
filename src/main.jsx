@@ -1,6 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import App from '../logiflow-dashboard-v4'
+import App from '../logiflow-dashboard-v8'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
