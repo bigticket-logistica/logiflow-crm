@@ -392,7 +392,7 @@ function ViewDetail({ camp, canal, onBack, onPostular }) {
 }
 
 function ViewForm({ camp, canal, op, onBack, onSuccess }) {
-  const [form,setForm]=useState({nombre:"",rut:"",telefono:"",email:"",fuente_contacto:""});
+  const [form,setForm]=useState({nombre:"",empresa:"",rut:"",telefono:"",email:"",fuente_contacto:""});
   const [respuestas,setRespuestas]=useState({});
   const [vars,setVars]=useState([]);
   const [loading,setLoading]=useState(false);
@@ -421,6 +421,7 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
       // Enviar al webhook de N8N — N8N guarda en Supabase y envía WhatsApp
       const payload = {
         nombre: form.nombre,
+        empresa: form.empresa||null,
         telefono: form.telefono,
         email: form.email||null,
         rut: form.rut||null,
@@ -441,10 +442,11 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
 
       // 1. Guardar en Supabase (fuente de verdad)
       const {data:lead,error:le}=await sb.from("leads").insert({
-        nombre:form.nombre,telefono:form.telefono,email:form.email||null,
+        nombre:form.nombre,empresa:form.empresa||null,telefono:form.telefono,email:form.email||null,
         canal,pais:op,score,clasificacion,etapa:"Nuevo",
         origen:isLibre?"Postulación libre":`Campaña: ${camp?.nombre||""}`,
         campana_id:camp?.id||null,fuente_contacto:form.fuente_contacto||null,
+        tipo_postulacion:isLibre?"libre":"campaña",
       }).select().single();
       if(le) throw le;
       await sb.from("postulaciones").insert({
@@ -493,6 +495,9 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
           <div className="form-title">Datos personales</div>
           <div className="two-col">
             <div className="field-row"><span className="field-label">Nombre completo *</span><input value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})} placeholder="Tu nombre"/></div>
+            <div className="field-row"><span className="field-label">Empresa / Razón social</span><input value={form.empresa} onChange={e=>setForm({...form,empresa:e.target.value})} placeholder="Nombre de tu empresa (opcional)"/></div>
+          </div>
+          <div className="two-col">
             <div className="field-row"><span className="field-label">RUT / CURP</span><input value={form.rut} onChange={e=>setForm({...form,rut:e.target.value})} placeholder="Identificación"/></div>
           </div>
           <div className="two-col">
