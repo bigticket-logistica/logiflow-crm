@@ -290,14 +290,14 @@ function ScoreFieldBuilder({ field, onUpdate, onRemove, usedVariables }) {
   );
 }
 
-function ViewCountry({ onSelect }) {
+function ViewCountry({ onSelect, busquedaCodigo, setBusquedaCodigo, buscarPostulacion, buscando, errorBusqueda }) {
   return (
     <div>
       <div className="topbar"><span className="logo"><span>big</span>ticket</span></div>
       <div className="pg" style={{maxWidth:440,paddingTop:48}}>
         <div className="sec-title" style={{textAlign:"center",marginBottom:6}}>Selecciona tu operación</div>
         <div className="sec-sub" style={{textAlign:"center"}}>¿En qué país trabajarás?</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:32}}>
           {Object.entries(PAISES).map(([key,p])=>(
             <div key={key} className="country-card" onClick={()=>onSelect(key)}>
               <img src={p.bandera} alt={p.label} style={{width:64,height:44,objectFit:"cover",borderRadius:4,margin:"0 auto 12px",display:"block"}} onError={e=>{e.target.style.display="none";e.target.nextSibling.style.display="block";}}/>
@@ -305,6 +305,24 @@ function ViewCountry({ onSelect }) {
               <div style={{fontSize:15,fontWeight:600,color:"#1a1a1a"}}>{p.label}</div>
             </div>
           ))}
+        </div>
+        <div style={{background:"#f8f9fa",border:"1px solid #e4e7ec",borderRadius:14,padding:"20px 20px"}}>
+          <div style={{fontSize:14,fontWeight:700,color:"#1a1a1a",marginBottom:4}}>🔍 Consultar estado de postulación</div>
+          <div style={{fontSize:12,color:"#888",marginBottom:14}}>Ingresa tu código para ver el estado e historial de tu postulación</div>
+          <div style={{display:"flex",gap:8}}>
+            <input
+              value={busquedaCodigo}
+              onChange={e=>setBusquedaCodigo(e.target.value.toUpperCase())}
+              onKeyDown={e=>e.key==="Enter"&&buscarPostulacion()}
+              placeholder="Ej: BT-K7M2X3"
+              style={{flex:1,padding:"10px 14px",borderRadius:8,border:"1px solid #e4e7ec",fontSize:14,fontFamily:"monospace",fontWeight:700,letterSpacing:1,background:"#fff"}}
+            />
+            <button onClick={buscarPostulacion} disabled={buscando}
+              style={{background:"#F47B20",color:"#fff",border:"none",borderRadius:8,padding:"10px 18px",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
+              {buscando?"...":"Consultar"}
+            </button>
+          </div>
+          {errorBusqueda&&<div style={{fontSize:12,color:"#EF4444",marginTop:8}}>{errorBusqueda}</div>}
         </div>
       </div>
     </div>
@@ -418,7 +436,11 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
       const scoreMax=isLibre?0:(camp.score_max||0);
       const clasificacion=calcClasificacion(score,scoreMax);
 
-      // Enviar al webhook de N8N — N8N guarda en Supabase y envía WhatsApp
+      // Generar código único de postulación
+      const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      const codigo="BT-"+Array.from({length:6},()=>chars[Math.floor(Math.random()*chars.length)]).join("");
+
+      // Enviar al webhook de N8N
       const payload = {
         nombre: form.nombre,
         empresa: form.empresa||null,
@@ -435,18 +457,20 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
         campana_nombre: camp?.nombre||null,
         tipo_postulacion: isLibre?"libre":"campaña",
         fuente_contacto: form.fuente_contacto||null,
+        codigo_postulacion: codigo,
         respuestas: isLibre?respuestas:Object.fromEntries(
           vars.map(v=>([v.pregunta, respuestas[v.id]||""]))
         ),
       };
 
-      // 1. Guardar en Supabase (fuente de verdad)
+      // 1. Guardar en Supabase
       const {data:lead,error:le}=await sb.from("leads").insert({
         nombre:form.nombre,empresa:form.empresa||null,telefono:form.telefono,email:form.email||null,
         canal,pais:op,score,clasificacion,etapa:"Nuevo",
         origen:isLibre?"Postulación libre":`Campaña: ${camp?.nombre||""}`,
         campana_id:camp?.id||null,fuente_contacto:form.fuente_contacto||null,
         tipo_postulacion:isLibre?"libre":"campaña",
+        codigo_postulacion:codigo,
       }).select().single();
       if(le) throw le;
       await sb.from("postulaciones").insert({
@@ -455,30 +479,23 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
         score_calculado:score,respuestas,
       });
 
-      // 2. Llamar a N8N para enviar WhatsApp de confirmación
+      // 2. Llamar a N8N para enviar WhatsApp
       try {
         await fetch("https://bigticket2026.app.n8n.cloud/webhook/confirmacion-postulacion", {
-          method: "POST",
-          mode: "no-cors",
+          method: "POST", mode: "no-cors",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            nombre: form.nombre,
-            telefono: form.telefono,
-            email: form.email||null,
-            canal,
-            pais: op,
-            score,
-            clasificacion,
+            nombre: form.nombre, telefono: form.telefono,
+            email: form.email||null, canal, pais: op, score, clasificacion,
             campana_nombre: camp?.nombre||"Postulación libre",
             origen: isLibre?"Postulación libre":`Campaña: ${camp?.nombre||""}`,
             fuente_contacto: form.fuente_contacto||null,
+            codigo_postulacion: codigo,
           }),
         });
-      } catch(fetchErr) {
-        console.log("N8N WhatsApp error:", fetchErr);
-      }
+      } catch(fetchErr) { console.log("N8N WhatsApp error:", fetchErr); }
 
-      onSuccess();
+      onSuccess(codigo);
     } catch(e){alert("Error al enviar: "+e.message);}
     finally{setLoading(false);}
   }
@@ -584,17 +601,78 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
   );
 }
 
-function ViewSuccess({ onVolver }) {
+function ViewSuccess({ codigo, onVolver }) {
+  const [copiado,setCopiado]=useState(false);
+  const copiar=()=>{navigator.clipboard?.writeText(codigo||"");setCopiado(true);setTimeout(()=>setCopiado(false),2000);};
   return (
     <div>
       <div className="topbar"><span className="logo"><span>big</span>ticket</span></div>
       <div className="success-wrap">
         <div className="success-card">
           <div style={{width:56,height:56,background:"#dcfce7",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px",fontSize:24,color:"#166534"}}>✓</div>
-          <div style={{fontSize:17,fontWeight:700,color:"#166534",marginBottom:8}}>Postulación enviada</div>
-          <div style={{fontSize:13,color:"#555",marginBottom:24}}>Tus datos fueron recibidos y registrados. Te contactaremos por WhatsApp a la brevedad.</div>
+          <div style={{fontSize:17,fontWeight:700,color:"#166534",marginBottom:8}}>¡Postulación enviada!</div>
+          <div style={{fontSize:13,color:"#555",marginBottom:20}}>Tus datos fueron recibidos. Te contactaremos por WhatsApp a la brevedad.</div>
+          {codigo&&(
+            <div style={{background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:12,padding:"16px 20px",marginBottom:20}}>
+              <div style={{fontSize:11,color:"#0369a1",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>Tu código de postulación</div>
+              <div style={{fontSize:28,fontWeight:900,color:"#0369a1",letterSpacing:3,fontFamily:"monospace",marginBottom:10}}>{codigo}</div>
+              <div style={{fontSize:12,color:"#555",marginBottom:12}}>Guarda este código — con él puedes consultar el estado de tu postulación en cualquier momento.</div>
+              <button onClick={copiar} style={{background:copiado?"#dcfce7":"#e0f2fe",color:copiado?"#166534":"#0369a1",border:"none",borderRadius:8,padding:"8px 16px",fontSize:12,fontWeight:700,cursor:"pointer",width:"100%"}}>
+                {copiado?"✓ Código copiado":"Copiar código"}
+              </button>
+            </div>
+          )}
           <button className="btn-orange" style={{maxWidth:200,margin:"0 auto"}} onClick={onVolver}>Volver al inicio</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ViewPostulacion({ data, onVolver }) {
+  const {lead,historial}=data;
+  const ETAPA_COLOR={"Nuevo Lead":"#3B82F6","Nuevo":"#3B82F6","Contactado":"#8B5CF6","Reunión Agendada":"#F59E0B","Propuesta Enviada":"#F97316","Negociación":"#EC4899","Ganado":"#10B981","Perdido":"#EF4444"};
+  const ETAPA_ICON={"Nuevo Lead":"🎯","Nuevo":"🎯","Contactado":"📞","Reunión Agendada":"📅","Propuesta Enviada":"📄","Negociación":"🤝","Ganado":"✅","Perdido":"❌"};
+  const etapaColor=ETAPA_COLOR[lead.etapa]||"#888";
+  return(
+    <div>
+      <div className="topbar"><span className="logo"><span>big</span>ticket</span></div>
+      <div style={{maxWidth:480,margin:"0 auto",padding:"20px 16px"}}>
+        <button onClick={onVolver} style={{background:"none",border:"none",color:"#888",fontSize:13,cursor:"pointer",marginBottom:16}}>← Volver</button>
+        <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",padding:"20px 24px",marginBottom:16}}>
+          <div style={{fontSize:11,color:"#888",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Código</div>
+          <div style={{fontSize:22,fontWeight:900,color:"#1a1a1a",letterSpacing:2,fontFamily:"monospace",marginBottom:16}}>{lead.codigo_postulacion}</div>
+          <div style={{fontSize:16,fontWeight:700,color:"#1a1a1a",marginBottom:4}}>{lead.nombre}</div>
+          {lead.empresa&&<div style={{fontSize:13,color:"#555",marginBottom:12}}>{lead.empresa}</div>}
+          <div style={{display:"inline-flex",alignItems:"center",gap:8,background:etapaColor+"18",border:`1px solid ${etapaColor}44`,borderRadius:20,padding:"6px 14px"}}>
+            <span style={{fontSize:16}}>{ETAPA_ICON[lead.etapa]||"📋"}</span>
+            <span style={{fontSize:13,fontWeight:700,color:etapaColor}}>{lead.etapa||"En revisión"}</span>
+          </div>
+        </div>
+        <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",padding:"20px 24px",marginBottom:16}}>
+          <div style={{fontSize:11,color:"#888",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:16}}>Datos de tu postulación</div>
+          {[["📅","Postulado el",new Date(lead.created_at).toLocaleDateString("es-CL",{day:"2-digit",month:"long",year:"numeric"})],["📋","Campaña",lead.origen],["📍","País",lead.pais],["📞","Teléfono",lead.telefono],["📧","Correo",lead.email]].filter(([,,v])=>v).map(([icon,k,v])=>(
+            <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #f4f5f7"}}>
+              <span style={{fontSize:13,color:"#888"}}>{icon} {k}</span>
+              <span style={{fontSize:13,color:"#1a1a1a",fontWeight:600,textAlign:"right",maxWidth:"55%"}}>{v}</span>
+            </div>
+          ))}
+        </div>
+        {historial.length>0&&(
+          <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",padding:"20px 24px"}}>
+            <div style={{fontSize:11,color:"#888",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:16}}>Historial de tu postulación</div>
+            <div style={{position:"relative",paddingLeft:28}}>
+              <div style={{position:"absolute",left:10,top:0,bottom:0,width:2,background:"#e4e7ec"}}/>
+              {historial.map((h,i)=>(
+                <div key={i} style={{marginBottom:16,position:"relative"}}>
+                  <div style={{position:"absolute",left:-24,top:2,width:10,height:10,borderRadius:"50%",background:ETAPA_COLOR[h.etapa_nueva]||"#888",border:"2px solid #fff"}}/>
+                  <div style={{fontSize:13,fontWeight:700,color:ETAPA_COLOR[h.etapa_nueva]||"#1a1a1a"}}>{ETAPA_ICON[h.etapa_nueva]||"📋"} {h.etapa_nueva}</div>
+                  <div style={{fontSize:11,color:"#888",marginTop:2}}>{new Date(h.created_at).toLocaleDateString("es-CL",{day:"2-digit",month:"short",year:"numeric"})} · {new Date(h.created_at).toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -904,6 +982,11 @@ export default function App() {
   const [formCamp,setFormCamp]=useState(null);
   const [showAdmin,setShowAdmin]=useState(false);
   const [adminAuth,setAdminAuth]=useState(!!sessionStorage.getItem("admin_auth"));
+  const [successCodigo,setSuccessCodigo]=useState(null);
+  const [busquedaCodigo,setBusquedaCodigo]=useState("");
+  const [resultadoBusqueda,setResultadoBusqueda]=useState(null);
+  const [buscando,setBuscando]=useState(false);
+  const [errorBusqueda,setErrorBusqueda]=useState("");
 
   useEffect(()=>{loadCampaigns();},[]);
 
@@ -913,16 +996,30 @@ export default function App() {
     setCampaigns(data||[]);setLoading(false);
   }
 
+  async function buscarPostulacion() {
+    const codigo=busquedaCodigo.trim().toUpperCase();
+    if(!codigo){setErrorBusqueda("Ingresa tu código de postulación.");return;}
+    setBuscando(true);setErrorBusqueda("");setResultadoBusqueda(null);
+    const {data,error}=await sb.from("leads").select("*").eq("codigo_postulacion",codigo).single();
+    if(error||!data){setErrorBusqueda("No encontramos una postulación con ese código.");setBuscando(false);return;}
+    // cargar historial
+    const {data:hist}=await sb.from("lead_historial").select("*").eq("lead_id",data.id).order("created_at",{ascending:true});
+    setResultadoBusqueda({lead:data,historial:hist||[]});
+    setBuscando(false);
+  }
+
   if(showAdmin&&!adminAuth) return <><style>{css}</style><AdminLogin onSuccess={()=>setAdminAuth(true)} onClose={()=>setShowAdmin(false)}/></>;
   if(showAdmin&&adminAuth) return <><style>{css}</style><AdminPanel onClose={()=>setShowAdmin(false)} campaigns={campaigns} setCampaigns={setCampaigns}/></>;
 
+  if(resultadoBusqueda) return <><style>{css}</style><ViewPostulacion data={resultadoBusqueda} onVolver={()=>setResultadoBusqueda(null)}/></>;
+
   return (
     <><style>{css}</ style>
-      {view==="country"&&<ViewCountry onSelect={c=>{setOp(c);setView("portal");}}/>}
+      {view==="country"&&<ViewCountry onSelect={c=>{setOp(c);setView("portal");}} busquedaCodigo={busquedaCodigo} setBusquedaCodigo={setBusquedaCodigo} buscarPostulacion={buscarPostulacion} buscando={buscando} errorBusqueda={errorBusqueda}/>}
       {view==="portal"&&op&&<ViewPortal op={op} canal={canal} campaigns={campaigns} loading={loading} onChangePais={()=>setView("country")} onDetail={c=>{setSelectedCamp(c);setView("detail");}} onLibre={()=>{setFormCamp(null);setView("form");}}/>}
       {view==="detail"&&selectedCamp&&<ViewDetail camp={selectedCamp} canal={canal} onBack={()=>setView("portal")} onPostular={()=>{setFormCamp(selectedCamp);setView("form");}}/>}
-      {view==="form"&&<ViewForm camp={formCamp} canal={canal} op={op} onBack={()=>setView(formCamp?"detail":"portal")} onSuccess={()=>setView("success")}/>}
-      {view==="success"&&<ViewSuccess onVolver={()=>{setView("portal");loadCampaigns();}}/>}
+      {view==="form"&&<ViewForm camp={formCamp} canal={canal} op={op} onBack={()=>setView(formCamp?"detail":"portal")} onSuccess={(codigo)=>{setSuccessCodigo(codigo);setView("success");}}/>}
+      {view==="success"&&<ViewSuccess codigo={successCodigo} onVolver={()=>{setView("portal");loadCampaigns();}}/>}
       {view==="portal"&&(
         <div style={{position:"fixed",bottom:20,right:20,zIndex:99,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:8}}>
           {adminAuth&&<button style={{background:"transparent",border:"none",cursor:"pointer",fontSize:11,color:"#888"}} onClick={()=>{sessionStorage.removeItem("admin_auth");setAdminAuth(false);}}>Cerrar sesión</button>}
