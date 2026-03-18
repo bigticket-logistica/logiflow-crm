@@ -755,16 +755,17 @@ const Pipeline = ({ leads, onSelect, onEtapaChange }) => {
 
 // ─── KPIs ─────────────────────────────────────────────────────────────────────
 const KPIsView = ({ leads }) => {
-  const ganados=leads.filter(l=>l.etapa==="Ganado"),perdidos=leads.filter(l=>l.etapa==="Perdido");
+  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Contactado","reunión agendada":"Reunión Agendada","reunion agendada":"Reunión Agendada","propuesta enviada":"Propuesta Enviada","negociación":"Negociación","negociacion":"Negociación","ganado":"Ganado","perdido":"Perdido"};return m[e.toLowerCase().trim()]||e;};
+  const ganados=leads.filter(l=>norm(l.etapa)==="Ganado"),perdidos=leads.filter(l=>norm(l.etapa)==="Perdido");
   const cerrados=ganados.length+perdidos.length;
   const tasaCierre=cerrados>0?Math.round((ganados.length/cerrados)*100):0;
   const tiempos=ganados.map(l=>diasEntre(l.created_at,l.updated_at)).filter(d=>d!==null);
   const tiempoPromedio=tiempos.length?Math.round(tiempos.reduce((a,b)=>a+b,0)/tiempos.length):null;
   const canales={};
-  leads.forEach(l=>{const c=(l.canal||"desconocido").toLowerCase();if(!canales[c])canales[c]={total:0,ganados:0};canales[c].total++;if(l.etapa==="Ganado")canales[c].ganados++;});
+  leads.forEach(l=>{const c=(l.fuente_contacto||l.canal||"desconocido").toLowerCase();if(!canales[c])canales[c]={total:0,ganados:0};canales[c].total++;if(norm(l.etapa)==="Ganado")canales[c].ganados++;});
   const canalStats=Object.entries(canales).map(([canal,d])=>({canal,total:d.total,ganados:d.ganados,eficacia:d.total>0?Math.round((d.ganados/d.total)*100):0})).sort((a,b)=>b.eficacia-a.eficacia);
   const canalEficaz=canalStats[0],canalMenos=canalStats[canalStats.length-1],canalVol=[...canalStats].sort((a,b)=>b.total-a.total)[0];
-  const scoreEtapa=ETAPAS_TODAS.map(e=>{const ls=leads.filter(l=>(l.etapa||"Nuevo Lead")===e);return{etapa:e,score:ls.length?Math.round(ls.reduce((a,l)=>a+(l.score||0),0)/ls.length):0,count:ls.length};}).filter(e=>e.count>0);
+  const scoreEtapa=ETAPAS_TODAS.map(e=>{const ls=leads.filter(l=>norm(l.etapa)===e);return{etapa:e,score:ls.length?Math.round(ls.reduce((a,l)=>a+(l.score||0),0)/ls.length):0,count:ls.length};}).filter(e=>e.count>0);
   return (
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
@@ -918,14 +919,15 @@ const LeadPanel = ({ lead, onClose, onUpdate }) => {
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 const DashboardMetrics = ({ leads }) => {
+  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Contactado","reunión agendada":"Reunión Agendada","reunion agendada":"Reunión Agendada","propuesta enviada":"Propuesta Enviada","negociación":"Negociación","negociacion":"Negociación","ganado":"Ganado","perdido":"Perdido"};return m[e.toLowerCase().trim()]||e;};
   const hoy=new Date();hoy.setHours(0,0,0,0);
   const nuevosHoy=leads.filter(l=>l.created_at&&new Date(l.created_at)>=hoy).length;
   const scorePromedio=leads.length?Math.round(leads.reduce((a,l)=>a+(l.score||0),0)/leads.length):0;
-  const ganados=leads.filter(l=>l.etapa==="Ganado").length;
-  const cerrados=ganados+leads.filter(l=>l.etapa==="Perdido").length;
+  const ganados=leads.filter(l=>norm(l.etapa)==="Ganado").length;
+  const cerrados=ganados+leads.filter(l=>norm(l.etapa)==="Perdido").length;
   const tasaCierre=cerrados>0?Math.round((ganados/cerrados)*100):0;
-  const canalData=Object.entries(leads.reduce((a,l)=>{const c=l.canal?.toLowerCase()||"otro";a[c]=(a[c]||0)+1;return a},{})).sort((a,b)=>b[1]-a[1]);
-  const etapaData=ETAPAS_TODAS.map(e=>({etapa:e,count:leads.filter(l=>(l.etapa||"Nuevo Lead")===e).length}));
+  const canalData=Object.entries(leads.reduce((a,l)=>{const c=(l.fuente_contacto||l.canal)?.toLowerCase()||"otro";a[c]=(a[c]||0)+1;return a},{})).sort((a,b)=>b[1]-a[1]);
+  const etapaData=ETAPAS_TODAS.map(e=>({etapa:e,count:leads.filter(l=>norm(l.etapa)===e).length}));
   return (
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
@@ -1009,11 +1011,12 @@ const HORAS_OLVIDADO=24;
 const HORAS_ESTANCADO=48;
 
 const calcAlertas=(leads)=>{
+  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Contactado","reunión agendada":"Reunión Agendada","reunion agendada":"Reunión Agendada","propuesta enviada":"Propuesta Enviada","negociación":"Negociación","negociacion":"Negociación","ganado":"Ganado","perdido":"Perdido"};return m[e.toLowerCase().trim()]||e;};
   const ahora=Date.now();
   const olvidados=[];
   const estancados=[];
   leads.forEach(l=>{
-    if(!ETAPAS_MONITOR.includes(l.etapa||"Nuevo Lead")) return;
+    if(!ETAPAS_MONITOR.includes(norm(l.etapa))) return;
     const hsSinTocar=(ahora-new Date(l.updated_at||l.created_at))/3600000;
     const hsEnEtapa =(ahora-new Date(l.created_at))/3600000;
     if(hsSinTocar>=HORAS_OLVIDADO)  olvidados.push({...l,horas:Math.floor(hsSinTocar)});
