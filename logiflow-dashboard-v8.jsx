@@ -920,7 +920,19 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
             <div style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:10,padding:14}}>
               <div style={{fontSize:10,fontWeight:800,color:"#555555",letterSpacing:1,marginBottom:10,textTransform:"uppercase"}}>Datos de contacto</div>
-              {[["📞","Teléfono",lead.telefono],["📧","Email",lead.email],["📍","Zona",lead.zona],["📦","Volumen",lead.volumen],["🔗","Canal",lead.canal],["📅","Captado",formatFecha(lead.created_at)],["🔄","Actualizado",formatFecha(lead.updated_at)]].filter(([,,v])=>v).map(([icon,k,v])=>(
+              {lead.codigo_postulacion&&(
+                <div style={{background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:8,padding:"10px 14px",marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div>
+                    <div style={{fontSize:9,color:"#0369a1",fontWeight:800,letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>Código postulación</div>
+                    <div style={{fontSize:16,fontWeight:900,color:"#0369a1",letterSpacing:2,fontFamily:"monospace"}}>{lead.codigo_postulacion}</div>
+                  </div>
+                  <button onClick={()=>navigator.clipboard?.writeText(lead.codigo_postulacion)}
+                    style={{background:"#e0f2fe",color:"#0369a1",border:"none",borderRadius:6,padding:"5px 10px",fontSize:11,cursor:"pointer",fontWeight:700}}>
+                    Copiar
+                  </button>
+                </div>
+              )}
+              {[["📞","Teléfono",lead.telefono],["📧","Email",lead.email],["📍","Zona",lead.zona],["📦","Volumen",lead.volumen],["🔗","Canal",lead.fuente_contacto||lead.canal],["📅","Captado",formatFecha(lead.created_at)],["🔄","Actualizado",formatFecha(lead.updated_at)]].filter(([,,v])=>v).map(([icon,k,v])=>(
                 <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #f4f5f7"}}>
                   <span style={{fontSize:12,color:"#555555"}}>{icon} {k}</span>
                   <span style={{fontSize:12,color:"#1a1a1a",fontWeight:600}}>{v}</span>
