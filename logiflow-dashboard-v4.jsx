@@ -1004,20 +1004,131 @@ const TablaLeads = ({ leads, onSelect }) => (
 );
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
+const ETAPAS_MONITOR=["Nuevo Lead","Contactado","Reunión Agendada","Propuesta Enviada","Negociación"];
+const HORAS_OLVIDADO=24;
+const HORAS_ESTANCADO=48;
+
+const calcAlertas=(leads)=>{
+  const ahora=Date.now();
+  const olvidados=[];
+  const estancados=[];
+  leads.forEach(l=>{
+    if(!ETAPAS_MONITOR.includes(l.etapa||"Nuevo Lead")) return;
+    const hsSinTocar=(ahora-new Date(l.updated_at||l.created_at))/3600000;
+    const hsEnEtapa =(ahora-new Date(l.created_at))/3600000;
+    if(hsSinTocar>=HORAS_OLVIDADO)  olvidados.push({...l,horas:Math.floor(hsSinTocar)});
+    else if(hsEnEtapa>=HORAS_ESTANCADO) estancados.push({...l,horas:Math.floor(hsEnEtapa)});
+  });
+  return{olvidados,estancados};
+};
+
+const AlertasPopup=({leads,onClose,onVerLead})=>{
+  const {olvidados,estancados}=calcAlertas(leads);
+  const total=olvidados.length+estancados.length;
+  if(total===0) return null;
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300}}>
+      <div style={{background:"#ffffff",borderRadius:16,width:560,maxHeight:"80vh",display:"flex",flexDirection:"column",boxShadow:"0 20px 60px rgba(0,0,0,.3)"}}>
+        {/* Header */}
+        <div style={{padding:"20px 24px",borderBottom:"1px solid #f0f2f5",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+          <div>
+            <div style={{fontSize:18,fontWeight:900,color:"#1a1a1a",fontFamily:"'Outfit',sans-serif"}}>
+              🔔 Alertas del CRM
+            </div>
+            <div style={{fontSize:12,color:"#888888",marginTop:2}}>
+              {total} lead{total!==1?"s":""} requiere{total===1?"":"n"} atención
+            </div>
+          </div>
+          <button onClick={onClose} style={{background:"#f0f2f5",border:"none",borderRadius:8,width:34,height:34,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",color:"#666666"}}>×</button>
+        </div>
+        {/* Contenido */}
+        <div style={{overflow:"auto",padding:"16px 24px",display:"flex",flexDirection:"column",gap:16}}>
+          {olvidados.length>0&&(
+            <div>
+              <div style={{fontSize:10,fontWeight:800,color:"#EF4444",letterSpacing:1.5,textTransform:"uppercase",marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
+                <div style={{width:8,height:8,borderRadius:"50%",background:"#EF4444"}}/>
+                Leads olvidados — sin tocar hace más de {HORAS_OLVIDADO}h ({olvidados.length})
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {olvidados.map(l=>(
+                  <div key={l.id} onClick={()=>{onVerLead(l);onClose();}}
+                    style={{background:"#fff5f5",border:"1px solid #fca5a5",borderRadius:10,padding:"10px 14px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",transition:"all .15s"}}
+                    onMouseOver={e=>e.currentTarget.style.background="#fee2e2"}
+                    onMouseOut={e=>e.currentTarget.style.background="#fff5f5"}>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a"}}>{l.nombre||"Sin nombre"}</div>
+                      <div style={{fontSize:11,color:"#888888",marginTop:2}}>{l.empresa||"Sin empresa"} · {ETAPA_CFG[l.etapa||"Nuevo Lead"]?.icon} {l.etapa||"Nuevo Lead"}</div>
+                    </div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <div style={{fontSize:13,fontWeight:800,color:"#EF4444"}}>{l.horas}h</div>
+                      <div style={{fontSize:10,color:"#888888"}}>sin gestión</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {estancados.length>0&&(
+            <div>
+              <div style={{fontSize:10,fontWeight:800,color:"#F59E0B",letterSpacing:1.5,textTransform:"uppercase",marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
+                <div style={{width:8,height:8,borderRadius:"50%",background:"#F59E0B"}}/>
+                Leads estancados — más de {HORAS_ESTANCADO}h en la misma etapa ({estancados.length})
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {estancados.map(l=>(
+                  <div key={l.id} onClick={()=>{onVerLead(l);onClose();}}
+                    style={{background:"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:"10px 14px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",transition:"all .15s"}}
+                    onMouseOver={e=>e.currentTarget.style.background="#fef3c7"}
+                    onMouseOut={e=>e.currentTarget.style.background="#fffbeb"}>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a"}}>{l.nombre||"Sin nombre"}</div>
+                      <div style={{fontSize:11,color:"#888888",marginTop:2}}>{l.empresa||"Sin empresa"} · {ETAPA_CFG[l.etapa||"Nuevo Lead"]?.icon} {l.etapa||"Nuevo Lead"}</div>
+                    </div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <div style={{fontSize:13,fontWeight:800,color:"#F59E0B"}}>{l.horas}h</div>
+                      <div style={{fontSize:10,color:"#888888"}}>en esta etapa</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        {/* Footer */}
+        <div style={{padding:"14px 24px",borderTop:"1px solid #f0f2f5",flexShrink:0,display:"flex",justifyContent:"flex-end"}}>
+          <button onClick={onClose}
+            style={{background:"#1a3a6b",color:"white",border:"none",borderRadius:8,padding:"9px 20px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>
+            Entendido, cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function App() {
   const [leads,setLeads]=useState([]);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState(null);
-  const [seccion,setSeccion]=useState("leads");
+  const [seccion,setSeccion]=useState("campana");
   const [selectedLead,setSelectedLead]=useState(null);
   const [busqueda,setBusqueda]=useState("");
   const [vista,setVista]=useState("pipeline");
   const [lastUpdate,setLastUpdate]=useState(null);
+  const [showAlertas,setShowAlertas]=useState(false);
   const refreshInterval=useRef(null);
+  const alertasMostradas=useRef(false);
 
   const fetchLeads=async()=>{
     try{const data=await sb.from("leads").select("*",{order:"created_at.desc"});
-      if(Array.isArray(data)){setLeads(data);setLastUpdate(new Date());setError(null);}
+      if(Array.isArray(data)){
+        setLeads(data);setLastUpdate(new Date());setError(null);
+        if(!alertasMostradas.current){
+          const {olvidados,estancados}=calcAlertas(data);
+          if(olvidados.length+estancados.length>0){setShowAlertas(true);}
+          alertasMostradas.current=true;
+        }
+      }
       else setError("Error al cargar leads");
     }catch{setError("Sin conexión a Supabase");}
     finally{setLoading(false);}
@@ -1136,6 +1247,12 @@ export default function App() {
             </div>
           </div>
           <div style={{background:"#dcfce7",border:"1px solid #86efac",borderRadius:7,padding:"5px 10px",fontSize:10,color:"#166534",fontWeight:700}}>⚡ N8N Activo</div>
+          {(()=>{const {olvidados,estancados}=calcAlertas(leads);const total=olvidados.length+estancados.length;return total>0?(
+            <button onClick={()=>setShowAlertas(true)} style={{position:"relative",background:"#EF444422",border:"1px solid #EF444466",borderRadius:7,padding:"5px 10px",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+              🔔
+              <span style={{position:"absolute",top:-5,right:-5,background:"#EF4444",color:"white",borderRadius:"50%",width:16,height:16,fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center"}}>{total}</span>
+            </button>
+          ):null;})()}
         </div>
 
         <div style={{flex:1,overflow:"auto",padding:20,display:"flex",flexDirection:"column"}}>
@@ -1158,6 +1275,7 @@ export default function App() {
       </div>
 
       {selectedLead&&<LeadPanel lead={selectedLead} onClose={()=>setSelectedLead(null)} onUpdate={handleLeadUpdate}/>}
+      {showAlertas&&<AlertasPopup leads={leads} onClose={()=>setShowAlertas(false)} onVerLead={(lead)=>{setSelectedLead(lead);setSeccion(lead.tipo_postulacion==="libre"?"libre":"campana");}}/>}
     </div>
   );
 }
