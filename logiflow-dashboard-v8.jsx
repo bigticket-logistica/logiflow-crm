@@ -827,7 +827,7 @@ const KPIsView = ({ leads }) => {
 };
 
 // ─── TIMELINE VIEW ────────────────────────────────────────────────────────────
-const TimelineView = ({ lead, onEtapaChange }) => {
+const TimelineView = ({ lead }) => {
   const [historial,setHistorial]=useState([]);
   const [loading,setLoading]=useState(true);
 
@@ -876,24 +876,17 @@ const TimelineView = ({ lead, onEtapaChange }) => {
 };
 
 // ─── PANEL DETALLE ────────────────────────────────────────────────────────────
-const LeadPanel = ({ lead, onClose, onUpdate }) => {
+const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
   const [tab,setTab]=useState("info");
   const [etapa,setEtapa]=useState(lead.etapa||"Nuevo Lead");
   const [saving,setSaving]=useState(false);
   const [saved,setSaved]=useState(false);
+
+  useEffect(()=>{ setEtapa(lead.etapa||"Nuevo Lead"); },[lead.etapa]);
   const handleEtapaChange=async(newEtapa)=>{
     const etapaActual=etapa;
     if(etapaActual===newEtapa) return;
-    const ok=window.confirm(`¿Confirmar cambio de etapa?\n\n${etapaActual}  →  ${newEtapa}\n\nLead: ${lead.nombre||"Sin nombre"}`);
-    if(!ok) return;
-    setSaving(true);
-    try{
-      await sb.from("leads").update({etapa:newEtapa},`id=eq.${lead.id}`);
-      await sb.from("lead_historial").insert({lead_id:lead.id,etapa_anterior:etapaActual,etapa_nueva:newEtapa});
-      setEtapa(newEtapa);
-      onUpdate&&onUpdate({...lead,etapa:newEtapa});
-      setSaved(true);setTimeout(()=>setSaved(false),2000);
-    }finally{setSaving(false);}
+    onEtapaChangeRequest&&onEtapaChangeRequest(lead,newEtapa);
   };
   const etapaCfg=ETAPA_CFG[etapa]||{color:"#888888"};
   const scoreColor=getScoreColor(lead.score||0);
@@ -960,22 +953,7 @@ const LeadPanel = ({ lead, onClose, onUpdate }) => {
             </div>}
           </div>
         )}
-        {tab==="timeline"&&(
-          <TimelineView lead={lead} onEtapaChange={async(newEtapa)=>{
-            const etapaActual=lead.etapa||"Nuevo Lead";
-            if(etapaActual===newEtapa) return;
-            const ok=window.confirm(`¿Confirmar cambio de etapa?\n\n${etapaActual}  →  ${newEtapa}\n\nLead: ${lead.nombre||"Sin nombre"}`);
-            if(!ok) return;
-            setSaving(true);
-            try{
-              await sb.from("leads").update({etapa:newEtapa},`id=eq.${lead.id}`);
-              await sb.from("lead_historial").insert({lead_id:lead.id,etapa_anterior:etapaActual,etapa_nueva:newEtapa});
-              setEtapa(newEtapa);
-              onUpdate&&onUpdate({...lead,etapa:newEtapa});
-              setSaved(true);setTimeout(()=>setSaved(false),2000);
-            }finally{setSaving(false);}
-          }}/>
-        )}
+        {tab==="timeline"&&<TimelineView lead={lead}/>}
       </div>
     </div>
   );
@@ -1207,11 +1185,18 @@ export default function App() {
 
   const NORM=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Contactado","reunión agendada":"Reunión Agendada","reunion agendada":"Reunión Agendada","propuesta enviada":"Propuesta Enviada","negociación":"Negociación","negociacion":"Negociación","ganado":"Ganado","perdido":"Perdido"};return m[e.toLowerCase().trim()]||e;};
 
-  const handleEtapaChange=async(lead,nuevaEtapa)=>{
+  const [confirmModal,setConfirmModal]=useState(null); // {lead, nuevaEtapa}
+
+  const handleEtapaChange=(lead,nuevaEtapa)=>{
     const etapaActual=NORM(lead.etapa);
     if(etapaActual===nuevaEtapa) return;
-    const confirm=window.confirm(`¿Confirmar cambio de etapa?\n\n${etapaActual}  →  ${nuevaEtapa}\n\nLead: ${lead.nombre||"Sin nombre"}`);
-    if(!confirm) return;
+    setConfirmModal({lead,nuevaEtapa,etapaActual});
+  };
+
+  const confirmarCambioEtapa=async()=>{
+    if(!confirmModal) return;
+    const {lead,nuevaEtapa,etapaActual}=confirmModal;
+    setConfirmModal(null);
     try{
       await sb.from("leads").update({etapa:nuevaEtapa},`id=eq.${lead.id}`);
       await sb.from("lead_historial").insert({lead_id:lead.id,etapa_anterior:etapaActual,etapa_nueva:nuevaEtapa});
@@ -1351,8 +1336,31 @@ export default function App() {
         </div>
       </div>
 
-      {selectedLead&&<LeadPanel lead={selectedLead} onClose={()=>setSelectedLead(null)} onUpdate={handleLeadUpdate}/>}
+      {selectedLead&&<LeadPanel lead={selectedLead} onClose={()=>setSelectedLead(null)} onUpdate={handleLeadUpdate} onEtapaChangeRequest={handleEtapaChange}/>}
       {showAlertas&&<AlertasPopup leads={leads} onClose={()=>setShowAlertas(false)} onVerLead={(lead)=>{setSelectedLead(lead);setSeccion(lead.tipo_postulacion==="libre"?"libre":"campana");}}/>}
+      {confirmModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:400}}>
+          <div style={{background:"#ffffff",borderRadius:14,padding:28,width:400,boxShadow:"0 20px 60px rgba(0,0,0,.3)"}}>
+            <div style={{fontSize:16,fontWeight:900,color:"#1a1a1a",fontFamily:"'Outfit',sans-serif",marginBottom:6}}>¿Confirmar cambio de etapa?</div>
+            <div style={{fontSize:12,color:"#555555",marginBottom:20}}>Lead: <strong>{confirmModal.lead.nombre||"Sin nombre"}</strong></div>
+            <div style={{display:"flex",alignItems:"center",gap:12,background:"#f0f2f5",borderRadius:10,padding:"14px 16px",marginBottom:20}}>
+              <div style={{flex:1,textAlign:"center"}}>
+                <div style={{fontSize:10,color:"#888888",marginBottom:4}}>ETAPA ACTUAL</div>
+                <div style={{fontSize:13,fontWeight:800,color:ETAPA_CFG[confirmModal.etapaActual]?.color||"#888888"}}>{ETAPA_CFG[confirmModal.etapaActual]?.icon} {confirmModal.etapaActual}</div>
+              </div>
+              <div style={{fontSize:20,color:"#aaaaaa"}}>→</div>
+              <div style={{flex:1,textAlign:"center"}}>
+                <div style={{fontSize:10,color:"#888888",marginBottom:4}}>NUEVA ETAPA</div>
+                <div style={{fontSize:13,fontWeight:800,color:ETAPA_CFG[confirmModal.nuevaEtapa]?.color||"#888888"}}>{ETAPA_CFG[confirmModal.nuevaEtapa]?.icon} {confirmModal.nuevaEtapa}</div>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>setConfirmModal(null)} style={{flex:1,background:"#f0f2f5",color:"#475569",border:"none",borderRadius:8,padding:"10px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>Cancelar</button>
+              <button onClick={confirmarCambioEtapa} style={{flex:1,background:"#1a3a6b",color:"white",border:"none",borderRadius:8,padding:"10px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>✓ Confirmar cambio</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
