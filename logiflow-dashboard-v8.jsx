@@ -1,40 +1,34 @@
 import { useState, useEffect, useRef } from "react";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // ─── CONFIGURACIÓN SUPABASE ───────────────────────────────────────────────────
 const SUPABASE_URL = "https://psvdtgjvognbmxfvqbaa.supabase.co";
 const SUPABASE_KEY = "sb_publishable_RayW0wqgesNI6FYZ6i0CFQ_6YHaHELP";
 
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// wrapper compatible con el código existente
 const sb = {
   from: (table) => ({
-    select: async (cols = "*", opts = {}) => {
-      let url = `${SUPABASE_URL}/rest/v1/${table}?select=${cols}`;
-      if (opts.filter) url += `&${opts.filter}`;
-      if (opts.order) url += `&order=${opts.order}`;
-      const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } });
-      return r.json();
+    select: async (cols="*", opts={}) => {
+      let q = supabase.from(table).select(cols);
+      if (opts.order) { const parts=opts.order.split("."); q=q.order(parts[0],{ascending:parts[1]==="asc"}); }
+      if (opts.filter) { const m=opts.filter.match(/^(\w+)=eq\.(.+)$/); if(m) q=q.eq(m[1],m[2]); }
+      const {data,error}=await q; if(error) throw error; return data||[];
     },
     update: async (data, filter) => {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${filter}`, {
-        method: "PATCH",
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=representation" },
-        body: JSON.stringify(data),
-      });
-      return r.json();
+      const m=filter.match(/^(\w+)=eq\.(.+)$/);
+      const {data:r,error}=await supabase.from(table).update(data).eq(m[1],m[2]).select();
+      if(error) throw error; return r;
     },
     insert: async (data) => {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
-        method: "POST",
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=representation" },
-        body: JSON.stringify(data),
-      });
-      return r.json();
+      const {data:r,error}=await supabase.from(table).insert(data).select();
+      if(error) throw error; return r;
     },
     delete: async (filter) => {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${filter}`, {
-        method: "DELETE",
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-      });
-      return r.ok;
+      const m=filter.match(/^(\w+)=eq\.(.+)$/);
+      const {error}=await supabase.from(table).delete().eq(m[1],m[2]);
+      if(error) throw error; return true;
     },
   }),
 };
