@@ -701,18 +701,18 @@ const LeadCard = ({ lead, onSelect, onDragStart }) => {
 const KanbanCol = ({ etapa, leads, onSelect, onDragStart, onDrop, isDragOver, setDragOver }) => {
   const cfg=ETAPA_CFG[etapa]||{color:"#888888",icon:"•"};
   return (
-    <div style={{width:ETAPAS_CIERRE.includes(etapa)?220:245,flexShrink:0}}
+    <div style={{width:ETAPAS_CIERRE.includes(etapa)?220:245,flexShrink:0,display:"flex",flexDirection:"column",height:"100%"}}
       onDragOver={e=>{e.preventDefault();setDragOver(etapa);}}
       onDragLeave={()=>setDragOver(null)}
       onDrop={e=>{onDrop(e,etapa);setDragOver(null);}}>
-      <div style={{padding:"8px 12px",background:"#ffffff",borderRadius:"10px 10px 0 0",
+      <div style={{padding:"8px 12px",background:"#ffffff",borderRadius:"10px 10px 0 0",flexShrink:0,
         borderBottom:`2px solid ${isDragOver?cfg.color:"#888888"}`,
         display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <span style={{fontSize:10,fontWeight:800,color:isDragOver?cfg.color:"#888888",textTransform:"uppercase",letterSpacing:1}}>{cfg.icon} {etapa}</span>
         <span style={{fontSize:10,fontWeight:800,background:cfg.color+"22",color:cfg.color,padding:"2px 8px",borderRadius:20}}>{leads.length}</span>
       </div>
-      <div style={{minHeight:400,background:isDragOver?cfg.color+"08":"#f0f2f5",borderRadius:"0 0 10px 10px",
-        padding:8,display:"flex",flexDirection:"column",gap:7,
+      <div style={{flex:1,overflowY:"auto",background:isDragOver?cfg.color+"08":"#f0f2f5",borderRadius:"0 0 10px 10px",
+        padding:8,display:"flex",flexDirection:"column",gap:7,minHeight:120,
         border:isDragOver?`1px dashed ${cfg.color}44`:"1px solid transparent"}}>
         {leads.map(lead=><LeadCard key={lead.id} lead={lead} onSelect={onSelect} onDragStart={onDragStart}/>)}
         {leads.length===0&&(
@@ -738,14 +738,16 @@ const Pipeline = ({ leads, onSelect, onEtapaChange }) => {
   };
   const lpe=(etapa)=>leads.filter(l=>normalizarEtapa(l.etapa)===etapa);
   return (
-    <div style={{overflowX:"auto",paddingBottom:12}}>
-      <div style={{display:"flex",gap:10,minWidth:"fit-content"}}>
-        {ETAPAS_PIPELINE.map(e=><KanbanCol key={e} etapa={e} leads={lpe(e)} onSelect={onSelect} onDragStart={handleDragStart} onDrop={handleDrop} isDragOver={dragOver===e} setDragOver={setDragOver}/>)}
-        <div style={{width:2,background:"linear-gradient(to bottom,transparent,#aaaaaa,transparent)",borderRadius:4,flexShrink:0,margin:"0 4px"}}/>
-        {ETAPAS_CIERRE.map(e=><KanbanCol key={e} etapa={e} leads={lpe(e)} onSelect={onSelect} onDragStart={handleDragStart} onDrop={handleDrop} isDragOver={dragOver===e} setDragOver={setDragOver}/>)}
-      </div>
-      <div style={{marginTop:10,fontSize:10,color:"#aaaaaa",textAlign:"center"}}>
+    <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
+      <div style={{fontSize:10,color:"#aaaaaa",textAlign:"center",padding:"4px 0 8px",flexShrink:0}}>
         💡 Arrastra tarjetas entre columnas · O haz clic para abrir el detalle
+      </div>
+      <div style={{flex:1,overflowX:"auto",overflowY:"hidden"}}>
+        <div style={{display:"flex",gap:10,minWidth:"fit-content",height:"100%"}}>
+          {ETAPAS_PIPELINE.map(e=><KanbanCol key={e} etapa={e} leads={lpe(e)} onSelect={onSelect} onDragStart={handleDragStart} onDrop={handleDrop} isDragOver={dragOver===e} setDragOver={setDragOver}/>)}
+          <div style={{width:2,background:"linear-gradient(to bottom,transparent,#aaaaaa,transparent)",borderRadius:4,flexShrink:0,margin:"0 4px"}}/>
+          {ETAPAS_CIERRE.map(e=><KanbanCol key={e} etapa={e} leads={lpe(e)} onSelect={onSelect} onDragStart={handleDragStart} onDrop={handleDrop} isDragOver={dragOver===e} setDragOver={setDragOver}/>)}
+        </div>
       </div>
     </div>
   );
@@ -1136,7 +1138,7 @@ export default function App() {
           <div style={{background:"#dcfce7",border:"1px solid #86efac",borderRadius:7,padding:"5px 10px",fontSize:10,color:"#166534",fontWeight:700}}>⚡ N8N Activo</div>
         </div>
 
-        <div style={{flex:1,overflow:"auto",padding:20}}>
+        <div style={{flex:1,overflow:"auto",padding:20,display:"flex",flexDirection:"column"}}>
           {loading?<Spinner/>:error?(
             <div style={{background:"#fff5f5",border:"1px solid #fca5a5",borderRadius:12,padding:24,textAlign:"center"}}>
               <div style={{fontSize:24,marginBottom:8}}>⚠️</div>
@@ -1144,13 +1146,13 @@ export default function App() {
               <button onClick={fetchLeads} style={{marginTop:12,background:"#f4f5f7",color:"#666666",border:"1px solid #aaaaaa",borderRadius:8,padding:"8px 16px",fontSize:12,cursor:"pointer"}}>Reintentar</button>
             </div>
           ):(
-            <>
+            <div style={{flex:1,display:"flex",flexDirection:"column",minHeight:0}}>
               {seccion==="dashboard" &&<DashboardMetrics leads={leads}/>}
               {seccion==="campana"  &&(vista==="pipeline"?<Pipeline leads={leadsCampana} onSelect={setSelectedLead} onEtapaChange={handleEtapaChange}/>:<TablaLeads leads={leadsCampana} onSelect={setSelectedLead}/>)}
               {seccion==="libre"    &&(vista==="pipeline"?<Pipeline leads={leadsLibre}   onSelect={setSelectedLead} onEtapaChange={handleEtapaChange}/>:<TablaLeads leads={leadsLibre}   onSelect={setSelectedLead}/>)}
               {seccion==="kpis"     &&<KPIsView leads={leads}/>}
               {seccion==="plantillas"&&<PlantillasView/>}
-            </>
+            </div>
           )}
         </div>
       </div>
