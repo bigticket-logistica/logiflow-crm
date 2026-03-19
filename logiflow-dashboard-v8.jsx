@@ -102,7 +102,16 @@ const Tag = ({ label, color }) => (
     background:color+"22",color,border:`1px solid ${color}44`,letterSpacing:.5}}>{label}</span>
 );
 
-const CanalTag = ({ canal }) => { const cfg=getCanalCfg(canal); return <Tag label={`${cfg.icon} ${cfg.label}`} color={cfg.color}/>; };
+const PAIS_CFG = {
+  "Chile":  { bandera:"🇨🇱", color:"#c0392b" },
+  "México": { bandera:"🇲🇽", color:"#27ae60" },
+};
+
+const PaisTag = ({ pais }) => {
+  if(!pais) return null;
+  const cfg=PAIS_CFG[pais]||{bandera:"🌎",color:"#888888"};
+  return <span style={{fontSize:11,fontWeight:700}}>{cfg.bandera} {pais}</span>;
+};
 
 const Spinner = () => (
   <div style={{display:"flex",alignItems:"center",justifyContent:"center",padding:60}}>
@@ -678,7 +687,10 @@ const LeadCard = ({ lead, onSelect, onDragStart }) => {
           <div style={{fontSize:12,fontWeight:700,color:"#1a1a1a",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{lead.nombre||"Sin nombre"}</div>
           <div style={{fontSize:10,color:"#555555",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{lead.empresa||"Sin empresa"}</div>
         </div>
-        <ScoreDot score={lead.score}/>
+        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3}}>
+          <ScoreDot score={lead.score}/>
+          {lead.pais&&<span style={{fontSize:14}}>{PAIS_CFG[lead.pais]?.bandera||"🌎"}</span>}
+        </div>
       </div>
       <div style={{marginBottom:6}}><CanalTag canal={lead.canal}/></div>
       {lead.volumen&&<div style={{fontSize:10,color:"#555555"}}>📦 {lead.volumen}</div>}
@@ -893,7 +905,8 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
             <div style={{fontSize:18,fontWeight:800,color:"#1a1a1a"}}>{lead.nombre||"Sin nombre"}</div>
             <div style={{fontSize:12,color:"#888888",marginTop:2}}>{lead.cargo?`${lead.cargo} · `:""}{lead.empresa||"Sin empresa"}</div>
             <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
-              <CanalTag canal={lead.canal}/>
+              <CanalTag canal={lead.fuente_contacto||lead.canal}/>
+              {lead.pais&&<Tag label={`${PAIS_CFG[lead.pais]?.bandera||"🌎"} ${lead.pais}`} color={PAIS_CFG[lead.pais]?.color||"#888888"}/>}
               {lead.clasificacion&&<Tag label={`${lead.emoji||""} ${lead.clasificacion}`} color={lead.clasificacion?.includes("Caliente")?"#EF4444":lead.clasificacion?.includes("Candidato")?"#F59E0B":"#F97316"}/>}
             </div>
           </div>
@@ -933,7 +946,7 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
                   </button>
                 </div>
               )}
-              {[["📞","Teléfono",lead.telefono],["📧","Email",lead.email],["📍","Zona",lead.zona],["📦","Volumen",lead.volumen],["🔗","Canal",lead.fuente_contacto||lead.canal],["📅","Captado",formatFecha(lead.created_at)],["🔄","Actualizado",formatFecha(lead.updated_at)]].filter(([,,v])=>v).map(([icon,k,v])=>(
+              {[["📞","Teléfono",lead.telefono],["📧","Email",lead.email],["📍","Zona",lead.zona],["📦","Volumen",lead.volumen],["🔗","Canal",lead.fuente_contacto||lead.canal],[lead.pais?`${PAIS_CFG[lead.pais]?.bandera||"🌎"}`:"🌎","País",lead.pais],["📅","Captado",formatFecha(lead.created_at)],["🔄","Actualizado",formatFecha(lead.updated_at)]].filter(([,,v])=>v).map(([icon,k,v])=>(
                 <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #f4f5f7"}}>
                   <span style={{fontSize:12,color:"#555555"}}>{icon} {k}</span>
                   <span style={{fontSize:12,color:"#1a1a1a",fontWeight:600}}>{v}</span>
@@ -1036,13 +1049,14 @@ const DashboardMetrics = ({ leads }) => {
 const TablaLeads = ({ leads, onSelect }) => (
   <div style={{background:"#ffffff",borderRadius:12,border:"1px solid #e4e7ec",overflow:"hidden"}}>
     <table style={{width:"100%",borderCollapse:"collapse"}}>
-      <thead><tr style={{background:"#f0f2f5"}}>{["Prospecto","Empresa","Canal","Etapa","Score","Clasificación","Actualizado",""].map(h=><th key={h} style={{padding:"10px 14px",textAlign:"left",fontSize:9,fontWeight:800,color:"#aaaaaa",textTransform:"uppercase",letterSpacing:1}}>{h}</th>)}</tr></thead>
+      <thead><tr style={{background:"#f0f2f5"}}>{["Prospecto","Empresa","Canal","País","Etapa","Score","Clasificación","Actualizado",""].map(h=><th key={h} style={{padding:"10px 14px",textAlign:"left",fontSize:9,fontWeight:800,color:"#aaaaaa",textTransform:"uppercase",letterSpacing:1}}>{h}</th>)}</tr></thead>
       <tbody>{leads.map((lead,i)=>{const cfg=ETAPA_CFG[lead.etapa]||{color:"#888888",icon:"•"};return(
         <tr key={lead.id} style={{borderTop:"1px solid #f0f2f5",background:i%2===0?"#ffffff":"#f8f9fa",cursor:"pointer"}}
           onClick={()=>onSelect(lead)} onMouseEnter={e=>e.currentTarget.style.background="#eef2ff"} onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"#ffffff":"#f8f9fa"}>
           <td style={{padding:"10px 14px"}}><div style={{fontSize:12,fontWeight:700,color:"#1a1a1a"}}>{lead.nombre||"—"}</div><div style={{fontSize:10,color:"#aaaaaa"}}>{lead.email||"—"}</div></td>
           <td style={{padding:"10px 14px",fontSize:12,color:"#888888"}}>{lead.empresa||"—"}</td>
-          <td style={{padding:"10px 14px"}}><CanalTag canal={lead.canal}/></td>
+          <td style={{padding:"10px 14px"}}><CanalTag canal={lead.fuente_contacto||lead.canal}/></td>
+          <td style={{padding:"10px 14px",fontSize:13}}>{lead.pais?`${PAIS_CFG[lead.pais]?.bandera||"🌎"} ${lead.pais}`:"—"}</td>
           <td style={{padding:"10px 14px"}}><Tag label={`${cfg.icon} ${lead.etapa||"Nuevo Lead"}`} color={cfg.color}/></td>
           <td style={{padding:"10px 14px"}}><ScoreDot score={lead.score}/></td>
           <td style={{padding:"10px 14px"}}>{lead.clasificacion?<Tag label={`${lead.emoji||""} ${lead.clasificacion}`} color={lead.clasificacion?.includes("Caliente")?"#EF4444":lead.clasificacion?.includes("Candidato")?"#F59E0B":"#F97316"}/>:<span style={{color:"#aaaaaa",fontSize:11}}>—</span>}</td>
