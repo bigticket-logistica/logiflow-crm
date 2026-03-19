@@ -716,7 +716,160 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
   );
 }
 
-function ViewSuccess({ codigo, onVolver }) {
+// ─── BIGGI — ASISTENTE VIRTUAL ────────────────────────────────────────────────
+const BIGGI_PROMPT = `Eres Biggi, el asistente virtual de BigTicket 🚛, una empresa de logística que conecta conductores terceros con campañas de reparto en Chile y México.
+
+Tu rol es ayudar a prospectos y conductores activos con sus consultas de forma amable, clara y con emojis ocasionales.
+
+INFORMACIÓN DE BIGTICKET:
+
+REQUISITOS PARA POSTULAR:
+- Los requisitos varían según la campaña (tipo de vehículo, zona, volumen)
+- Lo más importante es poder emitir facturas y tener documentación al día
+- Cada campaña tiene sus propios criterios de selección
+
+OPERACIONES:
+- Presencia en diferentes regiones de Chile y estados de México
+- Campañas activas disponibles en el portal
+
+MODALIDADES DE CONTRATO:
+- Apoyo: soporte puntual según demanda
+- Planta: contrato estable con ruta fija
+- Temporada: contrato por período específico
+- Cada modalidad tiene su propio flujo y forma de pago
+
+PAGOS:
+- Por cantidad de envíos: ganas según cuánto entregues
+- Por ruta fija: valor fijo por ruta completada
+- La documentación para pagos se solicita periódicamente
+
+CONSULTAS FRECUENTES DE TERCEROS ACTIVOS:
+- Certificación de flotas: proceso de verificación del vehículo
+- Documentación para pagos: boletas, facturas, liquidaciones
+- Carga y descarga de documentos: se hace a través del sistema
+- Incidentes (choque/robo): reportar inmediatamente al coordinador
+
+PORTAL:
+- Los prospectos pueden postular en: https://bigticket-portal.vercel.app
+- Pueden consultar el estado de su postulación con su código BT-XXXXXX
+
+REGLAS:
+- Si no sabes algo específico, sé honesto y deriva al equipo: +56957730804
+- No inventes información sobre pagos, rutas o campañas específicas
+- Siempre invita a postular si detectas que es un prospecto nuevo
+- Responde en el idioma del usuario (español)
+- Sé conciso — máximo 3-4 líneas por respuesta`;
+
+function BiggiBubble({ paginaPrincipal=false }) {
+  const [abierto,setAbierto]=useState(false);
+  const [mensajes,setMensajes]=useState([{rol:"biggi",texto:"¡Hola! Soy Biggi 🚛 el asistente virtual de BigTicket. ¿En qué puedo ayudarte hoy?"}]);
+  const [input,setInput]=useState("");
+  const [cargando,setCargando]=useState(false);
+  const endRef=useRef(null);
+
+  useEffect(()=>{endRef.current?.scrollIntoView({behavior:"smooth"});},[mensajes]);
+
+  const enviar=async()=>{
+    if(!input.trim()||cargando) return;
+    const texto=input.trim();
+    setInput("");
+    setMensajes(p=>[...p,{rol:"usuario",texto}]);
+    setCargando(true);
+    try {
+      const historial=mensajes.filter(m=>m.rol!=="biggi"||mensajes.indexOf(m)>0).map(m=>({
+        role:m.rol==="usuario"?"user":"assistant",
+        content:m.texto
+      }));
+      const res=await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","x-api-key":"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","anthropic-version":"2023-06-01","anthropic-dangerous-allow-browser":"true"},
+        body:JSON.stringify({
+          model:"claude-sonnet-4-20250514",
+          max_tokens:300,
+          system:BIGGI_PROMPT,
+          messages:[...historial,{role:"user",content:texto}]
+        })
+      });
+      const data=await res.json();
+      const respuesta=data.content?.[0]?.text||"Lo siento, no pude procesar tu consulta. Contacta al equipo: +56957730804";
+      setMensajes(p=>[...p,{rol:"biggi",texto:respuesta}]);
+    } catch(e){
+      setMensajes(p=>[...p,{rol:"biggi",texto:"Tuve un problema técnico. Por favor contacta al equipo: +56957730804 📞"}]);
+    }
+    finally{setCargando(false);}
+  };
+
+  // Logo de Biggi — camión animado
+  const BiggiFace=({size=40})=>(
+    <div style={{width:size,height:size,borderRadius:"50%",background:"linear-gradient(135deg,#F47B20,#d96a10)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*0.5,flexShrink:0,boxShadow:"0 2px 8px rgba(244,123,32,0.4)"}}>🚛</div>
+  );
+
+  return(
+    <>
+      {/* Botón flotante */}
+      {!abierto&&(
+        <div onClick={()=>setAbierto(true)} style={{position:"fixed",bottom:24,right:24,zIndex:999,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+          {paginaPrincipal&&(
+            <div style={{background:"#1a3a6b",color:"#fff",borderRadius:12,padding:"8px 14px",fontSize:12,fontWeight:600,boxShadow:"0 4px 16px rgba(0,0,0,0.2)",whiteSpace:"nowrap",animation:"pulse 2s infinite"}}>
+              💬 ¿Tienes dudas? ¡Pregúntale a Biggi!
+            </div>
+          )}
+          <div style={{width:60,height:60,borderRadius:"50%",background:"linear-gradient(135deg,#F47B20,#d96a10)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,boxShadow:"0 4px 20px rgba(244,123,32,0.5)",border:"3px solid #fff"}}>
+            🚛
+          </div>
+          <div style={{background:"#1a3a6b",color:"#fff",borderRadius:8,padding:"3px 10px",fontSize:11,fontWeight:700}}>Biggi</div>
+        </div>
+      )}
+
+      {/* Ventana del chat */}
+      {abierto&&(
+        <div style={{position:"fixed",bottom:24,right:24,zIndex:999,width:340,height:480,background:"#fff",borderRadius:16,boxShadow:"0 8px 40px rgba(0,0,0,0.2)",display:"flex",flexDirection:"column",overflow:"hidden",border:"1px solid #e4e7ec"}}>
+          {/* Header */}
+          <div style={{background:"linear-gradient(135deg,#1a3a6b,#2a5a9b)",padding:"12px 16px",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+            <BiggiFace size={36}/>
+            <div style={{flex:1}}>
+              <div style={{color:"#fff",fontSize:14,fontWeight:700}}>Biggi</div>
+              <div style={{color:"#aac3e8",fontSize:11}}>Asistente Virtual BigTicket</div>
+            </div>
+            <button onClick={()=>setAbierto(false)} style={{background:"rgba(255,255,255,0.15)",border:"none",color:"#fff",borderRadius:"50%",width:28,height:28,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+          </div>
+
+          {/* Mensajes */}
+          <div style={{flex:1,overflow:"auto",padding:12,display:"flex",flexDirection:"column",gap:10,background:"#f8f9fa"}}>
+            {mensajes.map((m,i)=>(
+              <div key={i} style={{display:"flex",gap:8,justifyContent:m.rol==="usuario"?"flex-end":"flex-start",alignItems:"flex-end"}}>
+                {m.rol==="biggi"&&<BiggiFace size={28}/>}
+                <div style={{maxWidth:"78%",background:m.rol==="usuario"?"#1a3a6b":"#fff",color:m.rol==="usuario"?"#fff":"#1a1a1a",borderRadius:m.rol==="usuario"?"12px 12px 2px 12px":"12px 12px 12px 2px",padding:"9px 12px",fontSize:12,lineHeight:1.5,border:m.rol==="usuario"?"none":"1px solid #e4e7ec",boxShadow:"0 1px 3px rgba(0,0,0,0.06)"}}>
+                  {m.texto}
+                </div>
+              </div>
+            ))}
+            {cargando&&(
+              <div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
+                <BiggiFace size={28}/>
+                <div style={{background:"#fff",border:"1px solid #e4e7ec",borderRadius:"12px 12px 12px 2px",padding:"9px 12px",fontSize:12,color:"#888"}}>
+                  <span style={{animation:"pulse 1s infinite"}}>Biggi está escribiendo...</span>
+                </div>
+              </div>
+            )}
+            <div ref={endRef}/>
+          </div>
+
+          {/* Input */}
+          <div style={{padding:"10px 12px",background:"#fff",borderTop:"1px solid #e4e7ec",display:"flex",gap:8,flexShrink:0}}>
+            <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&enviar()}
+              placeholder="Escribe tu consulta..."
+              style={{flex:1,padding:"8px 12px",borderRadius:20,border:"1px solid #e4e7ec",fontSize:12,outline:"none",background:"#f8f9fa"}}/>
+            <button onClick={enviar} disabled={cargando||!input.trim()}
+              style={{background:"#F47B20",color:"#fff",border:"none",borderRadius:"50%",width:34,height:34,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,opacity:cargando||!input.trim()?0.5:1}}>
+              ↑
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
   const [copiado,setCopiado]=useState(false);
   const copiar=()=>{navigator.clipboard?.writeText(codigo||"");setCopiado(true);setTimeout(()=>setCopiado(false),2000);};
   return (
@@ -1265,8 +1418,7 @@ export default function App() {
 
   if(showAdmin&&!adminAuth) return <><style>{css}</style><AdminLogin onSuccess={()=>setAdminAuth(true)} onClose={()=>setShowAdmin(false)}/></>;
   if(showAdmin&&adminAuth) return <><style>{css}</style><AdminPanel onClose={()=>setShowAdmin(false)} campaigns={campaigns} setCampaigns={setCampaigns}/></>;
-
-  if(resultadoBusqueda) return <><style>{css}</style><ViewPostulacion data={resultadoBusqueda} onVolver={()=>setResultadoBusqueda(null)}/></>;
+  if(resultadoBusqueda) return <><style>{css}</style><ViewPostulacion data={resultadoBusqueda} onVolver={()=>setResultadoBusqueda(null)}/><BiggiBubble/></>;
 
   return (
     <><style>{css}</ style>
@@ -1281,6 +1433,7 @@ export default function App() {
           <button className="btn-blue" onClick={()=>setShowAdmin(true)}>Admin ⚙</button>
         </div>
       )}
+      <BiggiBubble paginaPrincipal={view==="country"}/>
     </>
   );
 }
