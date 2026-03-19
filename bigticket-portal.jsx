@@ -495,6 +495,23 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
         });
       } catch(fetchErr) { console.log("N8N WhatsApp error:", fetchErr); }
 
+      // 3. Si es caliente, notificar a N8N para enviar WhatsApp de propuesta
+      if(clasificacion==="Caliente"&&lead.id){
+        try {
+          await fetch("https://bigticket2026.app.n8n.cloud/webhook/propuesta-enviada", {
+            method: "POST", mode: "no-cors",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({
+              lead_id: lead.id,
+              nombre: form.nombre,
+              telefono: form.telefono,
+              campana_nombre: camp?.nombre||"",
+              clasificacion,
+            }),
+          });
+        } catch(e){ console.log("N8N propuesta error:",e); }
+      }
+
       onSuccess(codigo);
     } catch(e){alert("Error al enviar: "+e.message);}
     finally{setLoading(false);}
