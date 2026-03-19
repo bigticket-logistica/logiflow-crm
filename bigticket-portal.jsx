@@ -788,8 +788,8 @@ function BiggiBubble({ paginaPrincipal=false }) {
           messages:[...historial,{role:"user",content:texto}]
         })
       });
-      const data=await res.json();
-      const respuesta=data.content?.[0]?.text||"Lo siento, no pude procesar tu consulta. Contacta al equipo: +56957730804";
+      const text=await res.text();
+      const respuesta=text||"Lo siento, no pude procesar tu consulta. Contacta al equipo: +56957730804";
       setMensajes(p=>[...p,{rol:"biggi",texto:respuesta}]);
     } catch(e){
       setMensajes(p=>[...p,{rol:"biggi",texto:"Tuve un problema técnico. Por favor contacta al equipo: +56957730804 📞"}]);
