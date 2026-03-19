@@ -103,16 +103,17 @@ const Tag = ({ label, color }) => (
 );
 
 const PAIS_CFG = {
-  "Chile":  { bandera:"🇨🇱", color:"#c0392b" },
-  "México": { bandera:"🇲🇽", color:"#27ae60" },
+  "Chile":  { bandera:"https://flagcdn.com/w40/cl.png", color:"#c0392b" },
+  "México": { bandera:"https://flagcdn.com/w40/mx.png", color:"#27ae60" },
 };
 
 const CanalTag = ({ canal }) => { const cfg=getCanalCfg(canal); return <Tag label={`${cfg.icon} ${cfg.label}`} color={cfg.color}/>; };
 
-const PaisTag = ({ pais }) => {
+const PaisFlag = ({ pais }) => {
   if(!pais) return null;
-  const cfg=PAIS_CFG[pais]||{bandera:"🌎",color:"#888888"};
-  return <span style={{fontSize:11,fontWeight:700}}>{cfg.bandera} {pais}</span>;
+  const cfg=PAIS_CFG[pais];
+  if(!cfg) return <span style={{fontSize:11,color:"#888"}}>{pais}</span>;
+  return <img src={cfg.bandera} alt={pais} title={pais} style={{width:20,height:14,objectFit:"cover",borderRadius:2,display:"inline-block"}}/>;
 };
 
 const Spinner = () => (
@@ -691,7 +692,7 @@ const LeadCard = ({ lead, onSelect, onDragStart }) => {
         </div>
         <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3}}>
           <ScoreDot score={lead.score}/>
-          {lead.pais&&<span style={{fontSize:14}}>{PAIS_CFG[lead.pais]?.bandera||"🌎"}</span>}
+          {lead.pais&&<PaisFlag pais={lead.pais}/>}
         </div>
       </div>
       <div style={{marginBottom:6}}><CanalTag canal={lead.canal}/></div>
@@ -908,7 +909,7 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
             <div style={{fontSize:12,color:"#888888",marginTop:2}}>{lead.cargo?`${lead.cargo} · `:""}{lead.empresa||"Sin empresa"}</div>
             <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
               <CanalTag canal={lead.fuente_contacto||lead.canal}/>
-              {lead.pais&&<Tag label={`${PAIS_CFG[lead.pais]?.bandera||"🌎"} ${lead.pais}`} color={PAIS_CFG[lead.pais]?.color||"#888888"}/>}
+              {lead.pais&&<div style={{display:"flex",alignItems:"center",gap:4,background:"#f0f2f5",borderRadius:20,padding:"2px 8px"}}><PaisFlag pais={lead.pais}/><span style={{fontSize:10,fontWeight:700,color:"#555"}}>{lead.pais}</span></div>}
               {lead.clasificacion&&<Tag label={`${lead.emoji||""} ${lead.clasificacion}`} color={lead.clasificacion?.includes("Caliente")?"#EF4444":lead.clasificacion?.includes("Candidato")?"#F59E0B":"#F97316"}/>}
             </div>
           </div>
@@ -948,12 +949,21 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
                   </button>
                 </div>
               )}
-              {[["📞","Teléfono",lead.telefono],["📧","Email",lead.email],["📍","Zona",lead.zona],["📦","Volumen",lead.volumen],["🔗","Canal",lead.fuente_contacto||lead.canal],[lead.pais?`${PAIS_CFG[lead.pais]?.bandera||"🌎"}`:"🌎","País",lead.pais],["📅","Captado",formatFecha(lead.created_at)],["🔄","Actualizado",formatFecha(lead.updated_at)]].filter(([,,v])=>v).map(([icon,k,v])=>(
+              {[["📞","Teléfono",lead.telefono],["📧","Email",lead.email],["📍","Zona",lead.zona],["📦","Volumen",lead.volumen],["🔗","Canal",lead.fuente_contacto||lead.canal],["📅","Captado",formatFecha(lead.created_at)],["🔄","Actualizado",formatFecha(lead.updated_at)]].filter(([,,v])=>v).map(([icon,k,v])=>(
                 <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #f4f5f7"}}>
                   <span style={{fontSize:12,color:"#555555"}}>{icon} {k}</span>
                   <span style={{fontSize:12,color:"#1a1a1a",fontWeight:600}}>{v}</span>
                 </div>
               ))}
+              {lead.pais&&(
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #f4f5f7"}}>
+                  <span style={{fontSize:12,color:"#555555"}}>🌎 País</span>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <PaisFlag pais={lead.pais}/>
+                    <span style={{fontSize:12,color:"#1a1a1a",fontWeight:600}}>{lead.pais}</span>
+                  </div>
+                </div>
+              )}
             </div>
             {lead.notas&&<div style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:10,padding:14}}><div style={{fontSize:10,fontWeight:800,color:"#555555",letterSpacing:1,marginBottom:8,textTransform:"uppercase"}}>Notas</div><div style={{fontSize:12,color:"#666666",lineHeight:1.6}}>{lead.notas}</div></div>}
           </div>
@@ -1058,7 +1068,7 @@ const TablaLeads = ({ leads, onSelect }) => (
           <td style={{padding:"10px 14px"}}><div style={{fontSize:12,fontWeight:700,color:"#1a1a1a"}}>{lead.nombre||"—"}</div><div style={{fontSize:10,color:"#aaaaaa"}}>{lead.email||"—"}</div></td>
           <td style={{padding:"10px 14px",fontSize:12,color:"#888888"}}>{lead.empresa||"—"}</td>
           <td style={{padding:"10px 14px"}}><CanalTag canal={lead.fuente_contacto||lead.canal}/></td>
-          <td style={{padding:"10px 14px",fontSize:13}}>{lead.pais?`${PAIS_CFG[lead.pais]?.bandera||"🌎"} ${lead.pais}`:"—"}</td>
+          <td style={{padding:"10px 14px"}}><div style={{display:"flex",alignItems:"center",gap:6}}><PaisFlag pais={lead.pais}/><span style={{fontSize:12,color:"#888"}}>{lead.pais||"—"}</span></div></td>
           <td style={{padding:"10px 14px"}}><Tag label={`${cfg.icon} ${lead.etapa||"Nuevo Lead"}`} color={cfg.color}/></td>
           <td style={{padding:"10px 14px"}}><ScoreDot score={lead.score}/></td>
           <td style={{padding:"10px 14px"}}>{lead.clasificacion?<Tag label={`${lead.emoji||""} ${lead.clasificacion}`} color={lead.clasificacion?.includes("Caliente")?"#EF4444":lead.clasificacion?.includes("Candidato")?"#F59E0B":"#F97316"}/>:<span style={{color:"#aaaaaa",fontSize:11}}>—</span>}</td>
