@@ -107,6 +107,8 @@ const PAIS_CFG = {
   "México": { bandera:"🇲🇽", color:"#27ae60" },
 };
 
+const CanalTag = ({ canal }) => { const cfg=getCanalCfg(canal); return <Tag label={`${cfg.icon} ${cfg.label}`} color={cfg.color}/>; };
+
 const PaisTag = ({ pais }) => {
   if(!pais) return null;
   const cfg=PAIS_CFG[pais]||{bandera:"🌎",color:"#888888"};
