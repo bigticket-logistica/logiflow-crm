@@ -780,12 +780,10 @@ function BiggiBubble({ paginaPrincipal=false }) {
         role:m.rol==="usuario"?"user":"assistant",
         content:m.texto
       }));
-      const res=await fetch("https://api.anthropic.com/v1/messages",{
+      const res=await fetch("https://bigticket2026.app.n8n.cloud/webhook/biggi-chat",{
         method:"POST",
-        headers:{"Content-Type":"application/json","x-api-key":"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","anthropic-version":"2023-06-01","anthropic-dangerous-allow-browser":"true"},
+        headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
-          model:"claude-sonnet-4-20250514",
-          max_tokens:300,
           system:BIGGI_PROMPT,
           messages:[...historial,{role:"user",content:texto}]
         })
@@ -799,9 +797,12 @@ function BiggiBubble({ paginaPrincipal=false }) {
     finally{setCargando(false);}
   };
 
-  // Logo de Biggi — camión animado
+  const DONB_URL="https://psvdtgjvognbmxfvqbaa.supabase.co/storage/v1/object/public/assets/Don_B.jpeg";
+
   const BiggiFace=({size=40})=>(
-    <div style={{width:size,height:size,borderRadius:"50%",background:"linear-gradient(135deg,#F47B20,#d96a10)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*0.5,flexShrink:0,boxShadow:"0 2px 8px rgba(244,123,32,0.4)"}}>🚛</div>
+    <div style={{width:size,height:size,borderRadius:"50%",overflow:"hidden",flexShrink:0,border:"2px solid #F47B20",boxShadow:"0 2px 8px rgba(244,123,32,0.4)"}}>
+      <img src={DONB_URL} alt="Biggi" style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:"top"}}/>
+    </div>
   );
 
   return(
@@ -814,8 +815,8 @@ function BiggiBubble({ paginaPrincipal=false }) {
               💬 ¿Tienes dudas? ¡Pregúntale a Biggi!
             </div>
           )}
-          <div style={{width:60,height:60,borderRadius:"50%",background:"linear-gradient(135deg,#F47B20,#d96a10)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,boxShadow:"0 4px 20px rgba(244,123,32,0.5)",border:"3px solid #fff"}}>
-            🚛
+          <div style={{width:60,height:60,borderRadius:"50%",overflow:"hidden",boxShadow:"0 4px 20px rgba(244,123,32,0.5)",border:"3px solid #F47B20"}}>
+            <img src={DONB_URL} alt="Biggi" style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:"top"}}/>
           </div>
           <div style={{background:"#1a3a6b",color:"#fff",borderRadius:8,padding:"3px 10px",fontSize:11,fontWeight:700}}>Biggi</div>
         </div>
