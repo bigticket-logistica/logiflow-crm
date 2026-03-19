@@ -409,12 +409,38 @@ function ViewDetail({ camp, canal, onBack, onPostular }) {
   );
 }
 
+const REGIONES_CHILE = [
+  "Región de Arica y Parinacota","Región de Tarapacá","Región de Antofagasta",
+  "Región de Atacama","Región de Coquimbo","Región de Valparaíso",
+  "Región Metropolitana de Santiago","Región del Libertador Gral. Bernardo O'Higgins",
+  "Región del Maule","Región de Ñuble","Región del Biobío",
+  "Región de La Araucanía","Región de Los Ríos","Región de Los Lagos",
+  "Región de Aysén del Gral. Carlos Ibáñez del Campo","Región de Magallanes y de la Antártica Chilena"
+];
+
+const ESTADOS_MEXICO = [
+  "Aguascalientes","Baja California","Baja California Sur","Campeche","Chiapas",
+  "Chihuahua","Ciudad de México","Coahuila","Colima","Durango","Guanajuato",
+  "Guerrero","Hidalgo","Jalisco","México","Michoacán","Morelos","Nayarit",
+  "Nuevo León","Oaxaca","Puebla","Querétaro","Quintana Roo","San Luis Potosí",
+  "Sinaloa","Sonora","Tabasco","Tamaulipas","Tlaxcala","Veracruz","Yucatán","Zacatecas"
+];
+
+const PREFIJOS = { "Chile": "+569", "México": "+521" };
+
 function ViewForm({ camp, canal, op, onBack, onSuccess }) {
-  const [form,setForm]=useState({nombre:"",empresa:"",rut:"",telefono:"",email:"",fuente_contacto:""});
+  const [form,setForm]=useState({nombre:"",empresa:"",rut:"",telefono:PREFIJOS[op]||"+569",email:"",fuente_contacto:"",pais_form:op||"Chile",region_estado:""});
   const [respuestas,setRespuestas]=useState({});
   const [vars,setVars]=useState([]);
   const [loading,setLoading]=useState(false);
   const isLibre=!camp;
+
+  const handlePaisChange=(nuevoPais)=>{
+    const prefijo=PREFIJOS[nuevoPais]||"+569";
+    setForm(p=>({...p,pais_form:nuevoPais,region_estado:"",telefono:prefijo}));
+  };
+
+  const regionesOpciones=form.pais_form==="México"?ESTADOS_MEXICO:REGIONES_CHILE;
 
   useEffect(()=>{if(camp)loadVars();},[camp]);
 
@@ -466,11 +492,12 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
       // 1. Guardar en Supabase
       const {data:lead,error:le}=await sb.from("leads").insert({
         nombre:form.nombre,empresa:form.empresa||null,telefono:form.telefono,email:form.email||null,
-        canal,pais:op,score,clasificacion,etapa:clasificacion==="Caliente"?"Propuesta Enviada":"Base Datos Leads",
+        canal,pais:form.pais_form||op,score,clasificacion,etapa:clasificacion==="Caliente"?"Propuesta Enviada":"Base Datos Leads",
         origen:isLibre?"Postulación libre":`Campaña: ${camp?.nombre||""}`,
         campana_id:camp?.id||null,fuente_contacto:form.fuente_contacto||null,
         tipo_postulacion:isLibre?"libre":"campaña",
         codigo_postulacion:codigo,
+        region_estado:form.region_estado||null,
       }).select().single();
       if(le) throw le;
       await sb.from("postulaciones").insert({
@@ -531,11 +558,47 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
             <div className="field-row"><span className="field-label">Nombre completo *</span><input value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})} placeholder="Tu nombre"/></div>
             <div className="field-row"><span className="field-label">Empresa / Razón social</span><input value={form.empresa} onChange={e=>setForm({...form,empresa:e.target.value})} placeholder="Nombre de tu empresa (opcional)"/></div>
           </div>
+          {/* País y Región — solo en postulación libre */}
+          {isLibre&&(
+            <div className="two-col">
+              <div className="field-row">
+                <span className="field-label">País *</span>
+                <select value={form.pais_form} onChange={e=>handlePaisChange(e.target.value)}
+                  style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #e4e7ec",background:"#f8f9fa",fontSize:14,cursor:"pointer"}}>
+                  <option value="Chile">🇨🇱 Chile</option>
+                  <option value="México">🇲🇽 México</option>
+                </select>
+              </div>
+              <div className="field-row">
+                <span className="field-label">{form.pais_form==="México"?"Estado *":"Región *"}</span>
+                <select value={form.region_estado} onChange={e=>setForm({...form,region_estado:e.target.value})}
+                  style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #e4e7ec",background:"#f8f9fa",fontSize:14,cursor:"pointer",color:form.region_estado?"#1a1a1a":"#888888"}}>
+                  <option value="">-- Seleccionar --</option>
+                  {regionesOpciones.map(r=><option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+            </div>
+          )}
+          {/* Región/Estado para postulación por campaña */}
+          {!isLibre&&(
+            <div className="field-row">
+              <span className="field-label">{op==="México"?"Estado *":"Región *"}</span>
+              <select value={form.region_estado} onChange={e=>setForm({...form,region_estado:e.target.value})}
+                style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #e4e7ec",background:"#f8f9fa",fontSize:14,cursor:"pointer",color:form.region_estado?"#1a1a1a":"#888888"}}>
+                <option value="">-- Seleccionar --</option>
+                {(op==="México"?ESTADOS_MEXICO:REGIONES_CHILE).map(r=><option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+          )}
           <div className="two-col">
             <div className="field-row"><span className="field-label">RUT / CURP</span><input value={form.rut} onChange={e=>setForm({...form,rut:e.target.value})} placeholder="Identificación"/></div>
           </div>
           <div className="two-col">
-            <div className="field-row"><span className="field-label">Teléfono WhatsApp *</span><input value={form.telefono} onChange={e=>setForm({...form,telefono:e.target.value})} placeholder="+56 9..."/></div>
+            <div className="field-row">
+              <span className="field-label">Teléfono WhatsApp *</span>
+              <input value={form.telefono} onChange={e=>setForm({...form,telefono:e.target.value})}
+                placeholder={form.pais_form==="México"?"+521 ...":"+569 ..."}/>
+            </div>
             <div className="field-row"><span className="field-label">Correo electrónico</span><input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="correo@..."/></div>
           </div>
           <div className="field-row">
