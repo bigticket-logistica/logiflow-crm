@@ -554,11 +554,20 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
         <CanalInfo canal={canal}/>
         <div className="form-card">
           <div className="form-title">Datos personales</div>
+
+          {/* Fila 1: Nombre + Empresa */}
           <div className="two-col">
             <div className="field-row"><span className="field-label">Nombre completo *</span><input value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})} placeholder="Tu nombre"/></div>
             <div className="field-row"><span className="field-label">Empresa / Razón social</span><input value={form.empresa} onChange={e=>setForm({...form,empresa:e.target.value})} placeholder="Nombre de tu empresa (opcional)"/></div>
           </div>
-          {/* País y Región — solo en postulación libre */}
+
+          {/* Fila 2: RUT + Correo */}
+          <div className="two-col">
+            <div className="field-row"><span className="field-label">RUT / CURP</span><input value={form.rut} onChange={e=>setForm({...form,rut:e.target.value})} placeholder="Identificación"/></div>
+            <div className="field-row"><span className="field-label">Correo electrónico</span><input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="correo@..."/></div>
+          </div>
+
+          {/* Fila 3: País + Región (postulación libre) */}
           {isLibre&&(
             <div className="two-col">
               <div className="field-row">
@@ -579,42 +588,68 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
               </div>
             </div>
           )}
-          {/* Región/Estado para postulación por campaña */}
+
+          {/* Fila 3 campaña: Región + Teléfono */}
+          {!isLibre&&(
+            <div className="two-col">
+              <div className="field-row">
+                <span className="field-label">{op==="México"?"Estado *":"Región *"}</span>
+                <select value={form.region_estado} onChange={e=>setForm({...form,region_estado:e.target.value})}
+                  style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #e4e7ec",background:"#f8f9fa",fontSize:14,cursor:"pointer",color:form.region_estado?"#1a1a1a":"#888888"}}>
+                  <option value="">-- Seleccionar --</option>
+                  {(op==="México"?ESTADOS_MEXICO:REGIONES_CHILE).map(r=><option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <div className="field-row">
+                <span className="field-label">Teléfono WhatsApp *</span>
+                <input value={form.telefono} onChange={e=>setForm({...form,telefono:e.target.value})}
+                  placeholder={op==="México"?"+521 ...":"+569 ..."}/>
+              </div>
+            </div>
+          )}
+
+          {/* Fila 4 libre: Teléfono + ¿Cómo nos conociste? */}
+          {isLibre&&(
+            <div className="two-col">
+              <div className="field-row">
+                <span className="field-label">Teléfono WhatsApp *</span>
+                <input value={form.telefono} onChange={e=>setForm({...form,telefono:e.target.value})}
+                  placeholder={form.pais_form==="México"?"+521 ...":"+569 ..."}/>
+              </div>
+              <div className="field-row">
+                <span className="field-label">¿Cómo nos conociste? *</span>
+                <select value={form.fuente_contacto} onChange={e=>setForm({...form,fuente_contacto:e.target.value})}
+                  style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #e4e7ec",background:"#f8f9fa",fontSize:14,color:form.fuente_contacto?"#1a1a1a":"#888888",cursor:"pointer"}}>
+                  <option value="">Selecciona una opción...</option>
+                  <option value="Instagram">📸 Instagram</option>
+                  <option value="Facebook">📘 Facebook</option>
+                  <option value="WhatsApp">💬 WhatsApp</option>
+                  <option value="Referido">🤝 Me lo recomendó alguien</option>
+                  <option value="Google">🔍 Google / Búsqueda web</option>
+                  <option value="Portal web">🌐 Entré directo al portal</option>
+                  <option value="Otro">💬 Otro</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* ¿Cómo nos conociste? para campaña — fila completa */}
           {!isLibre&&(
             <div className="field-row">
-              <span className="field-label">{op==="México"?"Estado *":"Región *"}</span>
-              <select value={form.region_estado} onChange={e=>setForm({...form,region_estado:e.target.value})}
-                style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #e4e7ec",background:"#f8f9fa",fontSize:14,cursor:"pointer",color:form.region_estado?"#1a1a1a":"#888888"}}>
-                <option value="">-- Seleccionar --</option>
-                {(op==="México"?ESTADOS_MEXICO:REGIONES_CHILE).map(r=><option key={r} value={r}>{r}</option>)}
+              <span className="field-label">¿Cómo nos conociste? *</span>
+              <select value={form.fuente_contacto} onChange={e=>setForm({...form,fuente_contacto:e.target.value})}
+                style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #e4e7ec",background:"#f8f9fa",fontSize:14,color:form.fuente_contacto?"#1a1a1a":"#888888",cursor:"pointer"}}>
+                <option value="">Selecciona una opción...</option>
+                <option value="Instagram">📸 Instagram</option>
+                <option value="Facebook">📘 Facebook</option>
+                <option value="WhatsApp">💬 WhatsApp</option>
+                <option value="Referido">🤝 Me lo recomendó alguien</option>
+                <option value="Google">🔍 Google / Búsqueda web</option>
+                <option value="Portal web">🌐 Entré directo al portal</option>
+                <option value="Otro">💬 Otro</option>
               </select>
             </div>
           )}
-          <div className="two-col">
-            <div className="field-row"><span className="field-label">RUT / CURP</span><input value={form.rut} onChange={e=>setForm({...form,rut:e.target.value})} placeholder="Identificación"/></div>
-          </div>
-          <div className="two-col">
-            <div className="field-row">
-              <span className="field-label">Teléfono WhatsApp *</span>
-              <input value={form.telefono} onChange={e=>setForm({...form,telefono:e.target.value})}
-                placeholder={form.pais_form==="México"?"+521 ...":"+569 ..."}/>
-            </div>
-            <div className="field-row"><span className="field-label">Correo electrónico</span><input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="correo@..."/></div>
-          </div>
-          <div className="field-row">
-            <span className="field-label">¿Cómo nos conociste? *</span>
-            <select value={form.fuente_contacto} onChange={e=>setForm({...form,fuente_contacto:e.target.value})}
-              style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #e4e7ec",background:"#f8f9fa",fontSize:14,color:form.fuente_contacto?"#1a1a1a":"#888888",cursor:"pointer"}}>
-              <option value="">Selecciona una opción...</option>
-              <option value="Instagram">📸 Instagram</option>
-              <option value="Facebook">📘 Facebook</option>
-              <option value="WhatsApp">💬 WhatsApp</option>
-              <option value="Referido">🤝 Me lo recomendó alguien</option>
-              <option value="Google">🔍 Google / Búsqueda web</option>
-              <option value="Portal web">🌐 Entré directo al portal</option>
-              <option value="Otro">💬 Otro</option>
-            </select>
-          </div>
         </div>
         {!isLibre && vars.length>0 && (
           <div className="form-card">
