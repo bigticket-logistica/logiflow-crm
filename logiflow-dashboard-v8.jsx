@@ -765,7 +765,28 @@ const Pipeline = ({ leads, onSelect, onEtapaChange }) => {
 
 // ─── KPIs ─────────────────────────────────────────────────────────────────────
 const KPIsView = ({ leads }) => {
+  const [descargando,setDescargando]=useState(false);
+  const reporteRef=useRef(null);
   const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Contrato Firmado","contrato no firmado":"Contrato No Firmado","ganado":"Contrato Firmado","perdido":"Contrato No Firmado","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
+
+  const descargarPDF=async()=>{
+    if(!reporteRef.current) return;
+    setDescargando(true);
+    try {
+      if(!window.html2canvas){const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";document.head.appendChild(s);await new Promise(r=>s.onload=r);}
+      if(!window.jspdf){const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";document.head.appendChild(s);await new Promise(r=>s.onload=r);}
+      const canvas=await window.html2canvas(reporteRef.current,{scale:2,backgroundColor:"#f0f2f5",useCORS:true});
+      const imgData=canvas.toDataURL("image/png");
+      const {jsPDF}=window.jspdf;
+      const pdf=new jsPDF({orientation:"portrait",unit:"mm",format:"a4"});
+      const pdfW=pdf.internal.pageSize.getWidth();
+      const pdfH=(canvas.height*pdfW)/canvas.width;
+      pdf.addImage(imgData,"PNG",0,0,pdfW,pdfH);
+      pdf.save(`BigTicket_KPIs_Generales_${new Date().toLocaleDateString("es-CL").replace(/\//g,"-")}.pdf`);
+    } catch(e){alert("Error generando PDF: "+e.message);}
+    finally{setDescargando(false);}
+  };
+
   const ganados=leads.filter(l=>norm(l.etapa)==="Contrato Firmado"),perdidos=leads.filter(l=>norm(l.etapa)==="Contrato No Firmado");
   const cerrados=ganados.length+perdidos.length;
   const tasaCierre=cerrados>0?Math.round((ganados.length/cerrados)*100):0;
@@ -777,7 +798,13 @@ const KPIsView = ({ leads }) => {
   const canalEficaz=canalStats[0],canalMenos=canalStats[canalStats.length-1],canalVol=[...canalStats].sort((a,b)=>b.total-a.total)[0];
   const scoreEtapa=ETAPAS_TODAS.map(e=>{const ls=leads.filter(l=>norm(l.etapa)===e);return{etapa:e,score:ls.length?Math.round(ls.reduce((a,l)=>a+(l.score||0),0)/ls.length):0,count:ls.length};}).filter(e=>e.count>0);
   return (
-    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+    <div style={{display:"flex",flexDirection:"column",gap:16}} ref={reporteRef}>
+      <div style={{display:"flex",justifyContent:"flex-end"}}>
+        <button onClick={descargarPDF} disabled={descargando}
+          style={{background:"#1a3a6b",color:"white",border:"none",borderRadius:8,padding:"9px 18px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif",opacity:descargando?0.6:1}}>
+          {descargando?"Generando...":"⬇ Descargar PDF"}
+        </button>
+      </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
         {[["✅","Tasa de cierre",`${tasaCierre}%`,"#10B981",`${ganados.length} contratos firmados de ${cerrados}`],["⏱","Tiempo promedio",tiempoPromedio!==null?`${tiempoPromedio}d`:"—","#3B82F6","Días lead→Contrato Firmado"],["📝","Contratos firmados",ganados.length,"#10B981",`${perdidos.length} no firmados`],["🚫","Contratos no firmados",perdidos.length,"#EF4444",`${cerrados>0?Math.round((perdidos.length/cerrados)*100):0}% del total cerrado`]].map(([icon,label,val,color,sub])=>(
           <div key={label} style={{background:"#ffffff",border:`1px solid ${color}22`,borderRadius:12,padding:16}}>
@@ -994,9 +1021,34 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
 // ─── KPIs POR CAMPAÑA ─────────────────────────────────────────────────────────
 const KPIsCampanaView = ({ leads }) => {
   const [campanaFiltro,setCampanaFiltro]=useState("todas");
+  const [descargando,setDescargando]=useState(false);
+  const reporteRef=useRef(null);
   const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Contrato Firmado","contrato no firmado":"Contrato No Firmado","ganado":"Contrato Firmado","perdido":"Contrato No Firmado","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
 
-  // Obtener campañas únicas
+  const descargarPDF=async()=>{
+    if(!reporteRef.current) return;
+    setDescargando(true);
+    try {
+      const script=document.createElement("script");
+      script.src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+      document.head.appendChild(script);
+      await new Promise(r=>script.onload=r);
+      const script2=document.createElement("script");
+      script2.src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+      document.head.appendChild(script2);
+      await new Promise(r=>script2.onload=r);
+      const canvas=await window.html2canvas(reporteRef.current,{scale:2,backgroundColor:"#f0f2f5",useCORS:true});
+      const imgData=canvas.toDataURL("image/png");
+      const {jsPDF}=window.jspdf;
+      const pdf=new jsPDF({orientation:"portrait",unit:"mm",format:"a4"});
+      const pdfW=pdf.internal.pageSize.getWidth();
+      const pdfH=(canvas.height*pdfW)/canvas.width;
+      pdf.addImage(imgData,"PNG",0,0,pdfW,pdfH);
+      const nombre=campanaFiltro==="todas"?"KPIs_Todas_Campanas":campanaFiltro.replace(/\s+/g,"_");
+      pdf.save(`BigTicket_${nombre}_${new Date().toLocaleDateString("es-CL").replace(/\//g,"-")}.pdf`);
+    } catch(e){alert("Error generando PDF: "+e.message);}
+    finally{setDescargando(false);}
+  };
   const campanas=[...new Set(leads.filter(l=>l.campana_id&&l.origen).map(l=>l.origen.replace("Campaña: ","")))].filter(Boolean).sort();
 
   const leadsFiltered=campanaFiltro==="todas"
@@ -1050,7 +1102,7 @@ const KPIsCampanaView = ({ leads }) => {
   ];
 
   return(
-    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+    <div style={{display:"flex",flexDirection:"column",gap:16}} ref={reporteRef}>
       {/* Filtro campaña */}
       <div style={{display:"flex",gap:12,alignItems:"center"}}>
         <select value={campanaFiltro} onChange={e=>setCampanaFiltro(e.target.value)}
@@ -1059,6 +1111,10 @@ const KPIsCampanaView = ({ leads }) => {
           {campanas.map(c=><option key={c} value={c}>{c}</option>)}
         </select>
         <div style={{fontSize:12,color:"#888888"}}>{total} leads {campanaFiltro!=="todas"?`en "${campanaFiltro}"`:"en total"}</div>
+        <button onClick={descargarPDF} disabled={descargando}
+          style={{background:"#1a3a6b",color:"white",border:"none",borderRadius:8,padding:"9px 18px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif",opacity:descargando?0.6:1,flexShrink:0}}>
+          {descargando?"Generando...":"⬇ Descargar PDF"}
+        </button>
       </div>
 
       {/* Métricas principales */}
