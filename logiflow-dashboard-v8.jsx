@@ -766,20 +766,20 @@ const Pipeline = ({ leads, onSelect, onEtapaChange }) => {
 // ─── KPIs ─────────────────────────────────────────────────────────────────────
 const KPIsView = ({ leads }) => {
   const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Contrato Firmado","contrato no firmado":"Contrato No Firmado","ganado":"Contrato Firmado","perdido":"Contrato No Firmado","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
-  const ganados=leads.filter(l=>norm(l.etapa)==="Ganado"),perdidos=leads.filter(l=>norm(l.etapa)==="Perdido");
+  const ganados=leads.filter(l=>norm(l.etapa)==="Contrato Firmado"),perdidos=leads.filter(l=>norm(l.etapa)==="Contrato No Firmado");
   const cerrados=ganados.length+perdidos.length;
   const tasaCierre=cerrados>0?Math.round((ganados.length/cerrados)*100):0;
   const tiempos=ganados.map(l=>diasEntre(l.created_at,l.updated_at)).filter(d=>d!==null);
   const tiempoPromedio=tiempos.length?Math.round(tiempos.reduce((a,b)=>a+b,0)/tiempos.length):null;
   const canales={};
-  leads.forEach(l=>{const c=(l.fuente_contacto||l.canal||"desconocido").toLowerCase();if(!canales[c])canales[c]={total:0,ganados:0};canales[c].total++;if(norm(l.etapa)==="Ganado")canales[c].ganados++;});
+  leads.forEach(l=>{const c=(l.fuente_contacto||l.canal||"desconocido").toLowerCase();if(!canales[c])canales[c]={total:0,ganados:0};canales[c].total++;if(norm(l.etapa)==="Contrato Firmado")canales[c].ganados++;});
   const canalStats=Object.entries(canales).map(([canal,d])=>({canal,total:d.total,ganados:d.ganados,eficacia:d.total>0?Math.round((d.ganados/d.total)*100):0})).sort((a,b)=>b.eficacia-a.eficacia);
   const canalEficaz=canalStats[0],canalMenos=canalStats[canalStats.length-1],canalVol=[...canalStats].sort((a,b)=>b.total-a.total)[0];
   const scoreEtapa=ETAPAS_TODAS.map(e=>{const ls=leads.filter(l=>norm(l.etapa)===e);return{etapa:e,score:ls.length?Math.round(ls.reduce((a,l)=>a+(l.score||0),0)/ls.length):0,count:ls.length};}).filter(e=>e.count>0);
   return (
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
-        {[["✅","Tasa de cierre",`${tasaCierre}%`,"#10B981",`${ganados.length} ganados de ${cerrados}`],["⏱","Tiempo promedio",tiempoPromedio!==null?`${tiempoPromedio}d`:"—","#3B82F6","Días lead→Ganado"],["📈","Leads ganados",ganados.length,"#10B981",`${perdidos.length} perdidos`],["📉","Leads perdidos",perdidos.length,"#EF4444",`${cerrados>0?Math.round((perdidos.length/cerrados)*100):0}% del cerrado`]].map(([icon,label,val,color,sub])=>(
+        {[["✅","Tasa de cierre",`${tasaCierre}%`,"#10B981",`${ganados.length} contratos firmados de ${cerrados}`],["⏱","Tiempo promedio",tiempoPromedio!==null?`${tiempoPromedio}d`:"—","#3B82F6","Días lead→Contrato Firmado"],["📝","Contratos firmados",ganados.length,"#10B981",`${perdidos.length} no firmados`],["🚫","Contratos no firmados",perdidos.length,"#EF4444",`${cerrados>0?Math.round((perdidos.length/cerrados)*100):0}% del total cerrado`]].map(([icon,label,val,color,sub])=>(
           <div key={label} style={{background:"#ffffff",border:`1px solid ${color}22`,borderRadius:12,padding:16}}>
             <div style={{fontSize:22}}>{icon}</div>
             <div style={{fontSize:28,fontWeight:900,color,fontFamily:"monospace",marginTop:6}}>{val}</div>
@@ -801,7 +801,7 @@ const KPIsView = ({ leads }) => {
               </div>
               <div style={{display:"flex",gap:16}}>
                 <div style={{textAlign:"center"}}><div style={{fontSize:22,fontWeight:900,color,fontFamily:"monospace"}}>{canal.eficacia}%</div><div style={{fontSize:9,color:"#555555"}}>EFICACIA</div></div>
-                <div style={{textAlign:"center"}}><div style={{fontSize:22,fontWeight:900,color:"#10B981",fontFamily:"monospace"}}>{canal.ganados}</div><div style={{fontSize:9,color:"#555555"}}>GANADOS</div></div>
+                <div style={{textAlign:"center"}}><div style={{fontSize:22,fontWeight:900,color:"#10B981",fontFamily:"monospace"}}>{canal.ganados}</div><div style={{fontSize:9,color:"#555555"}}>FIRMADOS</div></div>
               </div>
             </div>
           );
@@ -813,7 +813,7 @@ const KPIsView = ({ leads }) => {
           <div key={canal} style={{marginBottom:12}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
               <span style={{fontSize:12,color:"#666666"}}>{cfg.icon} {cfg.label}</span>
-              <div style={{display:"flex",gap:12}}><span style={{fontSize:10,color:"#555555"}}>{total} leads · {g} ganados</span><span style={{fontSize:12,fontWeight:800,color:cfg.color}}>{eficacia}%</span></div>
+              <div style={{display:"flex",gap:12}}><span style={{fontSize:10,color:"#555555"}}>{total} leads · {g} firmados</span><span style={{fontSize:12,fontWeight:800,color:cfg.color}}>{eficacia}%</span></div>
             </div>
             <div style={{height:6,background:"#f4f5f7",borderRadius:4}}><div style={{height:"100%",width:`${eficacia}%`,background:cfg.color,borderRadius:4,transition:"width .8s ease"}}/></div>
           </div>
@@ -991,14 +991,145 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
   );
 };
 
+// ─── KPIs POR CAMPAÑA ─────────────────────────────────────────────────────────
+const KPIsCampanaView = ({ leads }) => {
+  const [campanaFiltro,setCampanaFiltro]=useState("todas");
+  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Contrato Firmado","contrato no firmado":"Contrato No Firmado","ganado":"Contrato Firmado","perdido":"Contrato No Firmado","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
+
+  // Obtener campañas únicas
+  const campanas=[...new Set(leads.filter(l=>l.campana_id&&l.origen).map(l=>l.origen.replace("Campaña: ","")))].filter(Boolean).sort();
+
+  const leadsFiltered=campanaFiltro==="todas"
+    ? leads.filter(l=>l.campana_id)
+    : leads.filter(l=>(l.origen||"").includes(campanaFiltro));
+
+  const total=leadsFiltered.length;
+  if(total===0) return(
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      <select value={campanaFiltro} onChange={e=>setCampanaFiltro(e.target.value)}
+        style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:8,padding:"9px 12px",fontSize:13,maxWidth:400}}>
+        <option value="todas">Todas las campañas</option>
+        {campanas.map(c=><option key={c} value={c}>{c}</option>)}
+      </select>
+      <div style={{background:"#ffffff",borderRadius:12,border:"1px solid #e4e7ec",padding:40,textAlign:"center",color:"#aaaaaa"}}>No hay leads de campaña para mostrar</div>
+    </div>
+  );
+
+  const pct=(n)=>total>0?Math.round((n/total)*100):0;
+  const propAceptadas=leadsFiltered.filter(l=>norm(l.etapa)==="Propuesta Aceptada"||norm(l.etapa)==="Contrato Firmado"||norm(l.etapa)==="Contrato No Firmado").length;
+  const propRechazadas=leadsFiltered.filter(l=>norm(l.etapa)==="Propuesta Rechazada").length;
+  const contratosFirmados=leadsFiltered.filter(l=>norm(l.etapa)==="Contrato Firmado").length;
+  const contratosNoFirmados=leadsFiltered.filter(l=>norm(l.etapa)==="Contrato No Firmado").length;
+  const enProceso=leadsFiltered.filter(l=>!["Contrato Firmado","Contrato No Firmado","Propuesta Rechazada","Base Datos Leads"].includes(norm(l.etapa))).length;
+
+  // Canal con más ingresos
+  const canalesMap={};
+  leadsFiltered.forEach(l=>{const c=(l.fuente_contacto||l.canal||"Desconocido");canalesMap[c]=(canalesMap[c]||0)+1;});
+  const canalTop=Object.entries(canalesMap).sort((a,b)=>b[1]-a[1]);
+
+  // Tiempo promedio de cierre
+  const tiempos=leadsFiltered.filter(l=>norm(l.etapa)==="Contrato Firmado").map(l=>diasEntre(l.created_at,l.updated_at)).filter(d=>d!==null);
+  const tiempoPromedio=tiempos.length?Math.round(tiempos.reduce((a,b)=>a+b,0)/tiempos.length):null;
+
+  // Score promedio
+  const scorePromedio=leadsFiltered.length?Math.round(leadsFiltered.reduce((a,l)=>a+(l.score||0),0)/leadsFiltered.length):0;
+
+  // Leads calientes
+  const calientes=leadsFiltered.filter(l=>(l.clasificacion||"").toLowerCase().includes("caliente")).length;
+
+  const METRICAS=[
+    ["📋","Total postulaciones",total,"#3B82F6","leads en esta campaña"],
+    ["✅","Propuestas aceptadas",`${pct(propAceptadas)}%`,"#10B981",`${propAceptadas} de ${total}`],
+    ["❌","Propuestas rechazadas",`${pct(propRechazadas)}%`,"#EF4444",`${propRechazadas} de ${total}`],
+    ["📝","Contratos firmados",`${pct(contratosFirmados)}%`,"#059669",`${contratosFirmados} de ${total}`],
+    ["🚫","Contratos no firmados",`${pct(contratosNoFirmados)}%`,"#DC2626",`${contratosNoFirmados} de ${total}`],
+    ["⏳","En proceso",enProceso,"#F59E0B","leads activos en pipeline"],
+    ["⭐","Score promedio",scorePromedio,"#F59E0B","puntos promedio"],
+    ["🔴","Leads calientes",`${pct(calientes)}%`,"#EF4444",`${calientes} calientes`],
+    ["⏱","Tiempo prom. cierre",tiempoPromedio!==null?`${tiempoPromedio}d`:"—","#8B5CF6","días lead→contrato firmado"],
+  ];
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      {/* Filtro campaña */}
+      <div style={{display:"flex",gap:12,alignItems:"center"}}>
+        <select value={campanaFiltro} onChange={e=>setCampanaFiltro(e.target.value)}
+          style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:8,padding:"9px 14px",fontSize:13,flex:1,maxWidth:400,cursor:"pointer"}}>
+          <option value="todas">📊 Todas las campañas</option>
+          {campanas.map(c=><option key={c} value={c}>{c}</option>)}
+        </select>
+        <div style={{fontSize:12,color:"#888888"}}>{total} leads {campanaFiltro!=="todas"?`en "${campanaFiltro}"`:"en total"}</div>
+      </div>
+
+      {/* Métricas principales */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
+        {METRICAS.map(([icon,label,val,color,sub])=>(
+          <div key={label} style={{background:"#ffffff",border:`1px solid ${color}22`,borderRadius:12,padding:16}}>
+            <div style={{fontSize:20}}>{icon}</div>
+            <div style={{fontSize:26,fontWeight:900,color,fontFamily:"monospace",marginTop:6}}>{val}</div>
+            <div style={{fontSize:11,color:"#555555",fontWeight:700,marginTop:2}}>{label}</div>
+            <div style={{fontSize:10,color:"#aaaaaa",marginTop:2}}>{sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Canal con más ingresos */}
+      <div style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:12,padding:16}}>
+        <div style={{fontSize:10,fontWeight:800,color:"#555555",letterSpacing:2,marginBottom:14,textTransform:"uppercase"}}>Origen de leads</div>
+        {canalTop.map(([canal,count])=>{const cfg=getCanalCfg(canal.toLowerCase());return(
+          <div key={canal} style={{marginBottom:10}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+              <span style={{fontSize:12,color:"#666666"}}>{cfg.icon} {cfg.label||canal}</span>
+              <div style={{display:"flex",gap:12}}>
+                <span style={{fontSize:10,color:"#555555"}}>{count} leads</span>
+                <span style={{fontSize:12,fontWeight:800,color:cfg.color}}>{pct(count)}%</span>
+              </div>
+            </div>
+            <div style={{height:6,background:"#f4f5f7",borderRadius:4}}>
+              <div style={{height:"100%",width:`${pct(count)}%`,background:cfg.color,borderRadius:4,transition:"width .8s ease"}}/>
+            </div>
+          </div>
+        );})}
+      </div>
+
+      {/* Comparativa de campañas si se muestra "todas" */}
+      {campanaFiltro==="todas"&&campanas.length>1&&(
+        <div style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:12,padding:16}}>
+          <div style={{fontSize:10,fontWeight:800,color:"#555555",letterSpacing:2,marginBottom:14,textTransform:"uppercase"}}>Comparativa de campañas</div>
+          {campanas.map(c=>{
+            const ls=leads.filter(l=>(l.origen||"").includes(c));
+            const tot=ls.length;
+            const firm=ls.filter(l=>norm(l.etapa)==="Contrato Firmado").length;
+            const tasa=tot>0?Math.round((firm/tot)*100):0;
+            return(
+              <div key={c} style={{marginBottom:12}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                  <span style={{fontSize:12,color:"#1a1a1a",fontWeight:600}}>{c}</span>
+                  <div style={{display:"flex",gap:16}}>
+                    <span style={{fontSize:10,color:"#555555"}}>{tot} postulaciones · {firm} firmados</span>
+                    <span style={{fontSize:12,fontWeight:800,color:tasa>=50?"#10B981":tasa>=25?"#F59E0B":"#EF4444"}}>{tasa}%</span>
+                  </div>
+                </div>
+                <div style={{height:6,background:"#f4f5f7",borderRadius:4}}>
+                  <div style={{height:"100%",width:`${tasa}%`,background:tasa>=50?"#10B981":tasa>=25?"#F59E0B":"#EF4444",borderRadius:4,transition:"width .8s ease"}}/>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 const DashboardMetrics = ({ leads }) => {
   const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Contrato Firmado","contrato no firmado":"Contrato No Firmado","ganado":"Contrato Firmado","perdido":"Contrato No Firmado","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
   const hoy=new Date();hoy.setHours(0,0,0,0);
   const nuevosHoy=leads.filter(l=>l.created_at&&new Date(l.created_at)>=hoy).length;
   const scorePromedio=leads.length?Math.round(leads.reduce((a,l)=>a+(l.score||0),0)/leads.length):0;
-  const ganados=leads.filter(l=>norm(l.etapa)==="Ganado").length;
-  const cerrados=ganados+leads.filter(l=>norm(l.etapa)==="Perdido").length;
+  const ganados=leads.filter(l=>norm(l.etapa)==="Contrato Firmado").length;
+  const cerrados=ganados+leads.filter(l=>norm(l.etapa)==="Contrato No Firmado").length;
   const tasaCierre=cerrados>0?Math.round((ganados/cerrados)*100):0;
   const canalData=Object.entries(leads.reduce((a,l)=>{const c=(l.fuente_contacto||l.canal)?.toLowerCase()||"otro";a[c]=(a[c]||0)+1;return a},{})).sort((a,b)=>b[1]-a[1]);
   const etapaData=ETAPAS_TODAS.map(e=>({etapa:e,count:leads.filter(l=>norm(l.etapa)===e).length}));
@@ -1081,7 +1212,7 @@ const TablaLeads = ({ leads, onSelect }) => (
 );
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
-const ETAPAS_MONITOR=["Nuevo Lead","Propuesta Enviada","Propuesta Aceptada"];
+const ETAPAS_MONITOR=["Nuevo Lead","Propuesta Enviada","Propuesta Aceptada","Propuesta Rechazada"];
 const HORAS_OLVIDADO=24;
 const HORAS_ESTANCADO=48;
 
@@ -1281,8 +1412,8 @@ export default function App() {
     {id:"campana",     icon:"🎯",label:"Leads Campaña",      count:leadsCampana.length},
     {id:"libre",       icon:"📋",label:"Leads Libre",         count:leadsLibre.length},
     {id:"basedatos",   icon:"🗄️",label:"Base Datos Leads",   count:leadsBaseDatos.length},
-    {id:"kpis",        icon:"📊",label:"KPIs"},
-    {id:"plantillas",  icon:"💬",label:"Plantillas"},
+    {id:"kpis",        icon:"📊",label:"KPIs Generales"},
+    {id:"kpiscampana", icon:"🎯",label:"KPIs por Campaña"},
   ];
 
   return (
@@ -1355,8 +1486,8 @@ export default function App() {
               {seccion==="campana"    &&`🎯 ${leadsCampana.length} leads de campaña · ordenados por fecha y puntaje`}
               {seccion==="libre"      &&`📋 ${leadsLibre.length} leads postulación libre · ordenados por fecha`}
               {seccion==="basedatos"  &&`🗄️ ${leadsBaseDatos.length} leads · tibios y fríos`}
-              {seccion==="kpis"       &&"📊 Análisis de performance"}
-              {seccion==="plantillas" &&"💬 Plantillas de mensajes"}
+              {seccion==="kpis"       &&"📊 KPIs Generales"}
+              {seccion==="kpiscampana"&&"🎯 KPIs por Campaña"}
             </div>
           </div>
           <div style={{background:"#dcfce7",border:"1px solid #86efac",borderRadius:7,padding:"5px 10px",fontSize:10,color:"#166534",fontWeight:700}}>⚡ N8N Activo</div>
@@ -1382,7 +1513,7 @@ export default function App() {
               {seccion==="libre"      &&(vista==="pipeline"?<Pipeline leads={leadsLibre}   onSelect={setSelectedLead} onEtapaChange={handleEtapaChange}/>:<TablaLeads leads={leadsLibre}   onSelect={setSelectedLead}/>)}
               {seccion==="basedatos"  &&<TablaLeads leads={leadsBaseDatos} onSelect={setSelectedLead}/>}
               {seccion==="kpis"       &&<KPIsView leads={leads}/>}
-              {seccion==="plantillas" &&<PlantillasView/>}
+              {seccion==="kpiscampana"&&<KPIsCampanaView leads={leads}/>}
             </div>
           )}
         </div>
