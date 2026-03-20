@@ -1459,6 +1459,8 @@ export default function App() {
 
   const leadsBaseDatos=[...leads]
     .filter(l=>NORM(l.etapa)==="Base Datos Leads"||
+      NORM(l.etapa)==="Propuesta Rechazada"||
+      NORM(l.etapa)==="Contrato No Firmado"||
       (!esCaliente(l)&&["Contactado","Reunión Agendada","Negociación"].includes(l.etapa)))
     .filter(busquedaFilter)
     .sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
@@ -1541,7 +1543,7 @@ export default function App() {
               {seccion==="dashboard"  &&"📊 Resumen en tiempo real"}
               {seccion==="campana"    &&`🎯 ${leadsCampana.length} leads de campaña · ordenados por fecha y puntaje`}
               {seccion==="libre"      &&`📋 ${leadsLibre.length} leads postulación libre · ordenados por fecha`}
-              {seccion==="basedatos"  &&`🗄️ ${leadsBaseDatos.length} leads · tibios y fríos`}
+              {seccion==="basedatos"  &&`🗄️ ${leadsBaseDatos.length} leads · tibios, fríos, rechazados y no firmados`}
               {seccion==="kpis"       &&"📊 KPIs Generales"}
               {seccion==="kpiscampana"&&"🎯 KPIs por Campaña"}
             </div>
