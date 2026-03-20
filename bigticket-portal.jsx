@@ -291,10 +291,13 @@ function ScoreFieldBuilder({ field, onUpdate, onRemove, usedVariables }) {
   );
 }
 
-function ViewCountry({ onSelect, busquedaCodigo, setBusquedaCodigo, buscarPostulacion, buscando, errorBusqueda }) {
+function ViewCountry({ onSelect, busquedaCodigo, setBusquedaCodigo, buscarPostulacion, buscando, errorBusqueda, onAdmin }) {
   return (
     <div>
-      <div className="topbar"><span className="logo"><span>big</span>ticket</span></div>
+      <div className="topbar">
+        <span className="logo">Big<span>ticket</span></span>
+        <button className="btn-gw" onClick={onAdmin}>Admin ⚙</button>
+      </div>
       <div className="pg" style={{maxWidth:440,paddingTop:48}}>
         <div className="sec-title" style={{textAlign:"center",marginBottom:6}}>Selecciona tu operación</div>
         <div className="sec-sub" style={{textAlign:"center"}}>¿En qué país trabajarás?</div>
@@ -336,7 +339,7 @@ function ViewPortal({ op, canal, campaigns, loading, onChangePais, onDetail, onL
   return (
     <div>
       <div className="topbar">
-        <span className="logo"><span>big</span>ticket — Portal terceros</span>
+        <span className="logo">Big<span>ticket</span> — Portal terceros</span>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <span className="tag-op">{op}</span>
           <span className="canal-badge">{ch.label}</span>
@@ -718,7 +721,7 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
 }
 
 // ─── BIGGI — ASISTENTE VIRTUAL ────────────────────────────────────────────────
-const BIGGI_PROMPT = `Eres Biggi, el asistente virtual de BigTicket 🚛, una empresa de logística que conecta conductores terceros con campañas de reparto en Chile y México.
+const BIGGI_PROMPT = `Eres Biggy, el asistente virtual de BigTicket 🚛, una empresa de logística que conecta conductores terceros con campañas de reparto en Chile y México.
 
 Tu rol es ayudar a prospectos y conductores activos con sus consultas de forma amable, clara y con emojis ocasionales.
 
@@ -763,7 +766,7 @@ REGLAS:
 
 function BiggiBubble({ paginaPrincipal=false }) {
   const [abierto,setAbierto]=useState(false);
-  const [mensajes,setMensajes]=useState([{rol:"biggi",texto:"¡Hola! Soy Biggi 🚛 el asistente virtual de BigTicket. ¿En qué puedo ayudarte hoy?"}]);
+  const [mensajes,setMensajes]=useState([{rol:"biggi",texto:"¡Hola! Soy Biggy 🚛 el asistente virtual de BigTicket. ¿En qué puedo ayudarte hoy?"}]);
   const [input,setInput]=useState("");
   const [cargando,setCargando]=useState(false);
   const endRef=useRef(null);
@@ -814,7 +817,7 @@ function BiggiBubble({ paginaPrincipal=false }) {
 
       setMensajes(p=>[...p,{rol:"biggi",texto:respuesta}]);
     } catch(e){
-      console.error("Error Biggi:", e);
+      console.error("Error Biggy:", e);
       setMensajes(p=>[...p,{rol:"biggi",texto:"Tuve un problema técnico. Por favor contacta al equipo: +56957730804 📞"}]);
     } finally {
       setCargando(false);
@@ -851,7 +854,7 @@ function BiggiBubble({ paginaPrincipal=false }) {
     />
     <img
       src={DONB_URL}
-      alt="Biggi"
+      alt="Biggy"
       style={{
         width: "86%",
         height: "86%",
@@ -870,13 +873,13 @@ function BiggiBubble({ paginaPrincipal=false }) {
         <div onClick={()=>setAbierto(true)} style={{position:"fixed",bottom:24,right:24,zIndex:999,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
           {paginaPrincipal&&(
             <div style={{background:"#1a3a6b",color:"#fff",borderRadius:12,padding:"8px 14px",fontSize:12,fontWeight:600,boxShadow:"0 4px 16px rgba(0,0,0,0.2)",whiteSpace:"nowrap",animation:"pulse 2s infinite"}}>
-              💬 ¿Tienes dudas? ¡Pregúntale a Biggi!
+              💬 ¿Tienes dudas? ¡Pregúntale a Biggy!
             </div>
           )}
-          <div style={{width:60,height:60,borderRadius:"50%",overflow:"hidden",boxShadow:"0 4px 20px rgba(244,123,32,0.5)",border:"3px solid #F47B20"}}>
-            <img src={DONB_URL} alt="Biggi" style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:"top"}}/>
+          <div style={{width:80,height:80,borderRadius:"50%",overflow:"hidden",boxShadow:"0 4px 20px rgba(244,123,32,0.5)",border:"3px solid #F47B20"}}>
+            <img src={DONB_URL} alt="Biggy" style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:"top"}}/>
           </div>
-          <div style={{background:"#1a3a6b",color:"#fff",borderRadius:8,padding:"3px 10px",fontSize:11,fontWeight:700}}>Biggi</div>
+          <div style={{background:"#1a3a6b",color:"#fff",borderRadius:8,padding:"3px 10px",fontSize:11,fontWeight:700}}>Biggy</div>
         </div>
       )}
 
@@ -885,9 +888,9 @@ function BiggiBubble({ paginaPrincipal=false }) {
         <div style={{position:"fixed",bottom:24,right:24,zIndex:999,width:340,height:480,background:"#fff",borderRadius:16,boxShadow:"0 8px 40px rgba(0,0,0,0.2)",display:"flex",flexDirection:"column",overflow:"hidden",border:"1px solid #e4e7ec"}}>
           {/* Header */}
           <div style={{background:"linear-gradient(135deg,#1a3a6b,#2a5a9b)",padding:"12px 16px",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-            <BiggiFace size={36}/>
+            <BiggiFace size={48}/>
             <div style={{flex:1}}>
-              <div style={{color:"#fff",fontSize:14,fontWeight:700}}>Biggi</div>
+              <div style={{color:"#fff",fontSize:14,fontWeight:700}}>Biggy/div>
               <div style={{color:"#aac3e8",fontSize:11}}>Asistente Virtual BigTicket</div>
             </div>
             <button onClick={()=>setAbierto(false)} style={{background:"rgba(255,255,255,0.15)",border:"none",color:"#fff",borderRadius:"50%",width:28,height:28,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
@@ -897,7 +900,7 @@ function BiggiBubble({ paginaPrincipal=false }) {
           <div style={{flex:1,overflow:"auto",padding:12,display:"flex",flexDirection:"column",gap:10,background:"#f8f9fa"}}>
             {mensajes.map((m,i)=>(
               <div key={i} style={{display:"flex",gap:8,justifyContent:m.rol==="usuario"?"flex-end":"flex-start",alignItems:"flex-end"}}>
-                {m.rol==="biggi"&&<BiggiFace size={28}/>}
+                {m.rol==="biggi"&&<BiggiFace size={40}/>}
                 <div style={{maxWidth:"78%",background:m.rol==="usuario"?"#1a3a6b":"#fff",color:m.rol==="usuario"?"#fff":"#1a1a1a",borderRadius:m.rol==="usuario"?"12px 12px 2px 12px":"12px 12px 12px 2px",padding:"9px 12px",fontSize:12,lineHeight:1.5,border:m.rol==="usuario"?"none":"1px solid #e4e7ec",boxShadow:"0 1px 3px rgba(0,0,0,0.06)"}}>
                   {m.texto}
                 </div>
@@ -905,9 +908,9 @@ function BiggiBubble({ paginaPrincipal=false }) {
             ))}
             {cargando&&(
               <div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
-                <BiggiFace size={28}/>
+                <BiggiFace size={40}/>
                 <div style={{background:"#fff",border:"1px solid #e4e7ec",borderRadius:"12px 12px 12px 2px",padding:"9px 12px",fontSize:12,color:"#888"}}>
-                  <span style={{animation:"pulse 1s infinite"}}>Biggi está escribiendo...</span>
+                  <span style={{animation:"pulse 1s infinite"}}>Biggy está escribiendo...</span>
                 </div>
               </div>
             )}
@@ -936,7 +939,7 @@ function ViewSuccess({ codigo, onVolver }) {
   const copiar=()=>{navigator.clipboard?.writeText(codigo||"");setCopiado(true);setTimeout(()=>setCopiado(false),2000);};
   return (
     <div>
-      <div className="topbar"><span className="logo"><span>big</span>ticket</span></div>
+      <div className="topbar"><span className="logo">Big<span>ticket</span></span></div>
       <div style={{maxWidth:440,margin:"60px auto",padding:"20px"}}>
         <div style={{background:"#fff",borderRadius:16,padding:"40px 32px",textAlign:"center",border:"0.5px solid #e4e7ec"}}>
           <div style={{width:56,height:56,background:"#dcfce7",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px",fontSize:24,color:"#166534"}}>✓</div>
@@ -966,7 +969,7 @@ function ViewPostulacion({ data, onVolver }) {
   const etapaColor=ETAPA_COLOR[lead.etapa]||"#888";
   return(
     <div>
-      <div className="topbar"><span className="logo"><span>big</span>ticket</span></div>
+      <div className="topbar"><span className="logo">Big<span>ticket</span></span></div>
       <div style={{maxWidth:480,margin:"0 auto",padding:"20px 16px"}}>
         <button onClick={onVolver} style={{background:"none",border:"none",color:"#888",fontSize:13,cursor:"pointer",marginBottom:16}}>← Volver</button>
         <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",padding:"20px 24px",marginBottom:16}}>
@@ -1383,7 +1386,7 @@ function ViewPropuesta() {
   return(
     <div>
       <div className="topbar">
-        <span className="logo"><span>big</span>ticket</span>
+        <span className="logo">Big<span>ticket</span></span>
         <span style={{fontSize:13,color:"#888"}}>Propuesta económica</span>
       </div>
       <div style={{maxWidth:700,margin:"0 auto",padding:"20px 16px"}}>
@@ -1484,17 +1487,11 @@ export default function App() {
 
   return (
     <><style>{css}</ style>
-      {view==="country"&&<ViewCountry onSelect={c=>{setOp(c);setView("portal");}} busquedaCodigo={busquedaCodigo} setBusquedaCodigo={setBusquedaCodigo} buscarPostulacion={buscarPostulacion} buscando={buscando} errorBusqueda={errorBusqueda}/>}
+      {view==="country"&&<ViewCountry onSelect={c=>{setOp(c);setView("portal");}} busquedaCodigo={busquedaCodigo} setBusquedaCodigo={setBusquedaCodigo} buscarPostulacion={buscarPostulacion} buscando={buscando} errorBusqueda={errorBusqueda} onAdmin={()=>setShowAdmin(true)}/>}
       {view==="portal"&&op&&<ViewPortal op={op} canal={canal} campaigns={campaigns} loading={loading} onChangePais={()=>setView("country")} onDetail={c=>{setSelectedCamp(c);setView("detail");}} onLibre={()=>{setFormCamp(null);setView("form");}}/>}
       {view==="detail"&&selectedCamp&&<ViewDetail camp={selectedCamp} canal={canal} onBack={()=>setView("portal")} onPostular={()=>{setFormCamp(selectedCamp);setView("form");}}/>}
       {view==="form"&&<ViewForm camp={formCamp} canal={canal} op={op} onBack={()=>setView(formCamp?"detail":"portal")} onSuccess={(codigo)=>{setSuccessCodigo(codigo);setView("success");}}/>}
       {view==="success"&&<ViewSuccess codigo={successCodigo} onVolver={()=>{setView("portal");loadCampaigns();}}/>}
-      {view==="portal"&&(
-        <div style={{position:"fixed",bottom:20,right:20,zIndex:99,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:8}}>
-          {adminAuth&&<button style={{background:"transparent",border:"none",cursor:"pointer",fontSize:11,color:"#888"}} onClick={()=>{sessionStorage.removeItem("admin_auth");setAdminAuth(false);}}>Cerrar sesión</button>}
-          <button className="btn-blue" onClick={()=>setShowAdmin(true)}>Admin ⚙</button>
-        </div>
-      )}
       <BiggiBubble paginaPrincipal={view==="country"}/>
     </>
   );
