@@ -775,11 +775,15 @@ function BiggiBubble({ paginaPrincipal=false }) {
     setInput("");
     setMensajes(p=>[...p,{rol:"usuario",texto}]);
     setCargando(true);
+
     try {
-      const historial=mensajes.filter(m=>m.rol!=="biggi"||mensajes.indexOf(m)>0).map(m=>({
-        role:m.rol==="usuario"?"user":"assistant",
-        content:m.texto
-      }));
+      const historial=mensajes
+        .filter((m,i)=>m.rol!=="biggi" || i>0)
+        .map(m=>({
+          role:m.rol==="usuario"?"user":"assistant",
+          content:m.texto
+        }));
+
       const res=await fetch("https://bigticket2026.app.n8n.cloud/webhook/biggi-chat",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
@@ -788,14 +792,35 @@ function BiggiBubble({ paginaPrincipal=false }) {
           messages:[...historial,{role:"user",content:texto}]
         })
       });
-      const data=await res.json();
-      const respuesta=data.respuesta||data.content?.[0]?.text||data.text||"Lo siento, no pude procesar tu consulta. Contacta al equipo: +56957730804";
+
+      if(!res.ok){
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      const contentType = res.headers.get("content-type") || "";
+      let respuesta = "";
+
+      if(contentType.includes("application/json")){
+        const data = await res.json();
+        respuesta =
+          data.respuesta ||
+          data.content?.[0]?.text ||
+          data.text ||
+          "Lo siento, no pude procesar tu consulta. Contacta al equipo: +56957730804";
+      } else {
+        respuesta = await res.text();
+      }
+
       setMensajes(p=>[...p,{rol:"biggi",texto:respuesta}]);
     } catch(e){
+      console.error("Error Biggi:", e);
       setMensajes(p=>[...p,{rol:"biggi",texto:"Tuve un problema técnico. Por favor contacta al equipo: +56957730804 📞"}]);
+    } finally {
+      setCargando(false);
     }
-    finally{setCargando(false);}
   };
+
+  const DONB_URL="https://psvdtgjvognbmxfvqbaa.supabase.co/storage/v1/object/public/assets/Don_B.jpeg";
 
   const DONB_URL="https://psvdtgjvognbmxfvqbaa.supabase.co/storage/v1/object/public/assets/Don_B.jpeg";
 
