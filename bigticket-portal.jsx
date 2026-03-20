@@ -1544,7 +1544,7 @@ function ViewOnboarding({ lead, onVolver }) {
     <div>
       <div className="topbar">
         <span className="logo">Big<span>ticket</span></span>
-        <button className="btn-gw" onClick={onVolver}>← Volver</button>
+        <button className="btn-gw" onClick={onVolver}>Salir</button>
       </div>
       <div style={{maxWidth:600,margin:"0 auto",padding:"20px 16px"}}>
 
