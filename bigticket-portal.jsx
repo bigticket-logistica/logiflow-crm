@@ -821,11 +821,6 @@ function BiggiBubble({ paginaPrincipal=false }) {
     }
   };
 
-// URL GLOBAL (solo una vez en el archivo)
-const DONB_URL =
-  "https://psvdtgjvognbmxfvqbaa.supabase.co/storage/v1/object/public/assets/Don%20B1.jpeg";
-
-
 // Avatar PRO
 const BiggiFace = ({ size = 44 }) => (
   <div
