@@ -504,6 +504,7 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
       // 1. Guardar en Supabase
       const {data:lead,error:le}=await sb.from("leads").insert({
         nombre:form.nombre,empresa:form.empresa||null,telefono:form.telefono,email:form.email||null,
+        rut:form.rut||null,
         canal,pais:form.pais_form||op,score,clasificacion,etapa:clasificacion==="Caliente"?"Propuesta Enviada":"Base Datos Leads",
         origen:isLibre?"Postulación libre":`Campaña: ${camp?.nombre||""}`,
         campana_id:camp?.id||null,fuente_contacto:form.fuente_contacto||null,
