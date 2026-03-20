@@ -890,7 +890,7 @@ function BiggiBubble({ paginaPrincipal=false }) {
           <div style={{background:"linear-gradient(135deg,#1a3a6b,#2a5a9b)",padding:"12px 16px",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
             <BiggiFace size={48}/>
             <div style={{flex:1}}>
-              <div style={{color:"#fff",fontSize:14,fontWeight:700}}>Biggy/div>
+              <div style={{color:"#fff",fontSize:14,fontWeight:700}}>Biggy</div>
               <div style={{color:"#aac3e8",fontSize:11}}>Asistente Virtual BigTicket</div>
             </div>
             <button onClick={()=>setAbierto(false)} style={{background:"rgba(255,255,255,0.15)",border:"none",color:"#fff",borderRadius:"50%",width:28,height:28,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
