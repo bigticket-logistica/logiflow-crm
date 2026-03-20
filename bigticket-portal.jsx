@@ -717,8 +717,8 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
   );
 }
 
-// ─── Biggy — ASISTENTE VIRTUAL ────────────────────────────────────────────────
-const Biggy_PROMPT = `Eres Biggy, el asistente virtual de BigTicket 🚛, una empresa de logística que conecta conductores terceros con campañas de reparto en Chile y México.
+// ─── BIGGI — ASISTENTE VIRTUAL ────────────────────────────────────────────────
+const BIGGI_PROMPT = `Eres Biggi, el asistente virtual de BigTicket 🚛, una empresa de logística que conecta conductores terceros con campañas de reparto en Chile y México.
 
 Tu rol es ayudar a prospectos y conductores activos con sus consultas de forma amable, clara y con emojis ocasionales.
 
@@ -761,9 +761,9 @@ REGLAS:
 - Responde en el idioma del usuario (español)
 - Sé conciso — máximo 3-4 líneas por respuesta`;
 
-function BiggyBubble({ paginaPrincipal=false }) {
+function BiggiBubble({ paginaPrincipal=false }) {
   const [abierto,setAbierto]=useState(false);
-  const [mensajes,setMensajes]=useState([{rol:"Biggy",texto:"¡Hola! Soy Biggy 🚛 el asistente virtual de BigTicket. ¿En qué puedo ayudarte hoy?"}]);
+  const [mensajes,setMensajes]=useState([{rol:"biggi",texto:"¡Hola! Soy Biggi 🚛 el asistente virtual de BigTicket. ¿En qué puedo ayudarte hoy?"}]);
   const [input,setInput]=useState("");
   const [cargando,setCargando]=useState(false);
   const endRef=useRef(null);
@@ -779,17 +779,17 @@ function BiggyBubble({ paginaPrincipal=false }) {
 
     try {
       const historial=mensajes
-        .filter((m,i)=>m.rol!=="Biggy" || i>0)
+        .filter((m,i)=>m.rol!=="biggi" || i>0)
         .map(m=>({
           role:m.rol==="usuario"?"user":"assistant",
           content:m.texto
         }));
 
-      const res=await fetch("https://bigticket2026.app.n8n.cloud/webhook/Biggy-chat",{
+      const res=await fetch("https://bigticket2026.app.n8n.cloud/webhook/biggi-chat",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
-          system:Biggy_PROMPT,
+          system:BIGGI_PROMPT,
           messages:[...historial,{role:"user",content:texto}]
         })
       });
@@ -812,16 +812,16 @@ function BiggyBubble({ paginaPrincipal=false }) {
         respuesta = await res.text();
       }
 
-      setMensajes(p=>[...p,{rol:"Biggy",texto:respuesta}]);
+      setMensajes(p=>[...p,{rol:"biggi",texto:respuesta}]);
     } catch(e){
-      console.error("Error Biggy:", e);
-      setMensajes(p=>[...p,{rol:"Biggy",texto:"Tuve un problema técnico. Por favor contacta al equipo: +56957730804 📞"}]);
+      console.error("Error Biggi:", e);
+      setMensajes(p=>[...p,{rol:"biggi",texto:"Tuve un problema técnico. Por favor contacta al equipo: +56957730804 📞"}]);
     } finally {
       setCargando(false);
     }
   };
 
-  const BiggyFace = ({ size = 54 }) => (
+  const BiggiFace = ({ size = 54 }) => (
   <div
     style={{
       width: size,
@@ -851,7 +851,7 @@ function BiggyBubble({ paginaPrincipal=false }) {
     />
     <img
       src={DONB_URL}
-      alt="Biggy"
+      alt="Biggi"
       style={{
         width: "86%",
         height: "86%",
@@ -870,13 +870,13 @@ function BiggyBubble({ paginaPrincipal=false }) {
         <div onClick={()=>setAbierto(true)} style={{position:"fixed",bottom:24,right:24,zIndex:999,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
           {paginaPrincipal&&(
             <div style={{background:"#1a3a6b",color:"#fff",borderRadius:12,padding:"8px 14px",fontSize:12,fontWeight:600,boxShadow:"0 4px 16px rgba(0,0,0,0.2)",whiteSpace:"nowrap",animation:"pulse 2s infinite"}}>
-              💬 ¿Tienes dudas? ¡Pregúntale a Biggy!
+              💬 ¿Tienes dudas? ¡Pregúntale a Biggi!
             </div>
           )}
           <div style={{width:60,height:60,borderRadius:"50%",overflow:"hidden",boxShadow:"0 4px 20px rgba(244,123,32,0.5)",border:"3px solid #F47B20"}}>
-            <img src={DONB_URL} alt="Biggy" style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:"top"}}/>
+            <img src={DONB_URL} alt="Biggi" style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:"top"}}/>
           </div>
-          <div style={{background:"#1a3a6b",color:"#fff",borderRadius:8,padding:"3px 10px",fontSize:11,fontWeight:700}}>Biggy</div>
+          <div style={{background:"#1a3a6b",color:"#fff",borderRadius:8,padding:"3px 10px",fontSize:11,fontWeight:700}}>Biggi</div>
         </div>
       )}
 
@@ -885,9 +885,9 @@ function BiggyBubble({ paginaPrincipal=false }) {
         <div style={{position:"fixed",bottom:24,right:24,zIndex:999,width:340,height:480,background:"#fff",borderRadius:16,boxShadow:"0 8px 40px rgba(0,0,0,0.2)",display:"flex",flexDirection:"column",overflow:"hidden",border:"1px solid #e4e7ec"}}>
           {/* Header */}
           <div style={{background:"linear-gradient(135deg,#1a3a6b,#2a5a9b)",padding:"12px 16px",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-            <BiggyFace size={36}/>
+            <BiggiFace size={36}/>
             <div style={{flex:1}}>
-              <div style={{color:"#fff",fontSize:14,fontWeight:700}}>Biggy</div>
+              <div style={{color:"#fff",fontSize:14,fontWeight:700}}>Biggi</div>
               <div style={{color:"#aac3e8",fontSize:11}}>Asistente Virtual BigTicket</div>
             </div>
             <button onClick={()=>setAbierto(false)} style={{background:"rgba(255,255,255,0.15)",border:"none",color:"#fff",borderRadius:"50%",width:28,height:28,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
@@ -897,7 +897,7 @@ function BiggyBubble({ paginaPrincipal=false }) {
           <div style={{flex:1,overflow:"auto",padding:12,display:"flex",flexDirection:"column",gap:10,background:"#f8f9fa"}}>
             {mensajes.map((m,i)=>(
               <div key={i} style={{display:"flex",gap:8,justifyContent:m.rol==="usuario"?"flex-end":"flex-start",alignItems:"flex-end"}}>
-                {m.rol==="Biggy"&&<BiggyFace size={28}/>}
+                {m.rol==="biggi"&&<BiggiFace size={28}/>}
                 <div style={{maxWidth:"78%",background:m.rol==="usuario"?"#1a3a6b":"#fff",color:m.rol==="usuario"?"#fff":"#1a1a1a",borderRadius:m.rol==="usuario"?"12px 12px 2px 12px":"12px 12px 12px 2px",padding:"9px 12px",fontSize:12,lineHeight:1.5,border:m.rol==="usuario"?"none":"1px solid #e4e7ec",boxShadow:"0 1px 3px rgba(0,0,0,0.06)"}}>
                   {m.texto}
                 </div>
@@ -905,9 +905,9 @@ function BiggyBubble({ paginaPrincipal=false }) {
             ))}
             {cargando&&(
               <div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
-                <BiggyFace size={28}/>
+                <BiggiFace size={28}/>
                 <div style={{background:"#fff",border:"1px solid #e4e7ec",borderRadius:"12px 12px 12px 2px",padding:"9px 12px",fontSize:12,color:"#888"}}>
-                  <span style={{animation:"pulse 1s infinite"}}>Biggy está escribiendo...</span>
+                  <span style={{animation:"pulse 1s infinite"}}>Biggi está escribiendo...</span>
                 </div>
               </div>
             )}
@@ -1480,7 +1480,7 @@ export default function App() {
 
   if(showAdmin&&!adminAuth) return <><style>{css}</style><AdminLogin onSuccess={()=>setAdminAuth(true)} onClose={()=>setShowAdmin(false)}/></>;
   if(showAdmin&&adminAuth) return <><style>{css}</style><AdminPanel onClose={()=>setShowAdmin(false)} campaigns={campaigns} setCampaigns={setCampaigns}/></>;
-  if(resultadoBusqueda) return <><style>{css}</style><ViewPostulacion data={resultadoBusqueda} onVolver={()=>setResultadoBusqueda(null)}/><BiggyBubble/></>;
+  if(resultadoBusqueda) return <><style>{css}</style><ViewPostulacion data={resultadoBusqueda} onVolver={()=>setResultadoBusqueda(null)}/><BiggiBubble/></>;
 
   return (
     <><style>{css}</ style>
@@ -1495,7 +1495,7 @@ export default function App() {
           <button className="btn-blue" onClick={()=>setShowAdmin(true)}>Admin ⚙</button>
         </div>
       )}
-      <BiggyBubble paginaPrincipal={view==="country"}/>
+      <BiggiBubble paginaPrincipal={view==="country"}/>
     </>
   );
 }
