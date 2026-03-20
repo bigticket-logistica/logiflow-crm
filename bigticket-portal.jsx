@@ -1431,6 +1431,7 @@ function ViewOnboarding({ lead, onVolver }) {
   const [guardado,setGuardado]=useState(false);
   const [completado,setCompletado]=useState(false);
   const [showPrivacidad,setShowPrivacidad]=useState(false);
+  const [errores,setErrores]=useState({});
   const [form,setForm]=useState({
     trabaja_bigticket:null,
     tipos_vehiculo:[],
@@ -1488,10 +1489,21 @@ function ViewOnboarding({ lead, onVolver }) {
   };
 
   const enviarFormulario=async()=>{
-    if(!form.acepta_privacidad){alert("Debes aceptar las políticas de privacidad.");return;}
-    if(!form.tipos_vehiculo.length){alert("Selecciona al menos un tipo de vehículo.");return;}
-    if(!form.nombre||!form.rut||!form.telefono||!form.region||!form.localidad){
-      alert("Completa todos los campos obligatorios.");return;}
+    const nuevosErrores={};
+    if(!form.tipos_vehiculo.length) nuevosErrores.tipos_vehiculo="Selecciona al menos un tipo de vehículo";
+    if(!form.nombre?.trim()) nuevosErrores.nombre="Campo obligatorio";
+    if(!form.rut?.trim()) nuevosErrores.rut="Campo obligatorio";
+    if(!form.telefono?.trim()||form.telefono==="+569") nuevosErrores.telefono="Campo obligatorio";
+    if(!form.region) nuevosErrores.region="Campo obligatorio";
+    if(!form.localidad?.trim()) nuevosErrores.localidad="Campo obligatorio";
+    if(!form.acepta_privacidad) nuevosErrores.acepta_privacidad="Debes aceptar las políticas de privacidad";
+    if(Object.keys(nuevosErrores).length>0){
+      setErrores(nuevosErrores);
+      if(nuevosErrores.tipos_vehiculo){setPaso(1);return;}
+      if(nuevosErrores.nombre||nuevosErrores.rut||nuevosErrores.telefono||nuevosErrores.region||nuevosErrores.localidad){setPaso(2);return;}
+      return;
+    }
+    setErrores({});
     setGuardando(true);
     const payload={
       lead_id:lead.id, codigo_postulacion:lead.codigo_postulacion,
@@ -1610,29 +1622,45 @@ function ViewOnboarding({ lead, onVolver }) {
         {paso===2&&(
           <div className="form-card">
             <div className="form-title">Datos personales</div>
+            {Object.values(errores).some(e=>e)&&(
+              <div style={{background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:8,padding:"10px 14px",marginBottom:14,fontSize:12,color:"#c0392b",display:"flex",gap:8,alignItems:"flex-start"}}>
+                <span style={{flexShrink:0}}>⚠</span>
+                <span>Completa los campos marcados en rojo para continuar.</span>
+              </div>
+            )}
             <div className="two-col">
               <div className="field-row"><span className="field-label">Nombre *</span>
-                <input value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))} placeholder="Tu nombre"/></div>
+                <input value={form.nombre} onChange={e=>{setForm(f=>({...f,nombre:e.target.value}));setErrores(p=>({...p,nombre:""}));}}
+                  placeholder="Tu nombre" style={errores.nombre?{borderColor:"#EF4444",background:"#fff5f5"}:{}}/>
+                {errores.nombre&&<span style={{fontSize:11,color:"#EF4444",marginTop:3,display:"block"}}>⚠ {errores.nombre}</span>}</div>
               <div className="field-row"><span className="field-label">Apellidos *</span>
                 <input value={form.apellidos} onChange={e=>setForm(f=>({...f,apellidos:e.target.value}))} placeholder="Tus apellidos"/></div>
             </div>
             <div className="two-col">
               <div className="field-row"><span className="field-label">RUT (sin puntos ni guión) *</span>
-                <input value={form.rut} onChange={e=>setForm(f=>({...f,rut:e.target.value}))} placeholder="12345678k"/></div>
+                <input value={form.rut} onChange={e=>{setForm(f=>({...f,rut:e.target.value}));setErrores(p=>({...p,rut:""}));}}
+                  placeholder="12345678k" style={errores.rut?{borderColor:"#EF4444",background:"#fff5f5"}:{}}/>
+                {errores.rut&&<span style={{fontSize:11,color:"#EF4444",marginTop:3,display:"block"}}>⚠ {errores.rut}</span>}</div>
               <div className="field-row"><span className="field-label">Teléfono WhatsApp *</span>
-                <input value={form.telefono} onChange={e=>setForm(f=>({...f,telefono:e.target.value}))} placeholder="+569..."/></div>
+                <input value={form.telefono} onChange={e=>{setForm(f=>({...f,telefono:e.target.value}));setErrores(p=>({...p,telefono:""}));}}
+                  placeholder="+569..." style={errores.telefono?{borderColor:"#EF4444",background:"#fff5f5"}:{}}/>
+                {errores.telefono&&<span style={{fontSize:11,color:"#EF4444",marginTop:3,display:"block"}}>⚠ {errores.telefono}</span>}</div>
             </div>
             <div className="field-row"><span className="field-label">Correo electrónico</span>
               <input type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} placeholder="correo@..."/></div>
             <div className="two-col">
               <div className="field-row"><span className="field-label">Región *</span>
-                <select value={form.region} onChange={e=>setForm(f=>({...f,region:e.target.value}))}>
+                <select value={form.region} onChange={e=>{setForm(f=>({...f,region:e.target.value}));setErrores(p=>({...p,region:""}));}}
+                  style={errores.region?{borderColor:"#EF4444",background:"#fff5f5"}:{}}>
                   <option value="">-- Seleccionar --</option>
                   {REGIONES_CL.map(r=><option key={r}>{r}</option>)}
                 </select>
+                {errores.region&&<span style={{fontSize:11,color:"#EF4444",marginTop:3,display:"block"}}>⚠ {errores.region}</span>}
               </div>
               <div className="field-row"><span className="field-label">Localidad a la que postula *</span>
-                <input value={form.localidad} onChange={e=>setForm(f=>({...f,localidad:e.target.value}))} placeholder="Ej: Santiago Centro"/></div>
+                <input value={form.localidad} onChange={e=>{setForm(f=>({...f,localidad:e.target.value}));setErrores(p=>({...p,localidad:""}));}}
+                  placeholder="Ej: Santiago Centro" style={errores.localidad?{borderColor:"#EF4444",background:"#fff5f5"}:{}}/>
+                {errores.localidad&&<span style={{fontSize:11,color:"#EF4444",marginTop:3,display:"block"}}>⚠ {errores.localidad}</span>}</div>
             </div>
             <div style={{display:"flex",gap:10,marginTop:8}}>
               <button style={{flex:1,background:"#f0f2f5",color:"#475569",border:"none",borderRadius:8,padding:"10px",fontSize:12,fontWeight:700,cursor:"pointer"}}
@@ -1654,10 +1682,15 @@ function ViewOnboarding({ lead, onVolver }) {
               <div>🚛 {form.tipos_vehiculo.length} tipo(s) de vehículo seleccionado(s)</div>
               {form.trabaja_bigticket!==null&&<div>💼 {form.trabaja_bigticket?"Trabaja actualmente en BigTicket":"Primera vez en BigTicket"}</div>}
             </div>
+            {errores.acepta_privacidad&&(
+              <div style={{background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:8,padding:"10px 14px",marginBottom:12,fontSize:12,color:"#c0392b"}}>
+                ⚠ {errores.acepta_privacidad}
+              </div>
+            )}
             <label style={{display:"flex",alignItems:"flex-start",gap:10,padding:"12px 14px",borderRadius:10,
-              border:`1.5px solid ${form.acepta_privacidad?"#1a3a6b":"#e4e7ec"}`,
-              background:form.acepta_privacidad?"#eef2ff":"#fff",cursor:"pointer",marginBottom:16}}>
-              <input type="checkbox" checked={form.acepta_privacidad} onChange={e=>setForm(f=>({...f,acepta_privacidad:e.target.checked}))}
+              border:`1.5px solid ${errores.acepta_privacidad?"#EF4444":form.acepta_privacidad?"#1a3a6b":"#e4e7ec"}`,
+              background:form.acepta_privacidad?"#eef2ff":errores.acepta_privacidad?"#fff5f5":"#fff",cursor:"pointer",marginBottom:16}}>
+              <input type="checkbox" checked={form.acepta_privacidad} onChange={e=>{setForm(f=>({...f,acepta_privacidad:e.target.checked}));setErrores(p=>({...p,acepta_privacidad:""}));}}
                 style={{width:"auto",margin:"2px 0 0",accentColor:"#1a3a6b",flexShrink:0}}/>
               <span style={{fontSize:13,color:"#555",lineHeight:1.5}}>
                 Acepto las <button onClick={e=>{e.preventDefault();setShowPrivacidad(true)}}
