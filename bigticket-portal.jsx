@@ -717,8 +717,8 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
   );
 }
 
-// ─── BIGGY — ASISTENTE VIRTUAL ────────────────────────────────────────────────
-const BIGGY_PROMPT = `Eres Biggy, el asistente virtual de BigTicket 🚛, una empresa de logística que conecta conductores terceros con campañas de reparto en Chile y México.
+// ─── BIGGI — ASISTENTE VIRTUAL ────────────────────────────────────────────────
+const BIGGI_PROMPT = `Eres Biggi, el asistente virtual de BigTicket 🚛, una empresa de logística que conecta conductores terceros con campañas de reparto en Chile y México.
 
 Tu rol es ayudar a prospectos y conductores activos con sus consultas de forma amable, clara y con emojis ocasionales.
 
@@ -763,7 +763,7 @@ REGLAS:
 
 function BiggiBubble({ paginaPrincipal=false }) {
   const [abierto,setAbierto]=useState(false);
-  const [mensajes,setMensajes]=useState([{rol:"biggi",texto:"¡Hola! Soy Biggy 🚛 el asistente virtual de BigTicket. ¿En qué puedo ayudarte hoy?"}]);
+  const [mensajes,setMensajes]=useState([{rol:"biggi",texto:"¡Hola! Soy Biggi 🚛 el asistente virtual de BigTicket. ¿En qué puedo ayudarte hoy?"}]);
   const [input,setInput]=useState("");
   const [cargando,setCargando]=useState(false);
   const endRef=useRef(null);
@@ -851,7 +851,7 @@ function BiggiBubble({ paginaPrincipal=false }) {
     />
     <img
       src={DONB_URL}
-      alt="Biggy"
+      alt="Biggi"
       style={{
         width: "86%",
         height: "86%",
@@ -870,13 +870,13 @@ function BiggiBubble({ paginaPrincipal=false }) {
         <div onClick={()=>setAbierto(true)} style={{position:"fixed",bottom:24,right:24,zIndex:999,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
           {paginaPrincipal&&(
             <div style={{background:"#1a3a6b",color:"#fff",borderRadius:12,padding:"8px 14px",fontSize:12,fontWeight:600,boxShadow:"0 4px 16px rgba(0,0,0,0.2)",whiteSpace:"nowrap",animation:"pulse 2s infinite"}}>
-              💬 ¿Tienes dudas? ¡Pregúntale a Biggy!
+              💬 ¿Tienes dudas? ¡Pregúntale a Biggi!
             </div>
           )}
           <div style={{width:60,height:60,borderRadius:"50%",overflow:"hidden",boxShadow:"0 4px 20px rgba(244,123,32,0.5)",border:"3px solid #F47B20"}}>
-            <img src={DONB_URL} alt="Biggy" style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:"top"}}/>
+            <img src={DONB_URL} alt="Biggi" style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:"top"}}/>
           </div>
-          <div style={{background:"#1a3a6b",color:"#fff",borderRadius:8,padding:"3px 10px",fontSize:11,fontWeight:700}}>Biggy</div>
+          <div style={{background:"#1a3a6b",color:"#fff",borderRadius:8,padding:"3px 10px",fontSize:11,fontWeight:700}}>Biggi</div>
         </div>
       )}
 
@@ -887,7 +887,7 @@ function BiggiBubble({ paginaPrincipal=false }) {
           <div style={{background:"linear-gradient(135deg,#1a3a6b,#2a5a9b)",padding:"12px 16px",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
             <BiggiFace size={36}/>
             <div style={{flex:1}}>
-              <div style={{color:"#fff",fontSize:14,fontWeight:700}}>Biggy</div>
+              <div style={{color:"#fff",fontSize:14,fontWeight:700}}>Biggi</div>
               <div style={{color:"#aac3e8",fontSize:11}}>Asistente Virtual BigTicket</div>
             </div>
             <button onClick={()=>setAbierto(false)} style={{background:"rgba(255,255,255,0.15)",border:"none",color:"#fff",borderRadius:"50%",width:28,height:28,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
@@ -897,7 +897,7 @@ function BiggiBubble({ paginaPrincipal=false }) {
           <div style={{flex:1,overflow:"auto",padding:12,display:"flex",flexDirection:"column",gap:10,background:"#f8f9fa"}}>
             {mensajes.map((m,i)=>(
               <div key={i} style={{display:"flex",gap:8,justifyContent:m.rol==="usuario"?"flex-end":"flex-start",alignItems:"flex-end"}}>
-                {m.rol==="biggy"&&<BiggiFace size={28}/>}
+                {m.rol==="biggi"&&<BiggiFace size={28}/>}
                 <div style={{maxWidth:"78%",background:m.rol==="usuario"?"#1a3a6b":"#fff",color:m.rol==="usuario"?"#fff":"#1a1a1a",borderRadius:m.rol==="usuario"?"12px 12px 2px 12px":"12px 12px 12px 2px",padding:"9px 12px",fontSize:12,lineHeight:1.5,border:m.rol==="usuario"?"none":"1px solid #e4e7ec",boxShadow:"0 1px 3px rgba(0,0,0,0.06)"}}>
                   {m.texto}
                 </div>
@@ -907,7 +907,7 @@ function BiggiBubble({ paginaPrincipal=false }) {
               <div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
                 <BiggiFace size={28}/>
                 <div style={{background:"#fff",border:"1px solid #e4e7ec",borderRadius:"12px 12px 12px 2px",padding:"9px 12px",fontSize:12,color:"#888"}}>
-                  <span style={{animation:"pulse 1s infinite"}}>Biggy está escribiendo...</span>
+                  <span style={{animation:"pulse 1s infinite"}}>Biggi está escribiendo...</span>
                 </div>
               </div>
             )}
