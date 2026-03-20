@@ -5,6 +5,7 @@ const SUPABASE_URL = "https://psvdtgjvognbmxfvqbaa.supabase.co";
 const SUPABASE_KEY = "sb_publishable_RayW0wqgesNI6FYZ6i0CFQ_6YHaHELP";
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 const SUPERADMIN_KEY = "PortalTerceros2026";
+const DONB_URL = "https://psvdtgjvognbmxfvqbaa.supabase.co/storage/v1/object/public/assets/Don_B1.jpeg";
 
 const CANALES = {
   whatsapp: { label: "WhatsApp", color: "#25D366", initial: "W" },
@@ -820,15 +821,47 @@ function BiggiBubble({ paginaPrincipal=false }) {
     }
   };
 
-  const DONB_URL="https://psvdtgjvognbmxfvqbaa.supabase.co/storage/v1/object/public/assets/Don_B1.jpeg";
-
-  const DONB_URL="https://psvdtgjvognbmxfvqbaa.supabase.co/storage/v1/object/public/assets/Don_B1.jpeg";
-
-  const BiggiFace=({size=40})=>(
-    <div style={{width:size,height:size,borderRadius:"50%",overflow:"hidden",flexShrink:0,border:"2px solid #F47B20",boxShadow:"0 2px 8px rgba(244,123,32,0.4)"}}>
-      <img src={DONB_URL} alt="Biggi" style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:"top"}}/>
-    </div>
-  );
+  const BiggiFace = ({ size = 54 }) => (
+  <div
+    style={{
+      width: size,
+      height: size,
+      borderRadius: "50%",
+      position: "relative",
+      overflow: "hidden",
+      flexShrink: 0,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      background: "radial-gradient(circle at 30% 30%, #1C5E97 0%, #0B3A63 70%)",
+      border: "2px solid rgba(255,255,255,0.95)",
+      boxShadow:
+        "0 10px 24px rgba(11,58,99,0.30), 0 4px 14px rgba(244,123,32,0.22)",
+    }}
+  >
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        borderRadius: "50%",
+        background:
+          "linear-gradient(180deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.02) 40%, transparent 100%)",
+        pointerEvents: "none",
+      }}
+    />
+    <img
+      src={DONB_URL}
+      alt="Biggi"
+      style={{
+        width: "86%",
+        height: "86%",
+        objectFit: "contain",
+        objectPosition: "center",
+        display: "block",
+      }}
+    />
+  </div>
+);
 
   return(
     <>
