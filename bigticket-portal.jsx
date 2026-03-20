@@ -820,9 +820,9 @@ function BiggiBubble({ paginaPrincipal=false }) {
     }
   };
 
-  const DONB_URL="https://psvdtgjvognbmxfvqbaa.supabase.co/storage/v1/object/public/assets/Don_B.jpeg";
+  const DONB_URL="https://psvdtgjvognbmxfvqbaa.supabase.co/storage/v1/object/public/assets/Don_B1.jpeg";
 
-  const DONB_URL="https://psvdtgjvognbmxfvqbaa.supabase.co/storage/v1/object/public/assets/Don_B.jpeg";
+  const DONB_URL="https://psvdtgjvognbmxfvqbaa.supabase.co/storage/v1/object/public/assets/Don_B1.jpeg";
 
   const BiggiFace=({size=40})=>(
     <div style={{width:size,height:size,borderRadius:"50%",overflow:"hidden",flexShrink:0,border:"2px solid #F47B20",boxShadow:"0 2px 8px rgba(244,123,32,0.4)"}}>
