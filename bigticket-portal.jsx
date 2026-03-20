@@ -821,15 +821,19 @@ function BiggiBubble({ paginaPrincipal=false }) {
     }
   };
 
-  const BiggiFace = ({ size = 54 }) => (
+// URL GLOBAL (solo una vez en el archivo)
+const DONB_URL =
+  "https://psvdtgjvognbmxfvqbaa.supabase.co/storage/v1/object/public/assets/Don%20B1.jpeg";
+
+
+// Avatar PRO
+const BiggiFace = ({ size = 44 }) => (
   <div
     style={{
       width: size,
       height: size,
       borderRadius: "50%",
-      position: "relative",
       overflow: "hidden",
-      flexShrink: 0,
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
@@ -839,16 +843,6 @@ function BiggiBubble({ paginaPrincipal=false }) {
         "0 10px 24px rgba(11,58,99,0.30), 0 4px 14px rgba(244,123,32,0.22)",
     }}
   >
-    <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        borderRadius: "50%",
-        background:
-          "linear-gradient(180deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.02) 40%, transparent 100%)",
-        pointerEvents: "none",
-      }}
-    />
     <img
       src={DONB_URL}
       alt="Biggi"
@@ -856,72 +850,203 @@ function BiggiBubble({ paginaPrincipal=false }) {
         width: "86%",
         height: "86%",
         objectFit: "contain",
-        objectPosition: "center",
-        display: "block",
       }}
     />
   </div>
 );
 
-  return(
+
+// CHAT COMPLETO
+function BiggiBubble() {
+  const [open, setOpen] = React.useState(false);
+  const [messages, setMessages] = React.useState([
+    { rol: "biggi", texto: "¡Hola! 👋 Soy Biggi 🚛 ¿En qué puedo ayudarte?" },
+  ]);
+  const [input, setInput] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const endRef = React.useRef(null);
+
+  React.useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const send = async () => {
+    if (!input.trim() || loading) return;
+
+    const text = input.trim();
+    setInput("");
+    setMessages((p) => [...p, { rol: "usuario", texto: text }]);
+    setLoading(true);
+
+    try {
+      const res = await fetch(
+        "https://bigticket2026.app.n8n.cloud/webhook/biggi-chat",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mensaje: text }),
+        }
+      );
+
+      let reply = "";
+      const contentType = res.headers.get("content-type") || "";
+
+      if (contentType.includes("application/json")) {
+        const data = await res.json();
+        reply = data.respuesta || data.text || "";
+      } else {
+        reply = await res.text();
+      }
+
+      setMessages((p) => [...p, { rol: "biggi", texto: reply }]);
+    } catch (e) {
+      setMessages((p) => [
+        ...p,
+        {
+          rol: "biggi",
+          texto:
+            "Tuve un problema técnico. Contacta al equipo: +56957730804 📞",
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
     <>
-      {/* Botón flotante */}
-      {!abierto&&(
-        <div onClick={()=>setAbierto(true)} style={{position:"fixed",bottom:24,right:24,zIndex:999,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
-          {paginaPrincipal&&(
-            <div style={{background:"#1a3a6b",color:"#fff",borderRadius:12,padding:"8px 14px",fontSize:12,fontWeight:600,boxShadow:"0 4px 16px rgba(0,0,0,0.2)",whiteSpace:"nowrap",animation:"pulse 2s infinite"}}>
-              💬 ¿Tienes dudas? ¡Pregúntale a Biggi!
-            </div>
-          )}
-          <div style={{width:60,height:60,borderRadius:"50%",overflow:"hidden",boxShadow:"0 4px 20px rgba(244,123,32,0.5)",border:"3px solid #F47B20"}}>
-            <img src={DONB_URL} alt="Biggi" style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:"top"}}/>
-          </div>
-          <div style={{background:"#1a3a6b",color:"#fff",borderRadius:8,padding:"3px 10px",fontSize:11,fontWeight:700}}>Biggi</div>
-        </div>
-      )}
+      {/* BOTÓN FLOTANTE */}
+      <div
+        onClick={() => setOpen(!open)}
+        style={{
+          position: "fixed",
+          bottom: 20,
+          right: 20,
+          zIndex: 9999,
+          cursor: "pointer",
+          transition: "transform 0.2s",
+        }}
+      >
+        <BiggiFace size={58} />
+      </div>
 
-      {/* Ventana del chat */}
-      {abierto&&(
-        <div style={{position:"fixed",bottom:24,right:24,zIndex:999,width:340,height:480,background:"#fff",borderRadius:16,boxShadow:"0 8px 40px rgba(0,0,0,0.2)",display:"flex",flexDirection:"column",overflow:"hidden",border:"1px solid #e4e7ec"}}>
-          {/* Header */}
-          <div style={{background:"linear-gradient(135deg,#1a3a6b,#2a5a9b)",padding:"12px 16px",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-            <BiggiFace size={36}/>
-            <div style={{flex:1}}>
-              <div style={{color:"#fff",fontSize:14,fontWeight:700}}>Biggi</div>
-              <div style={{color:"#aac3e8",fontSize:11}}>Asistente Virtual BigTicket</div>
+      {/* CHAT */}
+      {open && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 90,
+            right: 20,
+            width: 320,
+            height: 480,
+            background: "#fff",
+            borderRadius: 16,
+            boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+            zIndex: 9999,
+          }}
+        >
+          {/* HEADER */}
+          <div
+            style={{
+              background: "#0B3A63",
+              color: "#fff",
+              padding: 12,
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+            }}
+          >
+            <BiggiFace size={34} />
+            <div>
+              <div style={{ fontWeight: "bold" }}>Biggi</div>
+              <div style={{ fontSize: 12, opacity: 0.8 }}>
+                Asistente virtual
+              </div>
             </div>
-            <button onClick={()=>setAbierto(false)} style={{background:"rgba(255,255,255,0.15)",border:"none",color:"#fff",borderRadius:"50%",width:28,height:28,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
           </div>
 
-          {/* Mensajes */}
-          <div style={{flex:1,overflow:"auto",padding:12,display:"flex",flexDirection:"column",gap:10,background:"#f8f9fa"}}>
-            {mensajes.map((m,i)=>(
-              <div key={i} style={{display:"flex",gap:8,justifyContent:m.rol==="usuario"?"flex-end":"flex-start",alignItems:"flex-end"}}>
-                {m.rol==="biggi"&&<BiggiFace size={28}/>}
-                <div style={{maxWidth:"78%",background:m.rol==="usuario"?"#1a3a6b":"#fff",color:m.rol==="usuario"?"#fff":"#1a1a1a",borderRadius:m.rol==="usuario"?"12px 12px 2px 12px":"12px 12px 12px 2px",padding:"9px 12px",fontSize:12,lineHeight:1.5,border:m.rol==="usuario"?"none":"1px solid #e4e7ec",boxShadow:"0 1px 3px rgba(0,0,0,0.06)"}}>
+          {/* MENSAJES */}
+          <div
+            style={{
+              flex: 1,
+              padding: 10,
+              overflowY: "auto",
+              background: "#f5f7fb",
+            }}
+          >
+            {messages.map((m, i) => (
+              <div
+                key={i}
+                style={{
+                  display: "flex",
+                  justifyContent:
+                    m.rol === "usuario" ? "flex-end" : "flex-start",
+                  marginBottom: 8,
+                }}
+              >
+                <div
+                  style={{
+                    maxWidth: "75%",
+                    padding: "8px 12px",
+                    borderRadius: 12,
+                    background:
+                      m.rol === "usuario" ? "#F47B20" : "#fff",
+                    color: m.rol === "usuario" ? "#fff" : "#000",
+                    boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+                    fontSize: 14,
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
                   {m.texto}
                 </div>
               </div>
             ))}
-            {cargando&&(
-              <div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
-                <BiggiFace size={28}/>
-                <div style={{background:"#fff",border:"1px solid #e4e7ec",borderRadius:"12px 12px 12px 2px",padding:"9px 12px",fontSize:12,color:"#888"}}>
-                  <span style={{animation:"pulse 1s infinite"}}>Biggi está escribiendo...</span>
-                </div>
+
+            {loading && (
+              <div style={{ fontSize: 12, opacity: 0.6 }}>
+                Biggi está escribiendo...
               </div>
             )}
-            <div ref={endRef}/>
+
+            <div ref={endRef} />
           </div>
 
-          {/* Input */}
-          <div style={{padding:"10px 12px",background:"#fff",borderTop:"1px solid #e4e7ec",display:"flex",gap:8,flexShrink:0}}>
-            <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&enviar()}
-              placeholder="Escribe tu consulta..."
-              style={{flex:1,padding:"8px 12px",borderRadius:20,border:"1px solid #e4e7ec",fontSize:12,outline:"none",background:"#f8f9fa"}}/>
-            <button onClick={enviar} disabled={cargando||!input.trim()}
-              style={{background:"#F47B20",color:"#fff",border:"none",borderRadius:"50%",width:34,height:34,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,opacity:cargando||!input.trim()?0.5:1}}>
-              ↑
+          {/* INPUT */}
+          <div
+            style={{
+              padding: 10,
+              borderTop: "1px solid #eee",
+              display: "flex",
+              gap: 6,
+            }}
+          >
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && send()}
+              placeholder="Escribe tu mensaje..."
+              style={{
+                flex: 1,
+                padding: 8,
+                borderRadius: 8,
+                border: "1px solid #ccc",
+              }}
+            />
+            <button
+              onClick={send}
+              style={{
+                background: "#F47B20",
+                color: "#fff",
+                border: "none",
+                padding: "8px 12px",
+                borderRadius: 8,
+                cursor: "pointer",
+              }}
+            >
+              ➤
             </button>
           </div>
         </div>
