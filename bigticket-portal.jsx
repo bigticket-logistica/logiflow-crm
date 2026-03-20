@@ -1376,6 +1376,60 @@ const REGIONES_CL = [
   "Región de Magallanes y de la Antártica Chilena",
 ];
 
+
+const COMUNAS_CL = [
+  "Aisén","Algarrobo","Alhué","Alto Biobío","Alto del Carmen","Alto Hospicio",
+  "Ancud","Andacollo","Angol","Antártica","Antofagasta","Antuco","Arauco","Arica",
+  "Buin","Bulnes","Cabildo","Cabo de Hornos","Cabrero","Calama","Calbuco","Caldera",
+  "Calera","Calera de Tango","Calle Larga","Camarones","Camiña","Canela","Cañete",
+  "Carahue","Cartagena","Casablanca","Castro","Catemu","Cauquenes","Cerrillos",
+  "Cerro Navia","Chaitén","Chañaral","Chanco","Chépica","Chiguayante","Chile Chico",
+  "Chillán","Chillán Viejo","Chimbarongo","Cholchol","Chonchi","Cisnes","Cobquecura",
+  "Cochamó","Cochrane","Codegua","Coelemu","Coihaique","Coihueco","Coinco","Colbún",
+  "Colchane","Colina","Collipulli","Coltauco","Combarbalá","Concepción","Conchalí",
+  "Concón","Constitución","Contulmo","Copiapó","Coquimbo","Coronel","Corral","Cunco",
+  "Curacautín","Curacaví","Curaco de Vélez","Curanilahue","Curarrehue","Curepto",
+  "Curicó","Dalcahue","Diego de Almagro","Doñihue","El Bosque","El Carmen","El Monte",
+  "El Quisco","El Tabo","Empedrado","Ercilla","Estación Central","Florida","Freire",
+  "Freirina","Fresia","Frutillar","Futaleufú","Futrono","Galvarino","General Lagos",
+  "Gorbea","Graneros","Guaitecas","Hijuelas","Hualaihué","Hualañé","Hualpén","Hualqui",
+  "Huara","Huasco","Huechuraba","Illapel","Independencia","Iquique","Isla de Maipo",
+  "Isla de Pascua","Juan Fernández","La Cisterna","La Cruz","La Estrella","La Florida",
+  "La Granja","La Higuera","La Ligua","La Pintana","La Reina","La Serena","La Unión",
+  "Lago Ranco","Lago Verde","Laguna Blanca","Laja","Lampa","Lanco","Las Cabras",
+  "Las Condes","Lautaro","Lebu","Licantén","Limache","Linares","Litueche","Llaillay",
+  "Llanquihue","Lo Barnechea","Lo Espejo","Lo Prado","Lolol","Loncoche","Longaví",
+  "Lonquimay","Los Álamos","Los Andes","Los Ángeles","Los Lagos","Los Muermos",
+  "Los Sauces","Los Vilos","Lota","Lumaco","Machalí","Macul","Máfil","Maipú","Malloa",
+  "Marchihue","María Elena","María Pinto","Mariquina","Maule","Maullín","Mejillones",
+  "Melipeuco","Melipilla","Molina","Monte Patria","Mostazal","Mulchén","Nacimiento",
+  "Nancagua","Natales","Navidad","Negrete","Ninhue","Ñiquén","Nogales","Nueva Imperial",
+  "Ñuñoa","O'Higgins","Olivar","Ollagüe","Olmué","Osorno","Ovalle","Padre Hurtado",
+  "Padre Las Casas","Paiguano","Paillaco","Paine","Palena","Palmilla","Panguipulli",
+  "Panquehue","Papudo","Paredones","Parral","Pedro Aguirre Cerda","Pelarco","Pelluhue",
+  "Pemuco","Peñaflor","Peñalolén","Pencahue","Penco","Peralillo","Perquenco","Petorca",
+  "Peumo","Pica","Pichidegua","Pichilemu","Pinto","Pirque","Pitrufquén","Placilla",
+  "Portezuelo","Porvenir","Pozo Almonte","Primavera","Providencia","Puchuncaví","Pucón",
+  "Pudahuel","Puente Alto","Puerto Montt","Puerto Octay","Puerto Varas","Pumanque",
+  "Punitaqui","Punta Arenas","Puqueldón","Purén","Purranque","Putaendo","Putre",
+  "Puyehue","Queilén","Quellón","Quemchi","Quilaco","Quilicura","Quilleco","Quillón",
+  "Quillota","Quilpué","Quinchao","Quinta de Tilcoco","Quinta Normal","Quintero",
+  "Quirihue","Rancagua","Ránquil","Rauco","Recoleta","Renaico","Renca","Rengo",
+  "Requínoa","Retiro","Rinconada","Río Bueno","Río Claro","Río Hurtado","Río Ibáñez",
+  "Río Negro","Río Verde","Romeral","Saavedra","Sagrada Familia","Salamanca",
+  "San Antonio","San Bernardo","San Carlos","San Clemente","San Esteban","San Fabián",
+  "San Felipe","San Fernando","San Gregorio","San Ignacio","San Javier","San Joaquín",
+  "San José de Maipo","San Juan de la Costa","San Miguel","San Nicolás","San Pablo",
+  "San Pedro","San Pedro de Atacama","San Pedro de la Paz","San Rafael","San Ramón",
+  "San Rosendo","San Vicente","Santa Bárbara","Santa Cruz","Santa Juana","Santa María",
+  "Santiago","Santo Domingo","Sierra Gorda","Talagante","Talca","Talcahuano","Taltal",
+  "Temuco","Teno","Teodoro Schmidt","Tierra Amarilla","Tiltil","Timaukel","Tirúa",
+  "Tocopilla","Toltén","Tomé","Torres del Paine","Tortel","Traiguén","Treguaco",
+  "Tucapel","Valdivia","Vallenar","Valparaíso","Vichuquén","Victoria","Vicuña","Vilcún",
+  "Villa Alegre","Villa Alemana","Villarrica","Viña del Mar","Vitacura","Yerbas Buenas",
+  "Yumbel","Yungay","Zapallar",
+];
+
 function OnboardingLogin({ onIngresar }) {
   const [codigo,setCodigo]=useState("");
   const [rut,setRut]=useState("");
@@ -1658,8 +1712,11 @@ function ViewOnboarding({ lead, onVolver }) {
                 {errores.region&&<span style={{fontSize:11,color:"#EF4444",marginTop:3,display:"block"}}>⚠ {errores.region}</span>}
               </div>
               <div className="field-row"><span className="field-label">Localidad a la que postula *</span>
-                <input value={form.localidad} onChange={e=>{setForm(f=>({...f,localidad:e.target.value}));setErrores(p=>({...p,localidad:""}));}}
-                  placeholder="Ej: Santiago Centro" style={errores.localidad?{borderColor:"#EF4444",background:"#fff5f5"}:{}}/>
+                <select value={form.localidad} onChange={e=>{setForm(f=>({...f,localidad:e.target.value}));setErrores(p=>({...p,localidad:""}));}}
+                  style={{width:"100%",padding:"9px 12px",borderRadius:8,border:`0.5px solid ${errores.localidad?"#EF4444":"#d0d5dd"}`,background:errores.localidad?"#fff5f5":"#fff",fontSize:13,color:form.localidad?"#1a1a1a":"#888",cursor:"pointer"}}>
+                  <option value="">-- Seleccionar comuna --</option>
+                  {COMUNAS_CL.map(c=><option key={c} value={c}>{c}</option>)}
+                </select>
                 {errores.localidad&&<span style={{fontSize:11,color:"#EF4444",marginTop:3,display:"block"}}>⚠ {errores.localidad}</span>}</div>
             </div>
             <div style={{display:"flex",gap:10,marginTop:8}}>
