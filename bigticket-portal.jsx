@@ -310,7 +310,7 @@ function ViewCountry({ onSelect, busquedaCodigo, setBusquedaCodigo, buscarPostul
             </div>
           ))}
         </div>
-        <div style={{background:"#f8f9fa",border:"1px solid #e4e7ec",borderRadius:14,padding:"20px 20px"}}>
+        <div style={{background:"#f8f9fa",border:"1px solid #e4e7ec",borderRadius:14,padding:"20px 20px",marginBottom:16}}>
           <div style={{fontSize:14,fontWeight:700,color:"#1a1a1a",marginBottom:4}}>🔍 Consultar estado de postulación</div>
           <div style={{fontSize:12,color:"#888",marginBottom:14}}>Ingresa tu código para ver el estado e historial de tu postulación</div>
           <div style={{display:"flex",gap:8}}>
@@ -327,6 +327,14 @@ function ViewCountry({ onSelect, busquedaCodigo, setBusquedaCodigo, buscarPostul
             </button>
           </div>
           {errorBusqueda&&<div style={{fontSize:12,color:"#EF4444",marginTop:8}}>{errorBusqueda}</div>}
+        </div>
+        <div style={{background:"#eef2ff",border:"1px solid #c7d7f9",borderRadius:14,padding:"20px 20px"}}>
+          <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:4}}>📋 Formulario de incorporación</div>
+          <div style={{fontSize:12,color:"#555",marginBottom:14}}>¿Tu propuesta fue aceptada? Completa tu formulario de incorporación a BigTicket</div>
+          <button onClick={()=>window.location.href="?onboarding=1"}
+            style={{background:"#1a3a6b",color:"#fff",border:"none",borderRadius:8,padding:"10px 18px",fontSize:13,fontWeight:700,cursor:"pointer",width:"100%"}}>
+            Completar formulario →
+          </button>
         </div>
       </div>
     </div>
@@ -1343,6 +1351,365 @@ function CanalesView({ postulaciones, onLoad }) {
   );
 }
 
+// ─── ONBOARDING TERCEROS ──────────────────────────────────────────────────────
+const TIPOS_VEHICULO_CL = [
+  "Camión de 28 a 30m³ | 5000 KG",
+  "Camión de 25 a 28m³ | 5000 KG",
+  "Camión de 25m³ | 2500 a 3000 KG",
+  "Camión Plano 5000 KG",
+  "Rampla 100m³ | 30 TON",
+  "Furgón 4m³",
+  "Furgón 6 a 8m³",
+  "Furgón 10 a 12m³",
+  "Furgón 13m³ (Big Vans)",
+  "Vehículo Particular (Sedán, SUV o Hatchback)",
+];
+
+const REGIONES_CL = [
+  "Región de Arica y Parinacota","Región de Tarapacá","Región de Antofagasta",
+  "Región de Atacama","Región de Coquimbo","Región de Valparaíso",
+  "Región Metropolitana de Santiago","Región del Libertador Gral. Bernardo O'Higgins",
+  "Región del Maule","Región de Ñuble","Región del Biobío",
+  "Región de La Araucanía","Región de Los Ríos","Región de Los Lagos",
+  "Región de Aysén del Gral. Carlos Ibáñez del Campo",
+  "Región de Magallanes y de la Antártica Chilena",
+];
+
+function OnboardingLogin({ onIngresar }) {
+  const [codigo,setCodigo]=useState("");
+  const [rut,setRut]=useState("");
+  const [error,setError]=useState("");
+  const [cargando,setCargando]=useState(false);
+
+  const ingresar=async()=>{
+    if(!codigo.trim()||!rut.trim()){setError("Ingresa tu código y RUT.");return;}
+    setCargando(true);setError("");
+    const {data,error:e}=await sb.from("leads").select("*")
+      .eq("codigo_postulacion",codigo.trim().toUpperCase())
+      .eq("rut",rut.trim().replace(/[.\-]/g,""))
+      .single();
+    if(e||!data){setError("Código o RUT incorrecto. Verifica tus datos.");setCargando(false);return;}
+    if(!["Propuesta Aceptada","Contrato Firmado","Contrato No Firmado"].includes(data.etapa)){
+      setError("Tu postulación aún no ha llegado a esta etapa.");setCargando(false);return;}
+    onIngresar(data);
+    setCargando(false);
+  };
+
+  return(
+    <div>
+      <div className="topbar"><span className="logo">Big<span>ticket</span></span></div>
+      <div style={{maxWidth:440,margin:"60px auto",padding:"0 20px"}}>
+        <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",padding:"32px 28px"}}>
+          <div style={{textAlign:"center",marginBottom:24}}>
+            <div style={{fontSize:32,marginBottom:8}}>📋</div>
+            <div style={{fontSize:18,fontWeight:700,color:"#1a1a1a",marginBottom:6}}>Formulario de incorporación</div>
+            <div style={{fontSize:13,color:"#666"}}>Ingresa con tu código de postulación y RUT para continuar</div>
+          </div>
+          <div className="field-row">
+            <span className="field-label">Código de postulación</span>
+            <input value={codigo} onChange={e=>setCodigo(e.target.value.toUpperCase())}
+              placeholder="Ej: BT-K7M2X3" style={{fontFamily:"monospace",fontWeight:700,letterSpacing:1}}/>
+          </div>
+          <div className="field-row">
+            <span className="field-label">RUT (sin puntos ni guión)</span>
+            <input value={rut} onChange={e=>setRut(e.target.value)} placeholder="Ej: 12345678k"/>
+          </div>
+          {error&&<div style={{background:"#fee2e2",borderRadius:8,padding:"10px 14px",fontSize:13,color:"#c0392b",marginBottom:14}}>{error}</div>}
+          <button className="btn-orange" onClick={ingresar} disabled={cargando}>
+            {cargando?"Verificando...":"Ingresar →"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ViewOnboarding({ lead, onVolver }) {
+  const [paso,setPaso]=useState(1);
+  const [guardando,setGuardando]=useState(false);
+  const [guardado,setGuardado]=useState(false);
+  const [completado,setCompletado]=useState(false);
+  const [showPrivacidad,setShowPrivacidad]=useState(false);
+  const [form,setForm]=useState({
+    trabaja_bigticket:null,
+    tipos_vehiculo:[],
+    nombre:lead.nombre||"",
+    apellidos:"",
+    rut:lead.rut||"",
+    telefono:lead.telefono||"+569",
+    email:lead.email||"",
+    region:lead.region_estado||"",
+    localidad:"",
+    acepta_privacidad:false,
+  });
+
+  // Cargar progreso guardado
+  useEffect(()=>{
+    const cargar=async()=>{
+      const {data}=await sb.from("onboarding_terceros").select("*").eq("lead_id",lead.id).single();
+      if(data){
+        setForm(f=>({...f,
+          trabaja_bigticket:data.trabaja_bigticket,
+          tipos_vehiculo:data.tipos_vehiculo||[],
+          nombre:data.nombre||f.nombre,
+          apellidos:data.apellidos||"",
+          rut:data.rut||f.rut,
+          telefono:data.telefono||f.telefono,
+          email:data.email||f.email,
+          region:data.region||f.region,
+          localidad:data.localidad||"",
+          acepta_privacidad:data.acepta_privacidad||false,
+        }));
+        if(data.paso_actual) setPaso(data.paso_actual);
+        if(data.completado) setCompletado(true);
+      }
+    };
+    cargar();
+  },[lead.id]);
+
+  const guardarProgreso=async(pasoActual=paso)=>{
+    setGuardando(true);
+    const payload={
+      lead_id:lead.id, codigo_postulacion:lead.codigo_postulacion,
+      rut:form.rut, nombre:form.nombre, apellidos:form.apellidos,
+      telefono:form.telefono, email:form.email, region:form.region,
+      localidad:form.localidad, trabaja_bigticket:form.trabaja_bigticket,
+      tipos_vehiculo:form.tipos_vehiculo, acepta_privacidad:form.acepta_privacidad,
+      paso_actual:pasoActual, updated_at:new Date().toISOString(),
+    };
+    const {data:existe}=await sb.from("onboarding_terceros").select("id").eq("lead_id",lead.id).single();
+    if(existe){
+      await sb.from("onboarding_terceros").update(payload).eq("lead_id",lead.id);
+    } else {
+      await sb.from("onboarding_terceros").insert(payload);
+    }
+    setGuardando(false);setGuardado(true);setTimeout(()=>setGuardado(false),2000);
+  };
+
+  const enviarFormulario=async()=>{
+    if(!form.acepta_privacidad){alert("Debes aceptar las políticas de privacidad.");return;}
+    if(!form.tipos_vehiculo.length){alert("Selecciona al menos un tipo de vehículo.");return;}
+    if(!form.nombre||!form.rut||!form.telefono||!form.region||!form.localidad){
+      alert("Completa todos los campos obligatorios.");return;}
+    setGuardando(true);
+    const payload={
+      lead_id:lead.id, codigo_postulacion:lead.codigo_postulacion,
+      rut:form.rut, nombre:form.nombre, apellidos:form.apellidos,
+      telefono:form.telefono, email:form.email, region:form.region,
+      localidad:form.localidad, trabaja_bigticket:form.trabaja_bigticket,
+      tipos_vehiculo:form.tipos_vehiculo, acepta_privacidad:form.acepta_privacidad,
+      paso_actual:3, completado:true, completado_at:new Date().toISOString(),
+      updated_at:new Date().toISOString(),
+    };
+    const {data:existe}=await sb.from("onboarding_terceros").select("id").eq("lead_id",lead.id).single();
+    if(existe){await sb.from("onboarding_terceros").update(payload).eq("lead_id",lead.id);}
+    else{await sb.from("onboarding_terceros").insert(payload);}
+    // Actualizar etapa del lead
+    await sb.from("leads").update({etapa:"Contrato Firmado"}).eq("id",lead.id);
+    // Notificar a N8N
+    try{
+      await fetch("https://bigticket2026.app.n8n.cloud/webhook/onboarding-completado",{
+        method:"POST",mode:"no-cors",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({...payload,campana_nombre:lead.origen||"",pais:lead.pais||"Chile"}),
+      });
+    }catch(e){console.log("N8N error:",e);}
+    setGuardando(false);setCompletado(true);
+  };
+
+  const toggleVehiculo=(tipo)=>{
+    setForm(f=>({...f,tipos_vehiculo:
+      f.tipos_vehiculo.includes(tipo)?f.tipos_vehiculo.filter(t=>t!==tipo):[...f.tipos_vehiculo,tipo]
+    }));
+  };
+
+  const PASOS=[{n:1,label:"Vehículo"},{n:2,label:"Datos personales"},{n:3,label:"Confirmación"}];
+  const pct=Math.round(((paso-1)/3)*100);
+
+  if(completado) return(
+    <div>
+      <div className="topbar"><span className="logo">Big<span>ticket</span></span></div>
+      <div style={{maxWidth:480,margin:"60px auto",padding:"0 20px"}}>
+        <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",padding:"40px 32px",textAlign:"center"}}>
+          <div style={{fontSize:48,marginBottom:16}}>🎉</div>
+          <div style={{fontSize:20,fontWeight:700,color:"#166534",marginBottom:8}}>¡Formulario enviado!</div>
+          <div style={{fontSize:13,color:"#555",marginBottom:24}}>Tu información fue recibida correctamente. Nuestro equipo la revisará y te contactará pronto por WhatsApp 🚛</div>
+          <button className="btn-orange" onClick={onVolver}>Volver al portal</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return(
+    <div>
+      <div className="topbar">
+        <span className="logo">Big<span>ticket</span></span>
+        <button className="btn-gw" onClick={onVolver}>← Volver</button>
+      </div>
+      <div style={{maxWidth:600,margin:"0 auto",padding:"20px 16px"}}>
+
+        {/* Progreso */}
+        <div style={{background:"#fff",borderRadius:12,border:"0.5px solid #e4e7ec",padding:"16px 20px",marginBottom:16}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a"}}>Formulario de incorporación — Chile 🇨🇱</div>
+            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+              {guardado&&<span style={{fontSize:11,color:"#10B981"}}>✓ Guardado</span>}
+              <button onClick={()=>guardarProgreso()} disabled={guardando}
+                style={{background:"#eef2ff",color:"#1a3a6b",border:"none",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+                {guardando?"Guardando...":"💾 Guardar avance"}
+              </button>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:8,marginBottom:10}}>
+            {PASOS.map(p=>(
+              <div key={p.n} onClick={()=>setPaso(p.n)} style={{flex:1,textAlign:"center",padding:"6px",borderRadius:8,cursor:"pointer",
+                background:paso===p.n?"#1a3a6b":paso>p.n?"#dcfce7":"#f0f2f5",
+                color:paso===p.n?"#fff":paso>p.n?"#166534":"#888",fontSize:11,fontWeight:700}}>
+                {paso>p.n?"✓ ":""}{p.label}
+              </div>
+            ))}
+          </div>
+          <div style={{height:4,background:"#f0f2f5",borderRadius:4}}>
+            <div style={{height:"100%",width:`${pct}%`,background:"#1a3a6b",borderRadius:4,transition:"width .4s"}}/>
+          </div>
+        </div>
+
+        {/* Paso 1 — Vehículo */}
+        {paso===1&&(
+          <div className="form-card">
+            <div className="form-title">¿Actualmente trabajas en BigTicket?</div>
+            <div style={{display:"flex",gap:12,marginBottom:20}}>
+              {[["si","Sí, trabajo actualmente"],["no","No, es mi primera vez"]].map(([val,label])=>(
+                <div key={val} onClick={()=>setForm(f=>({...f,trabaja_bigticket:val==="si"}))}
+                  style={{flex:1,padding:"12px 16px",borderRadius:10,border:`2px solid ${form.trabaja_bigticket===(val==="si")?"#1a3a6b":"#e4e7ec"}`,
+                    background:form.trabaja_bigticket===(val==="si")?"#eef2ff":"#fff",cursor:"pointer",textAlign:"center",fontSize:13,fontWeight:600,
+                    color:form.trabaja_bigticket===(val==="si")?"#1a3a6b":"#555",transition:"all .15s"}}>
+                  {label}
+                </div>
+              ))}
+            </div>
+            <div className="form-title">Tipo de vehículo (selecciona todos los que apliquen)</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {TIPOS_VEHICULO_CL.map(tipo=>(
+                <label key={tipo} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:8,
+                  border:`1.5px solid ${form.tipos_vehiculo.includes(tipo)?"#1a3a6b":"#e4e7ec"}`,
+                  background:form.tipos_vehiculo.includes(tipo)?"#eef2ff":"#fff",cursor:"pointer",transition:"all .15s"}}>
+                  <input type="checkbox" checked={form.tipos_vehiculo.includes(tipo)} onChange={()=>toggleVehiculo(tipo)}
+                    style={{width:"auto",margin:0,accentColor:"#1a3a6b"}}/>
+                  <span style={{fontSize:13,color:form.tipos_vehiculo.includes(tipo)?"#1a3a6b":"#555",fontWeight:form.tipos_vehiculo.includes(tipo)?600:400}}>{tipo}</span>
+                </label>
+              ))}
+            </div>
+            <button className="btn-orange" style={{marginTop:16}} onClick={()=>{guardarProgreso(2);setPaso(2);}}>
+              Siguiente →
+            </button>
+          </div>
+        )}
+
+        {/* Paso 2 — Datos personales */}
+        {paso===2&&(
+          <div className="form-card">
+            <div className="form-title">Datos personales</div>
+            <div className="two-col">
+              <div className="field-row"><span className="field-label">Nombre *</span>
+                <input value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))} placeholder="Tu nombre"/></div>
+              <div className="field-row"><span className="field-label">Apellidos *</span>
+                <input value={form.apellidos} onChange={e=>setForm(f=>({...f,apellidos:e.target.value}))} placeholder="Tus apellidos"/></div>
+            </div>
+            <div className="two-col">
+              <div className="field-row"><span className="field-label">RUT (sin puntos ni guión) *</span>
+                <input value={form.rut} onChange={e=>setForm(f=>({...f,rut:e.target.value}))} placeholder="12345678k"/></div>
+              <div className="field-row"><span className="field-label">Teléfono WhatsApp *</span>
+                <input value={form.telefono} onChange={e=>setForm(f=>({...f,telefono:e.target.value}))} placeholder="+569..."/></div>
+            </div>
+            <div className="field-row"><span className="field-label">Correo electrónico</span>
+              <input type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} placeholder="correo@..."/></div>
+            <div className="two-col">
+              <div className="field-row"><span className="field-label">Región *</span>
+                <select value={form.region} onChange={e=>setForm(f=>({...f,region:e.target.value}))}>
+                  <option value="">-- Seleccionar --</option>
+                  {REGIONES_CL.map(r=><option key={r}>{r}</option>)}
+                </select>
+              </div>
+              <div className="field-row"><span className="field-label">Localidad a la que postula *</span>
+                <input value={form.localidad} onChange={e=>setForm(f=>({...f,localidad:e.target.value}))} placeholder="Ej: Santiago Centro"/></div>
+            </div>
+            <div style={{display:"flex",gap:10,marginTop:8}}>
+              <button style={{flex:1,background:"#f0f2f5",color:"#475569",border:"none",borderRadius:8,padding:"10px",fontSize:12,fontWeight:700,cursor:"pointer"}}
+                onClick={()=>{guardarProgreso(1);setPaso(1);}}>← Anterior</button>
+              <button className="btn-orange" style={{flex:2,marginTop:0}} onClick={()=>{guardarProgreso(3);setPaso(3);}}>Siguiente →</button>
+            </div>
+          </div>
+        )}
+
+        {/* Paso 3 — Confirmación */}
+        {paso===3&&(
+          <div className="form-card">
+            <div className="form-title">Confirmación y políticas de privacidad</div>
+            <div style={{background:"#f8f9fa",borderRadius:10,padding:"14px 16px",marginBottom:16,fontSize:13,color:"#555",lineHeight:1.6}}>
+              <div style={{fontWeight:700,color:"#1a1a1a",marginBottom:8}}>Resumen de tu postulación:</div>
+              <div>👤 <strong>{form.nombre} {form.apellidos}</strong></div>
+              <div>🪪 RUT: {form.rut}</div>
+              <div>📍 {form.region} — {form.localidad}</div>
+              <div>🚛 {form.tipos_vehiculo.length} tipo(s) de vehículo seleccionado(s)</div>
+              {form.trabaja_bigticket!==null&&<div>💼 {form.trabaja_bigticket?"Trabaja actualmente en BigTicket":"Primera vez en BigTicket"}</div>}
+            </div>
+            <label style={{display:"flex",alignItems:"flex-start",gap:10,padding:"12px 14px",borderRadius:10,
+              border:`1.5px solid ${form.acepta_privacidad?"#1a3a6b":"#e4e7ec"}`,
+              background:form.acepta_privacidad?"#eef2ff":"#fff",cursor:"pointer",marginBottom:16}}>
+              <input type="checkbox" checked={form.acepta_privacidad} onChange={e=>setForm(f=>({...f,acepta_privacidad:e.target.checked}))}
+                style={{width:"auto",margin:"2px 0 0",accentColor:"#1a3a6b",flexShrink:0}}/>
+              <span style={{fontSize:13,color:"#555",lineHeight:1.5}}>
+                Acepto las <button onClick={e=>{e.preventDefault();setShowPrivacidad(true)}}
+                  style={{background:"none",border:"none",color:"#1a3a6b",fontWeight:700,cursor:"pointer",fontSize:13,padding:0,textDecoration:"underline"}}>
+                  Políticas de Privacidad</button> de BigTicket
+              </span>
+            </label>
+            <div style={{display:"flex",gap:10}}>
+              <button style={{flex:1,background:"#f0f2f5",color:"#475569",border:"none",borderRadius:8,padding:"10px",fontSize:12,fontWeight:700,cursor:"pointer"}}
+                onClick={()=>{guardarProgreso(2);setPaso(2);}}>← Anterior</button>
+              <button className="btn-orange" style={{flex:2,marginTop:0}} onClick={enviarFormulario} disabled={guardando}>
+                {guardando?"Enviando...":"✅ Enviar formulario"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Modal políticas */}
+        {showPrivacidad&&(
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:500}}>
+            <div style={{background:"#fff",borderRadius:14,width:560,maxHeight:"80vh",display:"flex",flexDirection:"column"}}>
+              <div style={{padding:"16px 20px",borderBottom:"1px solid #e4e7ec",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div style={{fontSize:15,fontWeight:700}}>Políticas de Privacidad — BigTicket</div>
+                <button onClick={()=>setShowPrivacidad(false)} style={{background:"#f0f2f5",border:"none",borderRadius:6,width:28,height:28,cursor:"pointer",fontSize:16}}>×</button>
+              </div>
+              <div style={{padding:"16px 20px",overflow:"auto",fontSize:13,color:"#555",lineHeight:1.7}}>
+                <p style={{marginBottom:12}}>Conforme a lo dispuesto en el artículo 19 N° 4 de la Constitución Política de la República y a las normas pertinentes de la Ley N° 19.628 sobre protección de la vida privada y sus modificaciones posteriores, el tratamiento de datos personales que se realiza en BigTicket, se rige por las siguientes reglas:</p>
+                <ul style={{paddingLeft:20,marginBottom:12,display:"flex",flexDirection:"column",gap:8}}>
+                  <li>BigTicket asegura la confidencialidad de los datos personales de los usuarios que se registren como tales en el sitio Web mediante el o los formularios establecidos para esos efectos. Sin perjuicio de sus facultades legales, la empresa sólo efectuará tratamiento de datos personales respecto de aquéllos que han sido entregados voluntariamente por los usuarios en el referido formulario.</li>
+                  <li>Los datos personales de los usuarios serán utilizados para el cumplimiento de los fines indicados en el formulario correspondiente y siempre dentro de las competencias y atribuciones de la empresa.</li>
+                  <li>BigTicket podrá comunicar a otros organismos del Estado, los datos personales de sus usuarios, conforme a lo establecido en la Ley 19.628.</li>
+                  <li>BigTicket podrá comunicar a terceros, sin el consentimiento expreso del titular, información estadística elaborada a partir de los datos personales de sus usuarios, cuando de dichos datos no sea posible identificar individualmente a los titulares.</li>
+                  <li>El usuario podrá en todo momento ejercer los derechos otorgados por la Ley N° 19.628 y sus modificaciones posteriores.</li>
+                </ul>
+                <p style={{marginBottom:12}}>En específico, podrá:</p>
+                <p style={{marginBottom:8}}>a. Solicitar información sobre los datos relativos a su persona, su procedencia y destinatario, el propósito del almacenamiento y la individualización de las personas u organismos a los cuales sus datos son transmitidos regularmente.</p>
+                <p style={{marginBottom:8}}>b. Solicitar que se modifiquen sus datos personales cuando ellos no sean correctos o no estén actualizados, si fuere procedente.</p>
+                <p style={{marginBottom:12}}>c. Solicitar la eliminación o cancelación de los datos entregados cuando así lo desee, en tanto fuere procedente.</p>
+                <p style={{marginBottom:12}}>Respecto de la recolección y tratamiento de datos realizado mediante mecanismos automatizados con el objeto de generar registros de actividad de los visitantes y registros de audiencia, BigTicket sólo podrá utilizar dicha información para la elaboración de informes que cumplan con los objetivos señalados. En ningún caso podrá realizar operaciones que impliquen asociar dicha información a algún usuario identificado o identificable.</p>
+                <p style={{fontWeight:600,color:"#1a3a6b"}}>Respecto del consentimiento uso de programa "Alto Checks" para obtención de datos personales:</p>
+                <p style={{marginTop:8}}>Al hacer clic en "Acepto", otorgo mi consentimiento voluntario para que BigTicket utilice el programa "Alto Checks" y procese mis Datos Personales de acuerdo con lo establecido en la Ley N° 19.628.</p>
+              </div>
+              <div style={{padding:"12px 20px",borderTop:"1px solid #e4e7ec"}}>
+                <button className="btn-orange" style={{maxWidth:200,margin:"0 auto"}} onClick={()=>setShowPrivacidad(false)}>Cerrar</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ViewPropuesta() {
   const [lead,setLead]=useState(null);
   const [campana,setCampana]=useState(null);
@@ -1441,11 +1808,16 @@ function ViewPropuesta() {
 }
 
 export default function App() {
-  // Detectar si es una URL de propuesta
+  // Detectar URL de propuesta
   const params=new URLSearchParams(window.location.search);
   if(params.get("lead")&&params.get("propuesta")==="1"){
     return <><style>{css}</style><ViewPropuesta/></>;
   }
+  // Detectar URL de onboarding
+  if(params.get("onboarding")==="1"){
+    return <><style>{css}</style><OnboardingApp/></>;
+  }
+
   const [view,setView]=useState("country");
   const [op,setOp]=useState(null);
   const [canal]=useState(getCanal);
@@ -1475,7 +1847,6 @@ export default function App() {
     setBuscando(true);setErrorBusqueda("");setResultadoBusqueda(null);
     const {data,error}=await sb.from("leads").select("*").eq("codigo_postulacion",codigo).single();
     if(error||!data){setErrorBusqueda("No encontramos una postulación con ese código.");setBuscando(false);return;}
-    // cargar historial
     const {data:hist}=await sb.from("lead_historial").select("*").eq("lead_id",data.id).order("created_at",{ascending:true});
     setResultadoBusqueda({lead:data,historial:hist||[]});
     setBuscando(false);
@@ -1493,6 +1864,20 @@ export default function App() {
       {view==="form"&&<ViewForm camp={formCamp} canal={canal} op={op} onBack={()=>setView(formCamp?"detail":"portal")} onSuccess={(codigo)=>{setSuccessCodigo(codigo);setView("success");}}/>}
       {view==="success"&&<ViewSuccess codigo={successCodigo} onVolver={()=>{setView("portal");loadCampaigns();}}/>}
       <BiggiBubble paginaPrincipal={view==="country"}/>
+    </>
+  );
+}
+
+// App separado para onboarding (acceso por URL ?onboarding=1)
+function OnboardingApp() {
+  const [lead,setLead]=useState(null);
+  return(
+    <><style>{css}</style>
+      {!lead
+        ?<OnboardingLogin onIngresar={setLead}/>
+        :<ViewOnboarding lead={lead} onVolver={()=>setLead(null)}/>
+      }
+      <BiggiBubble/>
     </>
   );
 }
