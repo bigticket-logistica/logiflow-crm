@@ -1833,6 +1833,23 @@ function ViewPropuesta() {
     const nuevaEtapa=decision==="si"?"Propuesta Aceptada":"Propuesta Rechazada";
     await sb.from("leads").update({etapa:nuevaEtapa,respuesta_propuesta:decision}).eq("id",lead.id);
     await sb.from("lead_historial").insert({lead_id:lead.id,etapa_anterior:lead.etapa,etapa_nueva:nuevaEtapa});
+    // Si acepta → notificar a N8N para enviar WhatsApp con link de onboarding
+    if(decision==="si"){
+      try{
+        await fetch("https://bigticket2026.app.n8n.cloud/webhook/invitacion-onboarding",{
+          method:"POST", mode:"no-cors",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            lead_id: lead.id,
+            nombre: lead.nombre,
+            telefono: lead.telefono,
+            codigo_postulacion: lead.codigo_postulacion,
+            campana_nombre: campana?.nombre||"",
+            link_onboarding: "https://bigticket-portal.vercel.app?onboarding=1",
+          }),
+        });
+      }catch(e){console.log("N8N onboarding error:",e);}
+    }
     setRespuesta(decision);
     setEnviado(true);
     setEnviando(false);
