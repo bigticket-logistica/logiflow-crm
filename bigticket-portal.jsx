@@ -431,11 +431,25 @@ const REGIONES_CHILE = [
 ];
 
 const ESTADOS_MEXICO = [
-  "Aguascalientes","Baja California","Baja California Sur","Campeche","Chiapas",
-  "Chihuahua","Ciudad de México","Coahuila","Colima","Durango","Guanajuato",
-  "Guerrero","Hidalgo","Jalisco","México","Michoacán","Morelos","Nayarit",
-  "Nuevo León","Oaxaca","Puebla","Querétaro","Quintana Roo","San Luis Potosí",
-  "Sinaloa","Sonora","Tabasco","Tamaulipas","Tlaxcala","Veracruz","Yucatán","Zacatecas"
+  "SMX1 San Jerónimo Tepetlacalco",
+  "SMX2 Complejo Industrial Tecnológico/Iztapalapa",
+  "SMX3 Lomas de Santo Domingo Reacomodo",
+  "SMX4 Bondojito",
+  "SMX5 Iztapalapa",
+  "SMX6 Industrial Tlaxcoapan",
+  "SMX7 Cuajimalpa",
+  "SMX8 Los Héroes Tecámac / Ojo de agua",
+  "SMX9 Granjas México, Iztacalco",
+  "SMX10 Vallejo",
+  "SMX11 Outlets Punta Norte",
+  "SCQ1 Colima",
+  "STX1 Tlaxcala",
+  "SHP1 Pachuca",
+  "SCY1 Celaya",
+  "SLT1 Toluca",
+  "SPV1 Puebla",
+  "SVR1 Veracruz",
+  "SVH1 Villahermosa",
 ];
 
 const PREFIJOS = { "Chile": "+569", "México": "+521" };
@@ -519,7 +533,7 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
         score_calculado:score,respuestas,
       });
 
-      // 2. Llamar a N8N para enviar WhatsApp
+      // 2. Llamar a N8N para enviar WhatsApp + correo
       try {
         await fetch("https://bigticket2026.app.n8n.cloud/webhook/confirmacion-postulacion", {
           method: "POST", mode: "no-cors",
@@ -531,9 +545,40 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
             origen: isLibre?"Postulación libre":`Campaña: ${camp?.nombre||""}`,
             fuente_contacto: form.fuente_contacto||null,
             codigo_postulacion: codigo,
+            fecha_postulacion: new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"}),
+            rut: form.rut||null,
+            empresa: form.empresa||null,
+            region_estado: form.region_estado||null,
           }),
         });
       } catch(fetchErr) { console.log("N8N WhatsApp error:", fetchErr); }
+
+      // 2b. Enviar correo de confirmación si tiene email
+      if(form.email){
+        try {
+          await fetch("https://bigticket2026.app.n8n.cloud/webhook/correo-postulacion", {
+            method: "POST", mode: "no-cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: form.email,
+              nombre: form.nombre,
+              empresa: form.empresa||null,
+              rut: form.rut||null,
+              telefono: form.telefono,
+              canal,
+              pais: op,
+              region_estado: form.region_estado||null,
+              score,
+              clasificacion,
+              campana_nombre: camp?.nombre||"Postulación libre",
+              origen: isLibre?"Postulación libre":`Campaña: ${camp?.nombre||""}`,
+              fuente_contacto: form.fuente_contacto||null,
+              codigo_postulacion: codigo,
+              fecha_postulacion: new Date().toLocaleString("es-CL",{day:"2-digit",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"}),
+            }),
+          });
+        } catch(e){ console.log("N8N correo error:",e); }
+      }
 
       // 3. Si es caliente, notificar a N8N para enviar WhatsApp de propuesta
       if(clasificacion==="Caliente"&&lead.id){
@@ -973,9 +1018,15 @@ function ViewSuccess({ codigo, onVolver }) {
 
 function ViewPostulacion({ data, onVolver }) {
   const {lead,historial}=data;
-  const ETAPA_COLOR={"Nuevo Lead":"#3B82F6","Nuevo":"#3B82F6","Contactado":"#8B5CF6","Reunión Agendada":"#F59E0B","Propuesta Enviada":"#F97316","Negociación":"#EC4899","Ganado":"#10B981","Perdido":"#EF4444"};
-  const ETAPA_ICON={"Nuevo Lead":"🎯","Nuevo":"🎯","Contactado":"📞","Reunión Agendada":"📅","Propuesta Enviada":"📄","Negociación":"🤝","Ganado":"✅","Perdido":"❌"};
+  const ETAPA_COLOR={"Nuevo Lead":"#3B82F6","Nuevo":"#3B82F6","Contactado":"#8B5CF6","Reunión Agendada":"#F59E0B","Propuesta Enviada":"#F97316","Negociación":"#EC4899","Propuesta Aceptada":"#10B981","Propuesta Rechazada":"#EF4444","Contrato Firmado":"#10B981","Base Datos Leads":"#6B7280","Ganado":"#10B981","Perdido":"#EF4444"};
+  const ETAPA_ICON={"Nuevo Lead":"🎯","Nuevo":"🎯","Contactado":"📞","Reunión Agendada":"📅","Propuesta Enviada":"📄","Negociación":"🤝","Propuesta Aceptada":"✅","Propuesta Rechazada":"❌","Contrato Firmado":"📝","Base Datos Leads":"🗃️","Ganado":"✅","Perdido":"❌"};
   const etapaColor=ETAPA_COLOR[lead.etapa]||"#888";
+  // Construir historial completo incluyendo etapa inicial
+  const historialCompleto=[
+    {etapa_nueva:"Postulación recibida",created_at:lead.created_at,etapa_anterior:null},
+    ...historial,
+    ...(lead.etapa&&!historial.find(h=>h.etapa_nueva===lead.etapa)?[{etapa_nueva:lead.etapa,created_at:lead.updated_at||lead.created_at,etapa_anterior:historial[historial.length-1]?.etapa_nueva||"Postulación recibida"}]:[]),
+  ];
   return(
     <div>
       <div className="topbar"><span className="logo">Big<span>ticket</span></span></div>
@@ -1000,21 +1051,19 @@ function ViewPostulacion({ data, onVolver }) {
             </div>
           ))}
         </div>
-        {historial.length>0&&(
-          <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",padding:"20px 24px"}}>
+        <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",padding:"20px 24px"}}>
             <div style={{fontSize:11,color:"#888",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:16}}>Historial de tu postulación</div>
             <div style={{position:"relative",paddingLeft:28}}>
               <div style={{position:"absolute",left:10,top:0,bottom:0,width:2,background:"#e4e7ec"}}/>
-              {historial.map((h,i)=>(
+              {historialCompleto.map((h,i)=>(
                 <div key={i} style={{marginBottom:16,position:"relative"}}>
-                  <div style={{position:"absolute",left:-24,top:2,width:10,height:10,borderRadius:"50%",background:ETAPA_COLOR[h.etapa_nueva]||"#888",border:"2px solid #fff"}}/>
-                  <div style={{fontSize:13,fontWeight:700,color:ETAPA_COLOR[h.etapa_nueva]||"#1a1a1a"}}>{ETAPA_ICON[h.etapa_nueva]||"📋"} {h.etapa_nueva}</div>
+                  <div style={{position:"absolute",left:-24,top:2,width:10,height:10,borderRadius:"50%",background:ETAPA_COLOR[h.etapa_nueva]||"#F47B20",border:"2px solid #fff",boxShadow:i===historialCompleto.length-1?"0 0 0 3px "+((ETAPA_COLOR[h.etapa_nueva]||"#F47B20")+"33"):"none"}}/>
+                  <div style={{fontSize:13,fontWeight:700,color:ETAPA_COLOR[h.etapa_nueva]||"#1a1a1a"}}>{ETAPA_ICON[h.etapa_nueva]||"📋"} {h.etapa_nueva}{i===historialCompleto.length-1&&<span style={{fontSize:10,background:"#F47B20",color:"#fff",borderRadius:10,padding:"1px 7px",marginLeft:6,fontWeight:600}}>Actual</span>}</div>
                   <div style={{fontSize:11,color:"#888",marginTop:2}}>{new Date(h.created_at).toLocaleDateString("es-CL",{day:"2-digit",month:"short",year:"numeric"})} · {new Date(h.created_at).toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})}</div>
                 </div>
               ))}
             </div>
           </div>
-        )}
       </div>
     </div>
   );
@@ -1106,7 +1155,7 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
         <button className="btn-gw" onClick={onClose}>Ver portal →</button>
       </div>
       <div className="admin-nav">
-        {[["camps","Campañas"],["nueva","Nueva campaña"],["postulaciones","Postulaciones"],["canales","Canales"]].map(([k,l])=>(
+        {[["camps","Campañas"],["nueva","Nueva campaña"],["postulaciones","Postulaciones"],["canales","Canales"],["centros_mx","Centros México"]].map(([k,l])=>(
           <button key={k} className={`nav-btn ${tab===k?"active":""}`} onClick={()=>setTab(k)}>{l}</button>
         ))}
       </div>
@@ -1183,6 +1232,67 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
           </div>
         )}
         {tab==="canales"&&<CanalesView postulaciones={postulaciones} onLoad={loadPost}/>}
+        {tab==="centros_mx"&&<CentrosMxAdmin/>}
+      </div>
+    </div>
+  );
+}
+
+
+function CentrosMxAdmin() {
+  const CENTROS_DEFAULT = [
+    "SMX1 San Jerónimo Tepetlacalco","SMX2 Complejo Industrial Tecnológico/Iztapalapa",
+    "SMX3 Lomas de Santo Domingo Reacomodo","SMX4 Bondojito","SMX5 Iztapalapa",
+    "SMX6 Industrial Tlaxcoapan","SMX7 Cuajimalpa","SMX8 Los Héroes Tecámac / Ojo de agua",
+    "SMX9 Granjas México, Iztacalco","SMX10 Vallejo","SMX11 Outlets Punta Norte",
+    "SCQ1 Colima","STX1 Tlaxcala","SHP1 Pachuca","SCY1 Celaya","SLT1 Toluca",
+    "SPV1 Puebla","SVR1 Veracruz","SVH1 Villahermosa",
+  ];
+  const [centros,setCentros]=useState(()=>{
+    try{const s=localStorage.getItem("centros_mx");return s?JSON.parse(s):CENTROS_DEFAULT;}
+    catch{return CENTROS_DEFAULT;}
+  });
+  const [nuevo,setNuevo]=useState("");
+  const [error,setError]=useState("");
+
+  const guardar=(lista)=>{
+    setCentros(lista);
+    try{localStorage.setItem("centros_mx",JSON.stringify(lista));}catch(e){}
+  };
+  const agregar=()=>{
+    const val=nuevo.trim();
+    if(!val){setError("Ingresa el nombre del centro.");return;}
+    if(centros.includes(val)){setError("Ese centro ya existe.");return;}
+    guardar([...centros,val]);
+    setNuevo("");setError("");
+  };
+  const eliminar=(c)=>{
+    if(!confirm(`¿Eliminar "${c}"?`))return;
+    guardar(centros.filter(x=>x!==c));
+  };
+
+  return(
+    <div>
+      <div className="sec-title" style={{marginBottom:4}}>Centros de distribución México</div>
+      <div className="sec-sub">Estos valores aparecen en el selector de Estado/Centro al postular desde México</div>
+      <div style={{background:"#fff",borderRadius:12,border:"0.5px solid #e4e7ec",padding:"16px 20px",marginBottom:16,marginTop:16}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a",marginBottom:12}}>Agregar nuevo centro</div>
+        <div style={{display:"flex",gap:8}}>
+          <input value={nuevo} onChange={e=>{setNuevo(e.target.value);setError("");}}
+            onKeyDown={e=>e.key==="Enter"&&agregar()}
+            placeholder="Ej: SMX12 Nuevo Centro" style={{flex:1,padding:"9px 12px",borderRadius:8,border:"0.5px solid #d0d5dd",fontSize:13}}/>
+          <button onClick={agregar} className="btn-orange" style={{width:"auto",padding:"9px 20px",marginTop:0}}>+ Agregar</button>
+        </div>
+        {error&&<div style={{fontSize:12,color:"#c0392b",marginTop:6}}>⚠ {error}</div>}
+      </div>
+      <div style={{background:"#fff",borderRadius:12,border:"0.5px solid #e4e7ec",padding:"16px 20px"}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a",marginBottom:12}}>Centros activos ({centros.length})</div>
+        {centros.map((c,i)=>(
+          <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 0",borderBottom:"0.5px solid #f4f5f7"}}>
+            <span style={{fontSize:13,color:"#1a1a1a"}}>{c}</span>
+            <button onClick={()=>eliminar(c)} className="btn-danger">Eliminar</button>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -1472,6 +1582,9 @@ function OnboardingLogin({ onIngresar }) {
           {error&&<div style={{background:"#fee2e2",borderRadius:8,padding:"10px 14px",fontSize:13,color:"#c0392b",marginBottom:14}}>{error}</div>}
           <button className="btn-orange" onClick={ingresar} disabled={cargando}>
             {cargando?"Verificando...":"Ingresar →"}
+          </button>
+          <button onClick={onVolver} style={{width:"100%",marginTop:10,background:"none",border:"0.5px solid #d0d5dd",borderRadius:10,padding:"10px",fontSize:13,color:"#555",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>
+            ← Volver al portal
           </button>
         </div>
       </div>
