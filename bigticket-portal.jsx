@@ -1540,7 +1540,7 @@ const COMUNAS_CL = [
   "Yumbel","Yungay","Zapallar",
 ];
 
-function OnboardingLogin({ onIngresar }) {
+function OnboardingLogin({ onIngresar, onVolver }) {
   const [codigo,setCodigo]=useState("");
   const [rut,setRut]=useState("");
   const [error,setError]=useState("");
@@ -1554,8 +1554,8 @@ function OnboardingLogin({ onIngresar }) {
       .eq("rut",rut.trim().replace(/[.\-]/g,""))
       .single();
     if(e||!data){setError("Código o RUT incorrecto. Verifica tus datos.");setCargando(false);return;}
-    if(!["Propuesta Aceptada","Contrato Firmado","Contrato No Firmado"].includes(data.etapa)){
-      setError("Tu postulación aún no ha llegado a esta etapa.");setCargando(false);return;}
+    if(!["Propuesta Aceptada","Contrato Firmado","Contrato No Firmado","Onboarding Pendiente"].includes(data.etapa)){
+      setError(`Tu postulación está en etapa "${data.etapa}". El formulario de incorporación se habilitará cuando el equipo BigTicket te lo indique.`);setCargando(false);return;}
     onIngresar(data);
     setCargando(false);
   };
@@ -2095,7 +2095,7 @@ function OnboardingApp() {
   return(
     <><style>{css}</style>
       {!lead
-        ?<OnboardingLogin onIngresar={setLead}/>
+        ?<OnboardingLogin onIngresar={setLead} onVolver={()=>window.location.href="https://bigticket-portal.vercel.app"}/>
         :<ViewOnboarding lead={lead} onVolver={()=>setLead(null)}/>
       }
       <BiggiBubble/>
