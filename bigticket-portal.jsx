@@ -1627,6 +1627,38 @@ function UploadField({ label, valor, onChange, uploading }) {
   );
 }
 
+
+function ErrMsg({ campo, errores }) {
+  return errores[campo] ?
+    <span style={{ fontSize: 11, color: "#EF4444", marginTop: 3, display: "block" }}>⚠ {errores[campo]}</span> : null;
+}
+
+function SelectField({ label, campo, opciones, value, onChange, required, errores, setErrores }) {
+  return (
+    <div className="field-row">
+      <span className="field-label">{label}{required ? " *" : ""}</span>
+      <select value={value} onChange={e => { onChange(e.target.value); setErrores(p => ({ ...p, [campo]: "" })); }}
+        style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `0.5px solid ${errores[campo] ? "#EF4444" : "#d0d5dd"}`, background: errores[campo] ? "#fff5f5" : "#fff", fontSize: 13, color: value ? "#1a1a1a" : "#888", cursor: "pointer" }}>
+        <option value="">-- Seleccionar --</option>
+        {opciones.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+      <ErrMsg campo={campo} errores={errores} />
+    </div>
+  );
+}
+
+function TextField({ label, campo, value, onChange, placeholder, required, type="text", errores, setErrores }) {
+  return (
+    <div className="field-row">
+      <span className="field-label">{label}{required ? " *" : ""}</span>
+      <input type={type} value={value} placeholder={placeholder || ""}
+        onChange={e => { onChange(e.target.value); setErrores(p => ({ ...p, [campo]: "" })); }}
+        style={errores[campo] ? { borderColor: "#EF4444", background: "#fff5f5" } : {}} />
+      <ErrMsg campo={campo} errores={errores} />
+    </div>
+  );
+}
+
 function ViewOnboarding({ lead, onVolver }) {
   const pais = lead.pais || "Chile";
   const esMexico = pais === "México";
@@ -1797,35 +1829,6 @@ function ViewOnboarding({ lead, onVolver }) {
     </div>
   );
 
-  const inputStyle = (campo) => ({
-    ...(errores[campo] ? { borderColor: "#EF4444", background: "#fff5f5" } : {})
-  });
-
-  const ErrMsg = ({ campo }) => errores[campo] ?
-    <span style={{ fontSize: 11, color: "#EF4444", marginTop: 3, display: "block" }}>⚠ {errores[campo]}</span> : null;
-
-  const SelectField = ({ label, campo, opciones, value, onChange, required }) => (
-    <div className="field-row">
-      <span className="field-label">{label}{required ? " *" : ""}</span>
-      <select value={value} onChange={e => { onChange(e.target.value); setErrores(p => ({ ...p, [campo]: "" })); }}
-        style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `0.5px solid ${errores[campo] ? "#EF4444" : "#d0d5dd"}`, background: errores[campo] ? "#fff5f5" : "#fff", fontSize: 13, color: value ? "#1a1a1a" : "#888", cursor: "pointer" }}>
-        <option value="">-- Seleccionar --</option>
-        {opciones.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
-      <ErrMsg campo={campo} />
-    </div>
-  );
-
-  const TextField = ({ label, campo, value, onChange, placeholder, required, type = "text" }) => (
-    <div className="field-row">
-      <span className="field-label">{label}{required ? " *" : ""}</span>
-      <input type={type} value={value} placeholder={placeholder || ""}
-        onChange={e => { onChange(e.target.value); setErrores(p => ({ ...p, [campo]: "" })); }}
-        style={inputStyle(campo)} />
-      <ErrMsg campo={campo} />
-    </div>
-  );
-
   return (
     <div>
       <div className="topbar">
@@ -1853,34 +1856,34 @@ function ViewOnboarding({ lead, onVolver }) {
               </div>
             )}
 
-            <SelectField label="Puesto al que postula" campo="puesto" opciones={PUESTOS_MX}
+            <SelectField errores={errores} setErrores={setErrores} label="Puesto al que postula" campo="puesto" opciones={PUESTOS_MX}
               value={formMX.puesto} onChange={v => updMX("puesto", v)} required />
 
-            <SelectField label="Tipo de Vehículo" campo="tipo_vehiculo" opciones={TIPOS_VEHICULO_MX}
+            <SelectField errores={errores} setErrores={setErrores} label="Tipo de Vehículo" campo="tipo_vehiculo" opciones={TIPOS_VEHICULO_MX}
               value={formMX.tipo_vehiculo} onChange={v => updMX("tipo_vehiculo", v)} required />
 
             <div className="two-col">
-              <TextField label="Nombres" campo="nombre" value={formMX.nombre} onChange={v => updMX("nombre", v)} placeholder="Tu nombre" required />
-              <TextField label="Apellidos" campo="apellidos" value={formMX.apellidos} onChange={v => updMX("apellidos", v)} placeholder="Tus apellidos" />
+              <TextField errores={errores} setErrores={setErrores} label="Nombres" campo="nombre" value={formMX.nombre} onChange={v => updMX("nombre", v)} placeholder="Tu nombre" required />
+              <TextField errores={errores} setErrores={setErrores} label="Apellidos" campo="apellidos" value={formMX.apellidos} onChange={v => updMX("apellidos", v)} placeholder="Tus apellidos" />
             </div>
             <div className="two-col">
-              <TextField label="INE" campo="ine" value={formMX.ine} onChange={v => updMX("ine", v)} placeholder="Número de INE" required />
-              <TextField label="CURP" campo="curp" value={formMX.curp} onChange={v => updMX("curp", v)} placeholder="CURP" />
+              <TextField errores={errores} setErrores={setErrores} label="INE" campo="ine" value={formMX.ine} onChange={v => updMX("ine", v)} placeholder="Número de INE" required />
+              <TextField errores={errores} setErrores={setErrores} label="CURP" campo="curp" value={formMX.curp} onChange={v => updMX("curp", v)} placeholder="CURP" />
             </div>
             <div className="two-col">
-              <TextField label="RFC" campo="rfc" value={formMX.rfc} onChange={v => updMX("rfc", v)} placeholder="RFC" />
+              <TextField errores={errores} setErrores={setErrores} label="RFC" campo="rfc" value={formMX.rfc} onChange={v => updMX("rfc", v)} placeholder="RFC" />
               {(formMX.puesto === "Driver" || formMX.puesto === "Propietario") && (
-                <TextField label="Licencia de Conducir" campo="licencia" value={formMX.licencia} onChange={v => updMX("licencia", v)} placeholder="Número de licencia" />
+                <TextField errores={errores} setErrores={setErrores} label="Licencia de Conducir" campo="licencia" value={formMX.licencia} onChange={v => updMX("licencia", v)} placeholder="Número de licencia" />
               )}
             </div>
             <div className="two-col">
-              <TextField label="Teléfono" campo="telefono" value={formMX.telefono} onChange={v => updMX("telefono", v)} placeholder="+521..." required />
-              <TextField label="Email" campo="email" type="email" value={formMX.email} onChange={v => updMX("email", v)} placeholder="correo@..." />
+              <TextField errores={errores} setErrores={setErrores} label="Teléfono" campo="telefono" value={formMX.telefono} onChange={v => updMX("telefono", v)} placeholder="+521..." required />
+              <TextField errores={errores} setErrores={setErrores} label="Email" campo="email" type="email" value={formMX.email} onChange={v => updMX("email", v)} placeholder="correo@..." />
             </div>
             <div className="two-col">
-              <SelectField label="Localidad (SVC)" campo="localidad" opciones={ESTADOS_MEXICO}
+              <SelectField errores={errores} setErrores={setErrores} label="Localidad (SVC)" campo="localidad" opciones={ESTADOS_MEXICO}
                 value={formMX.localidad} onChange={v => updMX("localidad", v)} />
-              <TextField label="Colonia" campo="colonia" value={formMX.colonia} onChange={v => updMX("colonia", v)} placeholder="Tu colonia" />
+              <TextField errores={errores} setErrores={setErrores} label="Colonia" campo="colonia" value={formMX.colonia} onChange={v => updMX("colonia", v)} placeholder="Tu colonia" />
             </div>
 
             <div style={{ marginTop: 8, padding: "12px 14px", background: "#f8f9fa", borderRadius: 10, marginBottom: 8 }}>
@@ -1912,38 +1915,38 @@ function ViewOnboarding({ lead, onVolver }) {
               </div>
             )}
 
-            <SelectField label="Tipo de Certificación" campo="tipo_certificacion"
+            <SelectField errores={errores} setErrores={setErrores} label="Tipo de Certificación" campo="tipo_certificacion"
               opciones={["Apoyo", "Planta", "Por Temporada"]}
               value={formCL.tipo_certificacion} onChange={v => updCL("tipo_certificacion", v)} required />
 
-            <SelectField label="¿Posee Inicio de Actividades?" campo="posee_inicio_actividades"
+            <SelectField errores={errores} setErrores={setErrores} label="¿Posee Inicio de Actividades?" campo="posee_inicio_actividades"
               opciones={["Si", "No"]}
               value={formCL.posee_inicio_actividades} onChange={v => updCL("posee_inicio_actividades", v)} required />
 
             {formCL.posee_inicio_actividades === "Si" && (
               <>
-                <SelectField label="¿Persona Natural o Empresa?" campo="tipo_persona"
+                <SelectField errores={errores} setErrores={setErrores} label="¿Persona Natural o Empresa?" campo="tipo_persona"
                   opciones={["Persona Natural", "Empresa"]}
                   value={formCL.tipo_persona} onChange={v => updCL("tipo_persona", v)} required />
                 <div className="two-col">
-                  <TextField label="Razón Social" campo="razon_social" value={formCL.razon_social} onChange={v => updCL("razon_social", v)} placeholder="Razón social" />
-                  <TextField label="RUT Empresa" campo="rut_empresa" value={formCL.rut_empresa} onChange={v => updCL("rut_empresa", v)} placeholder="RUT empresa" />
+                  <TextField errores={errores} setErrores={setErrores} label="Razón Social" campo="razon_social" value={formCL.razon_social} onChange={v => updCL("razon_social", v)} placeholder="Razón social" />
+                  <TextField errores={errores} setErrores={setErrores} label="RUT Empresa" campo="rut_empresa" value={formCL.rut_empresa} onChange={v => updCL("rut_empresa", v)} placeholder="RUT empresa" />
                 </div>
-                <TextField label="Dirección Empresa" campo="direccion_empresa" value={formCL.direccion_empresa} onChange={v => updCL("direccion_empresa", v)} placeholder="Dirección" />
+                <TextField errores={errores} setErrores={setErrores} label="Dirección Empresa" campo="direccion_empresa" value={formCL.direccion_empresa} onChange={v => updCL("direccion_empresa", v)} placeholder="Dirección" />
               </>
             )}
 
             <div className="form-title" style={{ marginTop: 16 }}>Datos del Representante Legal</div>
             <div className="two-col">
-              <TextField label="Nombre Completo" campo="nombre_representante" value={formCL.nombre_representante}
+              <TextField errores={errores} setErrores={setErrores} label="Nombre Completo" campo="nombre_representante" value={formCL.nombre_representante}
                 onChange={v => updCL("nombre_representante", v)} placeholder="Nombre completo" required />
-              <TextField label="RUT Representante Legal" campo="rut_representante" value={formCL.rut_representante}
+              <TextField errores={errores} setErrores={setErrores} label="RUT Representante Legal" campo="rut_representante" value={formCL.rut_representante}
                 onChange={v => updCL("rut_representante", v)} placeholder="12345678k" required />
             </div>
             <div className="two-col">
-              <TextField label="Correo de Contacto" campo="correo" type="email" value={formCL.correo}
+              <TextField errores={errores} setErrores={setErrores} label="Correo de Contacto" campo="correo" type="email" value={formCL.correo}
                 onChange={v => updCL("correo", v)} placeholder="correo@..." />
-              <TextField label="Teléfono de Contacto" campo="telefono" value={formCL.telefono}
+              <TextField errores={errores} setErrores={setErrores} label="Teléfono de Contacto" campo="telefono" value={formCL.telefono}
                 onChange={v => updCL("telefono", v)} placeholder="+569..." required />
             </div>
 
@@ -1956,26 +1959,26 @@ function ViewOnboarding({ lead, onVolver }) {
 
             <div className="form-title" style={{ marginTop: 16 }}>Datos Bancarios</div>
             <div className="two-col">
-              <TextField label="Banco" campo="banco" value={formCL.banco} onChange={v => updCL("banco", v)} placeholder="Nombre del banco" />
-              <SelectField label="Formato de Cuenta" campo="formato_cuenta"
+              <TextField errores={errores} setErrores={setErrores} label="Banco" campo="banco" value={formCL.banco} onChange={v => updCL("banco", v)} placeholder="Nombre del banco" />
+              <SelectField errores={errores} setErrores={setErrores} label="Formato de Cuenta" campo="formato_cuenta"
                 opciones={["Persona Natural", "Empresa"]}
                 value={formCL.formato_cuenta} onChange={v => updCL("formato_cuenta", v)} />
             </div>
             <div className="two-col">
-              <SelectField label="Tipo de Cuenta" campo="tipo_cuenta"
+              <SelectField errores={errores} setErrores={setErrores} label="Tipo de Cuenta" campo="tipo_cuenta"
                 opciones={["Cuenta Corriente", "Cuenta Vista", "Cuenta de Ahorro", "Chequera Electronica"]}
                 value={formCL.tipo_cuenta} onChange={v => updCL("tipo_cuenta", v)} />
-              <TextField label="Nombre del Titular" campo="nombre_titular" value={formCL.nombre_titular}
+              <TextField errores={errores} setErrores={setErrores} label="Nombre del Titular" campo="nombre_titular" value={formCL.nombre_titular}
                 onChange={v => updCL("nombre_titular", v)} placeholder="Nombre titular" />
             </div>
-            <TextField label="RUT del Titular" campo="rut_titular" value={formCL.rut_titular}
+            <TextField errores={errores} setErrores={setErrores} label="RUT del Titular" campo="rut_titular" value={formCL.rut_titular}
               onChange={v => updCL("rut_titular", v)} placeholder="RUT titular" />
 
             <div className="form-title" style={{ marginTop: 16 }}>Operación</div>
-            <SelectField label="Operación donde prestará servicios" campo="operacion"
+            <SelectField errores={errores} setErrores={setErrores} label="Operación donde prestará servicios" campo="operacion"
               opciones={OPERACIONES_CL}
               value={formCL.operacion} onChange={v => updCL("operacion", v)} required />
-            <TextField label="Nombre del Supervisor a Cargo" campo="supervisor" value={formCL.supervisor}
+            <TextField errores={errores} setErrores={setErrores} label="Nombre del Supervisor a Cargo" campo="supervisor" value={formCL.supervisor}
               onChange={v => updCL("supervisor", v)} placeholder="Nombre del supervisor" />
           </div>
         )}
