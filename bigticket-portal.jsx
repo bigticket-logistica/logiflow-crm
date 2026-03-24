@@ -1712,9 +1712,98 @@ function ViewOnboarding({ lead, onVolver }) {
     url_licencia: "",
   });
 
+  const [guardadoAvance, setGuardadoAvance] = useState(false);
+
   const upd = (setter) => (k, v) => setter(f => ({ ...f, [k]: v }));
   const updCL = upd(setFormCL);
   const updMX = upd(setFormMX);
+
+  const guardarAvance = async () => {
+    setGuardando(true);
+    try {
+      const payload = esMexico ? {
+        pais: "México", lead_id: lead.id, codigo_postulacion: lead.codigo_postulacion,
+        puesto: formMX.puesto, tipos_vehiculo: [formMX.tipo_vehiculo],
+        nombre: formMX.nombre, apellidos: formMX.apellidos, rut: formMX.ine,
+        curp: formMX.curp, rfc: formMX.rfc, licencia: formMX.licencia,
+        telefono: formMX.telefono, email: formMX.email, localidad: formMX.localidad,
+        colonia: formMX.colonia, url_ine: formMX.url_ine, url_curp: formMX.url_curp,
+        url_rfc: formMX.url_rfc, url_licencia: formMX.url_licencia,
+        acepta_privacidad: formMX.acepta_privacidad, completado: false,
+        updated_at: new Date().toISOString(),
+      } : {
+        pais: "Chile", lead_id: lead.id, codigo_postulacion: lead.codigo_postulacion,
+        tipo_certificacion: formCL.tipo_certificacion, posee_inicio_actividades: formCL.posee_inicio_actividades,
+        tipo_persona: formCL.tipo_persona, razon_social: formCL.razon_social,
+        rut_empresa: formCL.rut_empresa, direccion_empresa: formCL.direccion_empresa,
+        nombre: formCL.nombre_representante, rut: formCL.rut_representante,
+        correo: formCL.correo, telefono: formCL.telefono, banco: formCL.banco,
+        formato_cuenta: formCL.formato_cuenta, tipo_cuenta: formCL.tipo_cuenta,
+        nombre_titular: formCL.nombre_titular, rut_titular: formCL.rut_titular,
+        operacion: formCL.operacion, supervisor: formCL.supervisor,
+        url_carnet: formCL.url_carnet, acepta_privacidad: formCL.acepta_privacidad,
+        completado: false, updated_at: new Date().toISOString(),
+      };
+      const { data: existe } = await sb.from("onboarding_terceros").select("id").eq("lead_id", lead.id).single();
+      if (existe) { await sb.from("onboarding_terceros").update(payload).eq("lead_id", lead.id); }
+      else { await sb.from("onboarding_terceros").insert(payload); }
+      setGuardadoAvance(true);
+      setTimeout(() => setGuardadoAvance(false), 3000);
+    } catch(e) { alert("Error al guardar: " + e.message); }
+    finally { setGuardando(false); }
+  };
+
+  // Cargar progreso guardado
+  useEffect(() => {
+    const cargar = async () => {
+      const { data: saved } = await sb.from("onboarding_terceros").select("*").eq("lead_id", lead.id).single();
+      if (!saved) return;
+      if (esMexico) {
+        setFormMX(f => ({...f,
+          puesto: saved.puesto || f.puesto,
+          tipo_vehiculo: Array.isArray(saved.tipos_vehiculo) ? saved.tipos_vehiculo[0] : f.tipo_vehiculo,
+          nombre: saved.nombre || f.nombre,
+          apellidos: saved.apellidos || f.apellidos,
+          ine: saved.rut || f.ine,
+          curp: saved.curp || f.curp,
+          rfc: saved.rfc || f.rfc,
+          licencia: saved.licencia || f.licencia,
+          telefono: saved.telefono || f.telefono,
+          email: saved.email || f.email,
+          localidad: saved.localidad || f.localidad,
+          colonia: saved.colonia || f.colonia,
+          url_ine: saved.url_ine || "",
+          url_curp: saved.url_curp || "",
+          url_rfc: saved.url_rfc || "",
+          url_licencia: saved.url_licencia || "",
+          acepta_privacidad: saved.acepta_privacidad || false,
+        }));
+      } else {
+        setFormCL(f => ({...f,
+          tipo_certificacion: saved.tipo_certificacion || f.tipo_certificacion,
+          posee_inicio_actividades: saved.posee_inicio_actividades || f.posee_inicio_actividades,
+          tipo_persona: saved.tipo_persona || f.tipo_persona,
+          razon_social: saved.razon_social || f.razon_social,
+          rut_empresa: saved.rut_empresa || f.rut_empresa,
+          direccion_empresa: saved.direccion_empresa || f.direccion_empresa,
+          nombre_representante: saved.nombre || f.nombre_representante,
+          rut_representante: saved.rut || f.rut_representante,
+          correo: saved.correo || f.correo,
+          telefono: saved.telefono || f.telefono,
+          banco: saved.banco || f.banco,
+          formato_cuenta: saved.formato_cuenta || f.formato_cuenta,
+          tipo_cuenta: saved.tipo_cuenta || f.tipo_cuenta,
+          nombre_titular: saved.nombre_titular || f.nombre_titular,
+          rut_titular: saved.rut_titular || f.rut_titular,
+          operacion: saved.operacion || f.operacion,
+          supervisor: saved.supervisor || f.supervisor,
+          url_carnet: saved.url_carnet || "",
+          acepta_privacidad: saved.acepta_privacidad || false,
+        }));
+      }
+    };
+    cargar();
+  }, [lead.id]);
 
   const handleUpload = async (field, file, setter, leadId) => {
     if (!file) return;
@@ -1783,15 +1872,35 @@ function ViewOnboarding({ lead, onVolver }) {
       if (!formMX.puesto) nuevosErrores.puesto = "Campo obligatorio";
       if (!formMX.tipo_vehiculo) nuevosErrores.tipo_vehiculo = "Campo obligatorio";
       if (!formMX.nombre?.trim()) nuevosErrores.nombre = "Campo obligatorio";
+      if (!formMX.apellidos?.trim()) nuevosErrores.apellidos = "Campo obligatorio";
       if (!formMX.ine?.trim()) nuevosErrores.ine = "Campo obligatorio";
+      if (!formMX.curp?.trim()) nuevosErrores.curp = "Campo obligatorio";
+      if (!formMX.rfc?.trim()) nuevosErrores.rfc = "Campo obligatorio";
       if (!formMX.telefono?.trim()) nuevosErrores.telefono = "Campo obligatorio";
+      if (!formMX.localidad) nuevosErrores.localidad = "Campo obligatorio";
+      if (!formMX.url_ine) nuevosErrores.url_ine = "Debes adjuntar tu INE";
+      if (!formMX.url_curp) nuevosErrores.url_curp = "Debes adjuntar tu CURP";
+      if (!formMX.url_rfc) nuevosErrores.url_rfc = "Debes adjuntar tu RFC";
     } else {
       if (!formCL.tipo_certificacion) nuevosErrores.tipo_certificacion = "Campo obligatorio";
+      if (!formCL.posee_inicio_actividades) nuevosErrores.posee_inicio_actividades = "Campo obligatorio";
       if (!formCL.nombre_representante?.trim()) nuevosErrores.nombre_representante = "Campo obligatorio";
+      if (!formCL.rut_representante?.trim()) nuevosErrores.rut_representante = "Campo obligatorio";
+      if (!formCL.correo?.trim()) nuevosErrores.correo = "Campo obligatorio";
       if (!formCL.telefono?.trim()) nuevosErrores.telefono = "Campo obligatorio";
+      if (!formCL.banco?.trim()) nuevosErrores.banco = "Campo obligatorio";
+      if (!formCL.formato_cuenta) nuevosErrores.formato_cuenta = "Campo obligatorio";
+      if (!formCL.tipo_cuenta) nuevosErrores.tipo_cuenta = "Campo obligatorio";
+      if (!formCL.nombre_titular?.trim()) nuevosErrores.nombre_titular = "Campo obligatorio";
+      if (!formCL.rut_titular?.trim()) nuevosErrores.rut_titular = "Campo obligatorio";
       if (!formCL.operacion) nuevosErrores.operacion = "Campo obligatorio";
+      if (!formCL.url_carnet) nuevosErrores.url_carnet = "Debes adjuntar tu cédula de identidad";
     }
-    if (Object.keys(nuevosErrores).length > 0) { setErrores(nuevosErrores); return; }
+    if (Object.keys(nuevosErrores).length > 0) {
+      setErrores(nuevosErrores);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
     setErrores({});
 
     setGuardando(true);
@@ -1839,11 +1948,22 @@ function ViewOnboarding({ lead, onVolver }) {
 
         {/* Header */}
         <div style={{ background: "#fff", borderRadius: 12, border: "0.5px solid #e4e7ec", padding: "16px 20px", marginBottom: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>
-            Formulario de incorporación — {esMexico ? "México 🇲🇽" : "Chile 🇨🇱"}
-          </div>
-          <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
-            {lead.nombre} · Código: <strong style={{ fontFamily: "monospace" }}>{lead.codigo_postulacion}</strong>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>
+                Formulario de incorporación — {esMexico ? "México 🇲🇽" : "Chile 🇨🇱"}
+              </div>
+              <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
+                {lead.nombre} · Código: <strong style={{ fontFamily: "monospace" }}>{lead.codigo_postulacion}</strong>
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {guardadoAvance && <span style={{ fontSize: 11, color: "#10B981", fontWeight: 600 }}>✓ Guardado</span>}
+              <button onClick={guardarAvance} disabled={guardando}
+                style={{ background: "#eef2ff", color: "#1a3a6b", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                {guardando ? "Guardando..." : "💾 Guardar avance"}
+              </button>
+            </div>
           </div>
         </div>
 
