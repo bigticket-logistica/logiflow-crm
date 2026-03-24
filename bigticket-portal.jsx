@@ -1592,319 +1592,446 @@ function OnboardingLogin({ onIngresar, onVolver }) {
   );
 }
 
+
+const OPERACIONES_CL = [
+  "ML_ARAUCO","ML_ARICA","ML_CORDILLERA","ML_MELIPILLA","ML_SALAMANCA",
+  "ML_SAN_ANTONIO","ML_SERENA","ML_VIÑA","ML_CAÑETE","ML_PICHILEMU",
+  "F_VIÑA","S_VIÑA","R_RM","R_VIÑA","BODEGA_VIÑA","BODEGA_RM",
+];
+
+const TIPOS_VEHICULO_MX = ["Small Van","Large Van","Small + Large Van","Extra Van"];
+const PUESTOS_MX = ["Driver","Ayudante","Propietario"];
+
+async function subirDocumento(file, leadId, nombre) {
+  if (!file) return null;
+  const ext = file.name.split('.').pop();
+  const path = `${leadId}/${nombre}_${Date.now()}.${ext}`;
+  const { error } = await sb.storage.from("documentos-terceros").upload(path, file, { upsert: true, contentType: file.type });
+  if (error) { console.error("Error subiendo:", error); return null; }
+  const { data } = sb.storage.from("documentos-terceros").getPublicUrl(path);
+  return data.publicUrl;
+}
+
+function UploadField({ label, valor, onChange, uploading }) {
+  return (
+    <div className="field-row">
+      <span className="field-label">{label}</span>
+      <label style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:8,
+        border:"0.5px solid #d0d5dd",background:"#f8f9fa",cursor:"pointer",fontSize:13}}>
+        <span style={{fontSize:16}}>📎</span>
+        <span style={{color:valor?"#10B981":"#888",flex:1}}>{uploading?"Subiendo...":valor?"✅ Archivo cargado":"Seleccionar archivo"}</span>
+        <input type="file" accept="image/*,.pdf" style={{display:"none"}} onChange={onChange} disabled={uploading}/>
+      </label>
+      {valor&&<a href={valor} target="_blank" style={{fontSize:11,color:"#1a3a6b",marginTop:3,display:"block"}}>Ver archivo →</a>}
+    </div>
+  );
+}
+
 function ViewOnboarding({ lead, onVolver }) {
-  const [paso,setPaso]=useState(1);
-  const [guardando,setGuardando]=useState(false);
-  const [guardado,setGuardado]=useState(false);
-  const [completado,setCompletado]=useState(false);
-  const [showPrivacidad,setShowPrivacidad]=useState(false);
-  const [errores,setErrores]=useState({});
-  const [form,setForm]=useState({
-    trabaja_bigticket:null,
-    tipos_vehiculo:[],
-    nombre:lead.nombre||"",
-    apellidos:"",
-    rut:lead.rut||"",
-    telefono:lead.telefono||"+569",
-    email:lead.email||"",
-    region:lead.region_estado||"",
-    localidad:"",
-    acepta_privacidad:false,
+  const pais = lead.pais || "Chile";
+  const esMexico = pais === "México";
+  const [guardando, setGuardando] = useState(false);
+  const [completado, setCompletado] = useState(false);
+  const [uploading, setUploading] = useState({});
+  const [showPrivacidad, setShowPrivacidad] = useState(false);
+  const [errores, setErrores] = useState({});
+
+  // Form Chile
+  const [formCL, setFormCL] = useState({
+    tipo_certificacion: "",
+    posee_inicio_actividades: "",
+    tipo_persona: "",
+    razon_social: "",
+    rut_empresa: "",
+    direccion_empresa: "",
+    nombre_representante: lead.nombre || "",
+    rut_representante: lead.rut || "",
+    correo: lead.email || "",
+    telefono: lead.telefono || "",
+    banco: "",
+    formato_cuenta: "",
+    tipo_cuenta: "",
+    nombre_titular: "",
+    rut_titular: "",
+    operacion: "",
+    supervisor: "",
+    acepta_privacidad: false,
+    url_carnet: "",
   });
 
-  // Cargar progreso guardado
-  useEffect(()=>{
-    const cargar=async()=>{
-      const {data}=await sb.from("onboarding_terceros").select("*").eq("lead_id",lead.id).single();
-      if(data){
-        setForm(f=>({...f,
-          trabaja_bigticket:data.trabaja_bigticket,
-          tipos_vehiculo:data.tipos_vehiculo||[],
-          nombre:data.nombre||f.nombre,
-          apellidos:data.apellidos||"",
-          rut:data.rut||f.rut,
-          telefono:data.telefono||f.telefono,
-          email:data.email||f.email,
-          region:data.region||f.region,
-          localidad:data.localidad||"",
-          acepta_privacidad:data.acepta_privacidad||false,
-        }));
-        if(data.paso_actual) setPaso(data.paso_actual);
-        if(data.completado) setCompletado(true);
-      }
-    };
-    cargar();
-  },[lead.id]);
+  // Form México
+  const [formMX, setFormMX] = useState({
+    puesto: "",
+    tipo_vehiculo: "",
+    nombre: lead.nombre || "",
+    apellidos: "",
+    ine: lead.rut || "",
+    curp: "",
+    rfc: "",
+    licencia: "",
+    telefono: lead.telefono || "",
+    email: lead.email || "",
+    localidad: lead.region_estado || "",
+    colonia: "",
+    acepta_privacidad: false,
+    url_ine: "",
+    url_curp: "",
+    url_rfc: "",
+    url_licencia: "",
+  });
 
-  const guardarProgreso=async(pasoActual=paso)=>{
-    setGuardando(true);
-    const payload={
-      lead_id:lead.id, codigo_postulacion:lead.codigo_postulacion,
-      rut:form.rut, nombre:form.nombre, apellidos:form.apellidos,
-      telefono:form.telefono, email:form.email, region:form.region,
-      localidad:form.localidad, trabaja_bigticket:form.trabaja_bigticket,
-      tipos_vehiculo:form.tipos_vehiculo, acepta_privacidad:form.acepta_privacidad,
-      paso_actual:pasoActual, updated_at:new Date().toISOString(),
+  const upd = (setter) => (k, v) => setter(f => ({ ...f, [k]: v }));
+  const updCL = upd(setFormCL);
+  const updMX = upd(setFormMX);
+
+  const handleUpload = async (field, file, setter, leadId) => {
+    if (!file) return;
+    setUploading(u => ({ ...u, [field]: true }));
+    const url = await subirDocumento(file, leadId, field);
+    if (url) setter(f => ({ ...f, [`url_${field}`]: url }));
+    setUploading(u => ({ ...u, [field]: false }));
+  };
+
+  const enviar = async () => {
+    const payload = esMexico ? {
+      pais: "México",
+      lead_id: lead.id,
+      codigo_postulacion: lead.codigo_postulacion,
+      puesto: formMX.puesto,
+      tipos_vehiculo: [formMX.tipo_vehiculo],
+      nombre: formMX.nombre,
+      apellidos: formMX.apellidos,
+      rut: formMX.ine,
+      curp: formMX.curp,
+      rfc: formMX.rfc,
+      licencia: formMX.licencia,
+      telefono: formMX.telefono,
+      email: formMX.email,
+      localidad: formMX.localidad,
+      colonia: formMX.colonia,
+      url_ine: formMX.url_ine,
+      url_curp: formMX.url_curp,
+      url_rfc: formMX.url_rfc,
+      url_licencia: formMX.url_licencia,
+      acepta_privacidad: formMX.acepta_privacidad,
+      completado: true,
+      completado_at: new Date().toISOString(),
+    } : {
+      pais: "Chile",
+      lead_id: lead.id,
+      codigo_postulacion: lead.codigo_postulacion,
+      tipo_certificacion: formCL.tipo_certificacion,
+      posee_inicio_actividades: formCL.posee_inicio_actividades,
+      tipo_persona: formCL.tipo_persona,
+      razon_social: formCL.razon_social,
+      rut_empresa: formCL.rut_empresa,
+      direccion_empresa: formCL.direccion_empresa,
+      nombre: formCL.nombre_representante,
+      apellidos: "",
+      rut: formCL.rut_representante,
+      correo: formCL.correo,
+      telefono: formCL.telefono,
+      banco: formCL.banco,
+      formato_cuenta: formCL.formato_cuenta,
+      tipo_cuenta: formCL.tipo_cuenta,
+      nombre_titular: formCL.nombre_titular,
+      rut_titular: formCL.rut_titular,
+      operacion: formCL.operacion,
+      supervisor: formCL.supervisor,
+      url_carnet: formCL.url_carnet,
+      acepta_privacidad: formCL.acepta_privacidad,
+      completado: true,
+      completado_at: new Date().toISOString(),
     };
-    const {data:existe}=await sb.from("onboarding_terceros").select("id").eq("lead_id",lead.id).single();
-    if(existe){
-      await sb.from("onboarding_terceros").update(payload).eq("lead_id",lead.id);
+
+    // Validar campos obligatorios
+    const nuevosErrores = {};
+    if (!payload.acepta_privacidad) nuevosErrores.acepta_privacidad = "Debes aceptar las políticas";
+    if (esMexico) {
+      if (!formMX.puesto) nuevosErrores.puesto = "Campo obligatorio";
+      if (!formMX.tipo_vehiculo) nuevosErrores.tipo_vehiculo = "Campo obligatorio";
+      if (!formMX.nombre?.trim()) nuevosErrores.nombre = "Campo obligatorio";
+      if (!formMX.ine?.trim()) nuevosErrores.ine = "Campo obligatorio";
+      if (!formMX.telefono?.trim()) nuevosErrores.telefono = "Campo obligatorio";
     } else {
-      await sb.from("onboarding_terceros").insert(payload);
+      if (!formCL.tipo_certificacion) nuevosErrores.tipo_certificacion = "Campo obligatorio";
+      if (!formCL.nombre_representante?.trim()) nuevosErrores.nombre_representante = "Campo obligatorio";
+      if (!formCL.telefono?.trim()) nuevosErrores.telefono = "Campo obligatorio";
+      if (!formCL.operacion) nuevosErrores.operacion = "Campo obligatorio";
     }
-    setGuardando(false);setGuardado(true);setTimeout(()=>setGuardado(false),2000);
-  };
-
-  const enviarFormulario=async()=>{
-    const nuevosErrores={};
-    if(!form.tipos_vehiculo.length) nuevosErrores.tipos_vehiculo="Selecciona al menos un tipo de vehículo";
-    if(!form.nombre?.trim()) nuevosErrores.nombre="Campo obligatorio";
-    if(!form.rut?.trim()) nuevosErrores.rut="Campo obligatorio";
-    if(!form.telefono?.trim()||form.telefono==="+569") nuevosErrores.telefono="Campo obligatorio";
-    if(!form.region) nuevosErrores.region="Campo obligatorio";
-    if(!form.localidad?.trim()) nuevosErrores.localidad="Campo obligatorio";
-    if(!form.acepta_privacidad) nuevosErrores.acepta_privacidad="Debes aceptar las políticas de privacidad";
-    if(Object.keys(nuevosErrores).length>0){
-      setErrores(nuevosErrores);
-      if(nuevosErrores.tipos_vehiculo){setPaso(1);return;}
-      if(nuevosErrores.nombre||nuevosErrores.rut||nuevosErrores.telefono||nuevosErrores.region||nuevosErrores.localidad){setPaso(2);return;}
-      return;
-    }
+    if (Object.keys(nuevosErrores).length > 0) { setErrores(nuevosErrores); return; }
     setErrores({});
+
     setGuardando(true);
-    const payload={
-      lead_id:lead.id, codigo_postulacion:lead.codigo_postulacion,
-      rut:form.rut, nombre:form.nombre, apellidos:form.apellidos,
-      telefono:form.telefono, email:form.email, region:form.region,
-      localidad:form.localidad, trabaja_bigticket:form.trabaja_bigticket,
-      tipos_vehiculo:form.tipos_vehiculo, acepta_privacidad:form.acepta_privacidad,
-      paso_actual:3, completado:true, completado_at:new Date().toISOString(),
-      updated_at:new Date().toISOString(),
-    };
-    const {data:existe}=await sb.from("onboarding_terceros").select("id").eq("lead_id",lead.id).single();
-    if(existe){await sb.from("onboarding_terceros").update(payload).eq("lead_id",lead.id);}
-    else{await sb.from("onboarding_terceros").insert(payload);}
-    // Actualizar etapa del lead
-    await sb.from("leads").update({etapa:"Contrato Firmado"}).eq("id",lead.id);
-    // Notificar a N8N
-    try{
-      await fetch("https://bigticket2026.app.n8n.cloud/webhook/onboarding-completado",{
-        method:"POST",mode:"no-cors",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({...payload,campana_nombre:lead.origen||"",pais:lead.pais||"Chile"}),
-      });
-    }catch(e){console.log("N8N error:",e);}
-    setGuardando(false);setCompletado(true);
+    try {
+      // Guardar en Supabase
+      const { data: existe } = await sb.from("onboarding_terceros").select("id").eq("lead_id", lead.id).single();
+      const dbPayload = { ...payload, updated_at: new Date().toISOString() };
+      if (existe) { await sb.from("onboarding_terceros").update(dbPayload).eq("lead_id", lead.id); }
+      else { await sb.from("onboarding_terceros").insert(dbPayload); }
+      await sb.from("leads").update({ etapa: "Contrato Firmado" }).eq("id", lead.id);
+      // Notificar N8N
+      try {
+        await fetch("https://bigticket2026.app.n8n.cloud/webhook/onboarding-completado", {
+          method: "POST", mode: "no-cors",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...payload, campana_nombre: lead.origen || "", pais: pais }),
+        });
+      } catch (e) { console.log("N8N error:", e); }
+      setCompletado(true);
+    } catch (e) { alert("Error al enviar: " + e.message); }
+    finally { setGuardando(false); }
   };
 
-  const toggleVehiculo=(tipo)=>{
-    setForm(f=>({...f,tipos_vehiculo:
-      f.tipos_vehiculo.includes(tipo)?f.tipos_vehiculo.filter(t=>t!==tipo):[...f.tipos_vehiculo,tipo]
-    }));
-  };
-
-  const PASOS=[{n:1,label:"Vehículo"},{n:2,label:"Datos personales"},{n:3,label:"Confirmación"}];
-  const pct=Math.round(((paso-1)/3)*100);
-
-  if(completado) return(
+  if (completado) return (
     <div>
       <div className="topbar"><span className="logo">Big<span>ticket</span></span></div>
-      <div style={{maxWidth:480,margin:"60px auto",padding:"0 20px"}}>
-        <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",padding:"40px 32px",textAlign:"center"}}>
-          <div style={{fontSize:48,marginBottom:16}}>🎉</div>
-          <div style={{fontSize:20,fontWeight:700,color:"#166534",marginBottom:8}}>¡Formulario enviado!</div>
-          <div style={{fontSize:13,color:"#555",marginBottom:24}}>Tu información fue recibida correctamente. Nuestro equipo la revisará y te contactará pronto por WhatsApp 🚛</div>
+      <div style={{ maxWidth: 480, margin: "60px auto", padding: "0 20px" }}>
+        <div style={{ background: "#fff", borderRadius: 16, border: "0.5px solid #e4e7ec", padding: "40px 32px", textAlign: "center" }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🎉</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: "#166534", marginBottom: 8 }}>¡Formulario enviado!</div>
+          <div style={{ fontSize: 13, color: "#555", marginBottom: 24 }}>Tu información fue recibida correctamente. Nuestro equipo la revisará y te contactará pronto por WhatsApp 🚛</div>
           <button className="btn-orange" onClick={onVolver}>Volver al portal</button>
         </div>
       </div>
     </div>
   );
 
-  return(
+  const inputStyle = (campo) => ({
+    ...(errores[campo] ? { borderColor: "#EF4444", background: "#fff5f5" } : {})
+  });
+
+  const ErrMsg = ({ campo }) => errores[campo] ?
+    <span style={{ fontSize: 11, color: "#EF4444", marginTop: 3, display: "block" }}>⚠ {errores[campo]}</span> : null;
+
+  const SelectField = ({ label, campo, opciones, value, onChange, required }) => (
+    <div className="field-row">
+      <span className="field-label">{label}{required ? " *" : ""}</span>
+      <select value={value} onChange={e => { onChange(e.target.value); setErrores(p => ({ ...p, [campo]: "" })); }}
+        style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `0.5px solid ${errores[campo] ? "#EF4444" : "#d0d5dd"}`, background: errores[campo] ? "#fff5f5" : "#fff", fontSize: 13, color: value ? "#1a1a1a" : "#888", cursor: "pointer" }}>
+        <option value="">-- Seleccionar --</option>
+        {opciones.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+      <ErrMsg campo={campo} />
+    </div>
+  );
+
+  const TextField = ({ label, campo, value, onChange, placeholder, required, type = "text" }) => (
+    <div className="field-row">
+      <span className="field-label">{label}{required ? " *" : ""}</span>
+      <input type={type} value={value} placeholder={placeholder || ""}
+        onChange={e => { onChange(e.target.value); setErrores(p => ({ ...p, [campo]: "" })); }}
+        style={inputStyle(campo)} />
+      <ErrMsg campo={campo} />
+    </div>
+  );
+
+  return (
     <div>
       <div className="topbar">
         <span className="logo">Big<span>ticket</span></span>
         <button className="btn-gw" onClick={onVolver}>Salir</button>
       </div>
-      <div style={{maxWidth:600,margin:"0 auto",padding:"20px 16px"}}>
+      <div style={{ maxWidth: 640, margin: "0 auto", padding: "20px 16px" }}>
 
-        {/* Progreso */}
-        <div style={{background:"#fff",borderRadius:12,border:"0.5px solid #e4e7ec",padding:"16px 20px",marginBottom:16}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-            <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a"}}>Formulario de incorporación — Chile 🇨🇱</div>
-            <div style={{display:"flex",gap:8,alignItems:"center"}}>
-              {guardado&&<span style={{fontSize:11,color:"#10B981"}}>✓ Guardado</span>}
-              <button onClick={()=>guardarProgreso()} disabled={guardando}
-                style={{background:"#eef2ff",color:"#1a3a6b",border:"none",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
-                {guardando?"Guardando...":"💾 Guardar avance"}
-              </button>
-            </div>
+        {/* Header */}
+        <div style={{ background: "#fff", borderRadius: 12, border: "0.5px solid #e4e7ec", padding: "16px 20px", marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>
+            Formulario de incorporación — {esMexico ? "México 🇲🇽" : "Chile 🇨🇱"}
           </div>
-          <div style={{display:"flex",gap:8,marginBottom:10}}>
-            {PASOS.map(p=>(
-              <div key={p.n} onClick={()=>setPaso(p.n)} style={{flex:1,textAlign:"center",padding:"6px",borderRadius:8,cursor:"pointer",
-                background:paso===p.n?"#1a3a6b":paso>p.n?"#dcfce7":"#f0f2f5",
-                color:paso===p.n?"#fff":paso>p.n?"#166534":"#888",fontSize:11,fontWeight:700}}>
-                {paso>p.n?"✓ ":""}{p.label}
-              </div>
-            ))}
-          </div>
-          <div style={{height:4,background:"#f0f2f5",borderRadius:4}}>
-            <div style={{height:"100%",width:`${pct}%`,background:"#1a3a6b",borderRadius:4,transition:"width .4s"}}/>
+          <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
+            {lead.nombre} · Código: <strong style={{ fontFamily: "monospace" }}>{lead.codigo_postulacion}</strong>
           </div>
         </div>
 
-        {/* Paso 1 — Vehículo */}
-        {paso===1&&(
+        {/* ─── FORMULARIO MÉXICO ─── */}
+        {esMexico && (
           <div className="form-card">
-            <div className="form-title">¿Actualmente trabajas en BigTicket?</div>
-            <div style={{display:"flex",gap:12,marginBottom:20}}>
-              {[["si","Sí, trabajo actualmente"],["no","No, es mi primera vez"]].map(([val,label])=>(
-                <div key={val} onClick={()=>setForm(f=>({...f,trabaja_bigticket:val==="si"}))}
-                  style={{flex:1,padding:"12px 16px",borderRadius:10,border:`2px solid ${form.trabaja_bigticket===(val==="si")?"#1a3a6b":"#e4e7ec"}`,
-                    background:form.trabaja_bigticket===(val==="si")?"#eef2ff":"#fff",cursor:"pointer",textAlign:"center",fontSize:13,fontWeight:600,
-                    color:form.trabaja_bigticket===(val==="si")?"#1a3a6b":"#555",transition:"all .15s"}}>
-                  {label}
+            {Object.values(errores).some(e => e) && (
+              <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 12, color: "#c0392b" }}>
+                ⚠ Completa los campos obligatorios marcados con *
+              </div>
+            )}
+
+            <SelectField label="Puesto al que postula" campo="puesto" opciones={PUESTOS_MX}
+              value={formMX.puesto} onChange={v => updMX("puesto", v)} required />
+
+            <SelectField label="Tipo de Vehículo" campo="tipo_vehiculo" opciones={TIPOS_VEHICULO_MX}
+              value={formMX.tipo_vehiculo} onChange={v => updMX("tipo_vehiculo", v)} required />
+
+            <div className="two-col">
+              <TextField label="Nombres" campo="nombre" value={formMX.nombre} onChange={v => updMX("nombre", v)} placeholder="Tu nombre" required />
+              <TextField label="Apellidos" campo="apellidos" value={formMX.apellidos} onChange={v => updMX("apellidos", v)} placeholder="Tus apellidos" />
+            </div>
+            <div className="two-col">
+              <TextField label="INE" campo="ine" value={formMX.ine} onChange={v => updMX("ine", v)} placeholder="Número de INE" required />
+              <TextField label="CURP" campo="curp" value={formMX.curp} onChange={v => updMX("curp", v)} placeholder="CURP" />
+            </div>
+            <div className="two-col">
+              <TextField label="RFC" campo="rfc" value={formMX.rfc} onChange={v => updMX("rfc", v)} placeholder="RFC" />
+              {(formMX.puesto === "Driver" || formMX.puesto === "Propietario") && (
+                <TextField label="Licencia de Conducir" campo="licencia" value={formMX.licencia} onChange={v => updMX("licencia", v)} placeholder="Número de licencia" />
+              )}
+            </div>
+            <div className="two-col">
+              <TextField label="Teléfono" campo="telefono" value={formMX.telefono} onChange={v => updMX("telefono", v)} placeholder="+521..." required />
+              <TextField label="Email" campo="email" type="email" value={formMX.email} onChange={v => updMX("email", v)} placeholder="correo@..." />
+            </div>
+            <div className="two-col">
+              <SelectField label="Localidad (SVC)" campo="localidad" opciones={ESTADOS_MEXICO}
+                value={formMX.localidad} onChange={v => updMX("localidad", v)} />
+              <TextField label="Colonia" campo="colonia" value={formMX.colonia} onChange={v => updMX("colonia", v)} placeholder="Tu colonia" />
+            </div>
+
+            <div style={{ marginTop: 8, padding: "12px 14px", background: "#f8f9fa", borderRadius: 10, marginBottom: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", marginBottom: 10 }}>📎 Documentos requeridos</div>
+              <UploadField label="Adjuntar INE (ambos lados)" valor={formMX.url_ine}
+                uploading={uploading.ine}
+                onChange={e => handleUpload("ine", e.target.files[0], setFormMX, lead.id)} />
+              <UploadField label="Adjuntar CURP" valor={formMX.url_curp}
+                uploading={uploading.curp}
+                onChange={e => handleUpload("curp", e.target.files[0], setFormMX, lead.id)} />
+              <UploadField label="Adjuntar RFC" valor={formMX.url_rfc}
+                uploading={uploading.rfc}
+                onChange={e => handleUpload("rfc", e.target.files[0], setFormMX, lead.id)} />
+              {(formMX.puesto === "Driver" || formMX.puesto === "Propietario") && (
+                <UploadField label="Adjuntar Licencia de Conducir" valor={formMX.url_licencia}
+                  uploading={uploading.licencia}
+                  onChange={e => handleUpload("licencia", e.target.files[0], setFormMX, lead.id)} />
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ─── FORMULARIO CHILE ─── */}
+        {!esMexico && (
+          <div className="form-card">
+            {Object.values(errores).some(e => e) && (
+              <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 12, color: "#c0392b" }}>
+                ⚠ Completa los campos obligatorios marcados con *
+              </div>
+            )}
+
+            <SelectField label="Tipo de Certificación" campo="tipo_certificacion"
+              opciones={["Apoyo", "Planta", "Por Temporada"]}
+              value={formCL.tipo_certificacion} onChange={v => updCL("tipo_certificacion", v)} required />
+
+            <SelectField label="¿Posee Inicio de Actividades?" campo="posee_inicio_actividades"
+              opciones={["Si", "No"]}
+              value={formCL.posee_inicio_actividades} onChange={v => updCL("posee_inicio_actividades", v)} required />
+
+            {formCL.posee_inicio_actividades === "Si" && (
+              <>
+                <SelectField label="¿Persona Natural o Empresa?" campo="tipo_persona"
+                  opciones={["Persona Natural", "Empresa"]}
+                  value={formCL.tipo_persona} onChange={v => updCL("tipo_persona", v)} required />
+                <div className="two-col">
+                  <TextField label="Razón Social" campo="razon_social" value={formCL.razon_social} onChange={v => updCL("razon_social", v)} placeholder="Razón social" />
+                  <TextField label="RUT Empresa" campo="rut_empresa" value={formCL.rut_empresa} onChange={v => updCL("rut_empresa", v)} placeholder="RUT empresa" />
                 </div>
-              ))}
+                <TextField label="Dirección Empresa" campo="direccion_empresa" value={formCL.direccion_empresa} onChange={v => updCL("direccion_empresa", v)} placeholder="Dirección" />
+              </>
+            )}
+
+            <div className="form-title" style={{ marginTop: 16 }}>Datos del Representante Legal</div>
+            <div className="two-col">
+              <TextField label="Nombre Completo" campo="nombre_representante" value={formCL.nombre_representante}
+                onChange={v => updCL("nombre_representante", v)} placeholder="Nombre completo" required />
+              <TextField label="RUT Representante Legal" campo="rut_representante" value={formCL.rut_representante}
+                onChange={v => updCL("rut_representante", v)} placeholder="12345678k" required />
             </div>
-            <div className="form-title">Tipo de vehículo (selecciona todos los que apliquen)</div>
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {TIPOS_VEHICULO_CL.map(tipo=>(
-                <label key={tipo} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:8,
-                  border:`1.5px solid ${form.tipos_vehiculo.includes(tipo)?"#1a3a6b":"#e4e7ec"}`,
-                  background:form.tipos_vehiculo.includes(tipo)?"#eef2ff":"#fff",cursor:"pointer",transition:"all .15s"}}>
-                  <input type="checkbox" checked={form.tipos_vehiculo.includes(tipo)} onChange={()=>toggleVehiculo(tipo)}
-                    style={{width:"auto",margin:0,accentColor:"#1a3a6b"}}/>
-                  <span style={{fontSize:13,color:form.tipos_vehiculo.includes(tipo)?"#1a3a6b":"#555",fontWeight:form.tipos_vehiculo.includes(tipo)?600:400}}>{tipo}</span>
-                </label>
-              ))}
+            <div className="two-col">
+              <TextField label="Correo de Contacto" campo="correo" type="email" value={formCL.correo}
+                onChange={v => updCL("correo", v)} placeholder="correo@..." />
+              <TextField label="Teléfono de Contacto" campo="telefono" value={formCL.telefono}
+                onChange={v => updCL("telefono", v)} placeholder="+569..." required />
             </div>
-            <button className="btn-orange" style={{marginTop:16}} onClick={()=>{guardarProgreso(2);setPaso(2);}}>
-              Siguiente →
+
+            <div style={{ padding: "12px 14px", background: "#f8f9fa", borderRadius: 10, marginBottom: 8, marginTop: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", marginBottom: 10 }}>📎 Documentos</div>
+              <UploadField label="Adjuntar Cédula de Identidad (ambas caras)" valor={formCL.url_carnet}
+                uploading={uploading.carnet}
+                onChange={e => handleUpload("carnet", e.target.files[0], setFormCL, lead.id)} />
+            </div>
+
+            <div className="form-title" style={{ marginTop: 16 }}>Datos Bancarios</div>
+            <div className="two-col">
+              <TextField label="Banco" campo="banco" value={formCL.banco} onChange={v => updCL("banco", v)} placeholder="Nombre del banco" />
+              <SelectField label="Formato de Cuenta" campo="formato_cuenta"
+                opciones={["Persona Natural", "Empresa"]}
+                value={formCL.formato_cuenta} onChange={v => updCL("formato_cuenta", v)} />
+            </div>
+            <div className="two-col">
+              <SelectField label="Tipo de Cuenta" campo="tipo_cuenta"
+                opciones={["Cuenta Corriente", "Cuenta Vista", "Cuenta de Ahorro", "Chequera Electronica"]}
+                value={formCL.tipo_cuenta} onChange={v => updCL("tipo_cuenta", v)} />
+              <TextField label="Nombre del Titular" campo="nombre_titular" value={formCL.nombre_titular}
+                onChange={v => updCL("nombre_titular", v)} placeholder="Nombre titular" />
+            </div>
+            <TextField label="RUT del Titular" campo="rut_titular" value={formCL.rut_titular}
+              onChange={v => updCL("rut_titular", v)} placeholder="RUT titular" />
+
+            <div className="form-title" style={{ marginTop: 16 }}>Operación</div>
+            <SelectField label="Operación donde prestará servicios" campo="operacion"
+              opciones={OPERACIONES_CL}
+              value={formCL.operacion} onChange={v => updCL("operacion", v)} required />
+            <TextField label="Nombre del Supervisor a Cargo" campo="supervisor" value={formCL.supervisor}
+              onChange={v => updCL("supervisor", v)} placeholder="Nombre del supervisor" />
+          </div>
+        )}
+
+        {/* Política de privacidad */}
+        <div className="form-card">
+          {errores.acepta_privacidad && (
+            <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 12, fontSize: 12, color: "#c0392b" }}>
+              ⚠ {errores.acepta_privacidad}
+            </div>
+          )}
+          <label style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", borderRadius: 10,
+            border: `1.5px solid ${errores.acepta_privacidad ? "#EF4444" : (esMexico ? formMX.acepta_privacidad : formCL.acepta_privacidad) ? "#1a3a6b" : "#e4e7ec"}`,
+            background: (esMexico ? formMX.acepta_privacidad : formCL.acepta_privacidad) ? "#eef2ff" : "#fff", cursor: "pointer" }}>
+            <input type="checkbox"
+              checked={esMexico ? formMX.acepta_privacidad : formCL.acepta_privacidad}
+              onChange={e => {
+                if (esMexico) updMX("acepta_privacidad", e.target.checked);
+                else updCL("acepta_privacidad", e.target.checked);
+                setErrores(p => ({ ...p, acepta_privacidad: "" }));
+              }}
+              style={{ width: "auto", margin: "2px 0 0", accentColor: "#1a3a6b", flexShrink: 0 }} />
+            <span style={{ fontSize: 13, color: "#555", lineHeight: 1.5 }}>
+              Acepto las <button onClick={e => { e.preventDefault(); setShowPrivacidad(true); }}
+                style={{ background: "none", border: "none", color: "#1a3a6b", fontWeight: 700, cursor: "pointer", fontSize: 13, padding: 0, textDecoration: "underline" }}>
+                Políticas de Privacidad</button> de BigTicket
+            </span>
+          </label>
+
+          <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+            <button style={{ flex: 1, background: "#f0f2f5", color: "#475569", border: "none", borderRadius: 8, padding: "10px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+              onClick={onVolver}>← Volver</button>
+            <button className="btn-orange" style={{ flex: 2, marginTop: 0 }} onClick={enviar} disabled={guardando}>
+              {guardando ? "Enviando..." : "✅ Enviar formulario"}
             </button>
           </div>
-        )}
-
-        {/* Paso 2 — Datos personales */}
-        {paso===2&&(
-          <div className="form-card">
-            <div className="form-title">Datos personales</div>
-            {Object.values(errores).some(e=>e)&&(
-              <div style={{background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:8,padding:"10px 14px",marginBottom:14,fontSize:12,color:"#c0392b",display:"flex",gap:8,alignItems:"flex-start"}}>
-                <span style={{flexShrink:0}}>⚠</span>
-                <span>Completa los campos marcados en rojo para continuar.</span>
-              </div>
-            )}
-            <div className="two-col">
-              <div className="field-row"><span className="field-label">Nombre *</span>
-                <input value={form.nombre} onChange={e=>{setForm(f=>({...f,nombre:e.target.value}));setErrores(p=>({...p,nombre:""}));}}
-                  placeholder="Tu nombre" style={errores.nombre?{borderColor:"#EF4444",background:"#fff5f5"}:{}}/>
-                {errores.nombre&&<span style={{fontSize:11,color:"#EF4444",marginTop:3,display:"block"}}>⚠ {errores.nombre}</span>}</div>
-              <div className="field-row"><span className="field-label">Apellidos *</span>
-                <input value={form.apellidos} onChange={e=>setForm(f=>({...f,apellidos:e.target.value}))} placeholder="Tus apellidos"/></div>
-            </div>
-            <div className="two-col">
-              <div className="field-row"><span className="field-label">RUT (sin puntos ni guión) *</span>
-                <input value={form.rut} onChange={e=>{setForm(f=>({...f,rut:e.target.value}));setErrores(p=>({...p,rut:""}));}}
-                  placeholder="12345678k" style={errores.rut?{borderColor:"#EF4444",background:"#fff5f5"}:{}}/>
-                {errores.rut&&<span style={{fontSize:11,color:"#EF4444",marginTop:3,display:"block"}}>⚠ {errores.rut}</span>}</div>
-              <div className="field-row"><span className="field-label">Teléfono WhatsApp *</span>
-                <input value={form.telefono} onChange={e=>{setForm(f=>({...f,telefono:e.target.value}));setErrores(p=>({...p,telefono:""}));}}
-                  placeholder="+569..." style={errores.telefono?{borderColor:"#EF4444",background:"#fff5f5"}:{}}/>
-                {errores.telefono&&<span style={{fontSize:11,color:"#EF4444",marginTop:3,display:"block"}}>⚠ {errores.telefono}</span>}</div>
-            </div>
-            <div className="field-row"><span className="field-label">Correo electrónico</span>
-              <input type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} placeholder="correo@..."/></div>
-            <div className="two-col">
-              <div className="field-row"><span className="field-label">Región *</span>
-                <select value={form.region} onChange={e=>{setForm(f=>({...f,region:e.target.value}));setErrores(p=>({...p,region:""}));}}
-                  style={errores.region?{borderColor:"#EF4444",background:"#fff5f5"}:{}}>
-                  <option value="">-- Seleccionar --</option>
-                  {REGIONES_CL.map(r=><option key={r}>{r}</option>)}
-                </select>
-                {errores.region&&<span style={{fontSize:11,color:"#EF4444",marginTop:3,display:"block"}}>⚠ {errores.region}</span>}
-              </div>
-              <div className="field-row"><span className="field-label">Localidad a la que postula *</span>
-                <select value={form.localidad} onChange={e=>{setForm(f=>({...f,localidad:e.target.value}));setErrores(p=>({...p,localidad:""}));}}
-                  style={{width:"100%",padding:"9px 12px",borderRadius:8,border:`0.5px solid ${errores.localidad?"#EF4444":"#d0d5dd"}`,background:errores.localidad?"#fff5f5":"#fff",fontSize:13,color:form.localidad?"#1a1a1a":"#888",cursor:"pointer"}}>
-                  <option value="">-- Seleccionar comuna --</option>
-                  {COMUNAS_CL.map(c=><option key={c} value={c}>{c}</option>)}
-                </select>
-                {errores.localidad&&<span style={{fontSize:11,color:"#EF4444",marginTop:3,display:"block"}}>⚠ {errores.localidad}</span>}</div>
-            </div>
-            <div style={{display:"flex",gap:10,marginTop:8}}>
-              <button style={{flex:1,background:"#f0f2f5",color:"#475569",border:"none",borderRadius:8,padding:"10px",fontSize:12,fontWeight:700,cursor:"pointer"}}
-                onClick={()=>{guardarProgreso(1);setPaso(1);}}>← Anterior</button>
-              <button className="btn-orange" style={{flex:2,marginTop:0}} onClick={()=>{guardarProgreso(3);setPaso(3);}}>Siguiente →</button>
-            </div>
-          </div>
-        )}
-
-        {/* Paso 3 — Confirmación */}
-        {paso===3&&(
-          <div className="form-card">
-            <div className="form-title">Confirmación y políticas de privacidad</div>
-            <div style={{background:"#f8f9fa",borderRadius:10,padding:"14px 16px",marginBottom:16,fontSize:13,color:"#555",lineHeight:1.6}}>
-              <div style={{fontWeight:700,color:"#1a1a1a",marginBottom:8}}>Resumen de tu postulación:</div>
-              <div>👤 <strong>{form.nombre} {form.apellidos}</strong></div>
-              <div>🪪 RUT: {form.rut}</div>
-              <div>📍 {form.region} — {form.localidad}</div>
-              <div>🚛 {form.tipos_vehiculo.length} tipo(s) de vehículo seleccionado(s)</div>
-              {form.trabaja_bigticket!==null&&<div>💼 {form.trabaja_bigticket?"Trabaja actualmente en BigTicket":"Primera vez en BigTicket"}</div>}
-            </div>
-            {errores.acepta_privacidad&&(
-              <div style={{background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:8,padding:"10px 14px",marginBottom:12,fontSize:12,color:"#c0392b"}}>
-                ⚠ {errores.acepta_privacidad}
-              </div>
-            )}
-            <label style={{display:"flex",alignItems:"flex-start",gap:10,padding:"12px 14px",borderRadius:10,
-              border:`1.5px solid ${errores.acepta_privacidad?"#EF4444":form.acepta_privacidad?"#1a3a6b":"#e4e7ec"}`,
-              background:form.acepta_privacidad?"#eef2ff":errores.acepta_privacidad?"#fff5f5":"#fff",cursor:"pointer",marginBottom:16}}>
-              <input type="checkbox" checked={form.acepta_privacidad} onChange={e=>{setForm(f=>({...f,acepta_privacidad:e.target.checked}));setErrores(p=>({...p,acepta_privacidad:""}));}}
-                style={{width:"auto",margin:"2px 0 0",accentColor:"#1a3a6b",flexShrink:0}}/>
-              <span style={{fontSize:13,color:"#555",lineHeight:1.5}}>
-                Acepto las <button onClick={e=>{e.preventDefault();setShowPrivacidad(true)}}
-                  style={{background:"none",border:"none",color:"#1a3a6b",fontWeight:700,cursor:"pointer",fontSize:13,padding:0,textDecoration:"underline"}}>
-                  Políticas de Privacidad</button> de BigTicket
-              </span>
-            </label>
-            <div style={{display:"flex",gap:10}}>
-              <button style={{flex:1,background:"#f0f2f5",color:"#475569",border:"none",borderRadius:8,padding:"10px",fontSize:12,fontWeight:700,cursor:"pointer"}}
-                onClick={()=>{guardarProgreso(2);setPaso(2);}}>← Anterior</button>
-              <button className="btn-orange" style={{flex:2,marginTop:0}} onClick={enviarFormulario} disabled={guardando}>
-                {guardando?"Enviando...":"✅ Enviar formulario"}
-              </button>
-            </div>
-          </div>
-        )}
+        </div>
 
         {/* Modal políticas */}
-        {showPrivacidad&&(
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:500}}>
-            <div style={{background:"#fff",borderRadius:14,width:560,maxHeight:"80vh",display:"flex",flexDirection:"column"}}>
-              <div style={{padding:"16px 20px",borderBottom:"1px solid #e4e7ec",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <div style={{fontSize:15,fontWeight:700}}>Políticas de Privacidad — BigTicket</div>
-                <button onClick={()=>setShowPrivacidad(false)} style={{background:"#f0f2f5",border:"none",borderRadius:6,width:28,height:28,cursor:"pointer",fontSize:16}}>×</button>
+        {showPrivacidad && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 500 }}>
+            <div style={{ background: "#fff", borderRadius: 14, width: 560, maxHeight: "80vh", display: "flex", flexDirection: "column" }}>
+              <div style={{ padding: "16px 20px", borderBottom: "1px solid #e4e7ec", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ fontSize: 15, fontWeight: 700 }}>Políticas de Privacidad — BigTicket</div>
+                <button onClick={() => setShowPrivacidad(false)} style={{ background: "#f0f2f5", border: "none", borderRadius: 6, width: 28, height: 28, cursor: "pointer", fontSize: 16 }}>×</button>
               </div>
-              <div style={{padding:"16px 20px",overflow:"auto",fontSize:13,color:"#555",lineHeight:1.7}}>
-                <p style={{marginBottom:12}}>Conforme a lo dispuesto en el artículo 19 N° 4 de la Constitución Política de la República y a las normas pertinentes de la Ley N° 19.628 sobre protección de la vida privada y sus modificaciones posteriores, el tratamiento de datos personales que se realiza en BigTicket, se rige por las siguientes reglas:</p>
-                <ul style={{paddingLeft:20,marginBottom:12,display:"flex",flexDirection:"column",gap:8}}>
-                  <li>BigTicket asegura la confidencialidad de los datos personales de los usuarios que se registren como tales en el sitio Web mediante el o los formularios establecidos para esos efectos. Sin perjuicio de sus facultades legales, la empresa sólo efectuará tratamiento de datos personales respecto de aquéllos que han sido entregados voluntariamente por los usuarios en el referido formulario.</li>
-                  <li>Los datos personales de los usuarios serán utilizados para el cumplimiento de los fines indicados en el formulario correspondiente y siempre dentro de las competencias y atribuciones de la empresa.</li>
-                  <li>BigTicket podrá comunicar a otros organismos del Estado, los datos personales de sus usuarios, conforme a lo establecido en la Ley 19.628.</li>
-                  <li>BigTicket podrá comunicar a terceros, sin el consentimiento expreso del titular, información estadística elaborada a partir de los datos personales de sus usuarios, cuando de dichos datos no sea posible identificar individualmente a los titulares.</li>
-                  <li>El usuario podrá en todo momento ejercer los derechos otorgados por la Ley N° 19.628 y sus modificaciones posteriores.</li>
+              <div style={{ padding: "16px 20px", overflow: "auto", fontSize: 13, color: "#555", lineHeight: 1.7 }}>
+                <p style={{ marginBottom: 12 }}>Conforme a lo dispuesto en el artículo 19 N° 4 de la Constitución Política de la República y a las normas pertinentes de la Ley N° 19.628 sobre protección de la vida privada, el tratamiento de datos personales que se realiza en BigTicket se rige por las siguientes reglas:</p>
+                <ul style={{ paddingLeft: 20, marginBottom: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                  <li>BigTicket asegura la confidencialidad de los datos personales de los usuarios.</li>
+                  <li>Los datos serán utilizados para el cumplimiento de los fines indicados en el formulario.</li>
+                  <li>El usuario podrá ejercer los derechos otorgados por la Ley N° 19.628 en cualquier momento.</li>
                 </ul>
-                <p style={{marginBottom:12}}>En específico, podrá:</p>
-                <p style={{marginBottom:8}}>a. Solicitar información sobre los datos relativos a su persona, su procedencia y destinatario, el propósito del almacenamiento y la individualización de las personas u organismos a los cuales sus datos son transmitidos regularmente.</p>
-                <p style={{marginBottom:8}}>b. Solicitar que se modifiquen sus datos personales cuando ellos no sean correctos o no estén actualizados, si fuere procedente.</p>
-                <p style={{marginBottom:12}}>c. Solicitar la eliminación o cancelación de los datos entregados cuando así lo desee, en tanto fuere procedente.</p>
-                <p style={{marginBottom:12}}>Respecto de la recolección y tratamiento de datos realizado mediante mecanismos automatizados con el objeto de generar registros de actividad de los visitantes y registros de audiencia, BigTicket sólo podrá utilizar dicha información para la elaboración de informes que cumplan con los objetivos señalados. En ningún caso podrá realizar operaciones que impliquen asociar dicha información a algún usuario identificado o identificable.</p>
-                <p style={{fontWeight:600,color:"#1a3a6b"}}>Respecto del consentimiento uso de programa "Alto Checks" para obtención de datos personales:</p>
-                <p style={{marginTop:8}}>Al hacer clic en "Acepto", otorgo mi consentimiento voluntario para que BigTicket utilice el programa "Alto Checks" y procese mis Datos Personales de acuerdo con lo establecido en la Ley N° 19.628.</p>
               </div>
-              <div style={{padding:"12px 20px",borderTop:"1px solid #e4e7ec"}}>
-                <button className="btn-orange" style={{maxWidth:200,margin:"0 auto"}} onClick={()=>setShowPrivacidad(false)}>Cerrar</button>
+              <div style={{ padding: "12px 20px", borderTop: "1px solid #e4e7ec" }}>
+                <button className="btn-orange" style={{ maxWidth: 200, margin: "0 auto" }} onClick={() => setShowPrivacidad(false)}>Cerrar</button>
               </div>
             </div>
           </div>
