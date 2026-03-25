@@ -619,9 +619,12 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
             <div className="field-row"><span className="field-label">Empresa / Razón social</span><input value={form.empresa} onChange={e=>setForm({...form,empresa:e.target.value})} placeholder="Nombre de tu empresa (opcional)"/></div>
           </div>
 
-          {/* Fila 2: RUT + Correo */}
+          {/* Fila 2: RUT (Chile) / CURP (México) + Correo */}
           <div className="two-col">
-            <div className="field-row"><span className="field-label">RUT / CURP</span><input value={form.rut} onChange={e=>setForm({...form,rut:e.target.value})} placeholder="Identificación"/></div>
+            <div className="field-row">
+              <span className="field-label">{form.pais_form==="México"?"CURP":"RUT"}</span>
+              <input value={form.rut} onChange={e=>setForm({...form,rut:e.target.value})} placeholder={form.pais_form==="México"?"Ej: ABCD123456HDFXXX00":"Ej: 12345678k"}/>
+            </div>
             <div className="field-row"><span className="field-label">Correo electrónico</span><input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="correo@..."/></div>
           </div>
 
@@ -1542,23 +1545,41 @@ const COMUNAS_CL = [
 
 function OnboardingLogin({ onIngresar, onVolver }) {
   const [codigo,setCodigo]=useState("");
-  const [rut,setRut]=useState("");
+  const [documento,setDocumento]=useState("");
   const [error,setError]=useState("");
   const [cargando,setCargando]=useState(false);
+  const [leadParcial,setLeadParcial]=useState(null); // guardamos el lead tras validar código
+  const [paso,setPaso]=useState(1); // paso 1: código, paso 2: RUT o CURP
 
-  const ingresar=async()=>{
-    if(!codigo.trim()||!rut.trim()){setError("Ingresa tu código y RUT.");return;}
+  const validarCodigo=async()=>{
+    if(!codigo.trim()){setError("Ingresa tu código de postulación.");return;}
     setCargando(true);setError("");
     const {data,error:e}=await sb.from("leads").select("*")
       .eq("codigo_postulacion",codigo.trim().toUpperCase())
-      .eq("rut",rut.trim().replace(/[.\-]/g,""))
       .single();
-    if(e||!data){setError("Código o RUT incorrecto. Verifica tus datos.");setCargando(false);return;}
+    if(e||!data){setError("Código no encontrado. Verifica tus datos.");setCargando(false);return;}
     if(!["Propuesta Aceptada","Contrato Firmado","Contrato No Firmado","Onboarding Pendiente"].includes(data.etapa)){
       setError(`Tu postulación está en etapa "${data.etapa}". El formulario de incorporación se habilitará cuando el equipo BigTicket te lo indique.`);setCargando(false);return;}
+    setLeadParcial(data);
+    setPaso(2);
+    setCargando(false);
+  };
+
+  const validarDocumento=async()=>{
+    if(!documento.trim()){setError(`Ingresa tu ${leadParcial?.pais==="México"?"CURP":"RUT"}.`);return;}
+    setCargando(true);setError("");
+    const docLimpio=documento.trim().replace(/[.\-]/g,"").toUpperCase();
+    const campoDoc=leadParcial?.pais==="México"?"curp":"rut";
+    const {data,error:e}=await sb.from("leads").select("*")
+      .eq("codigo_postulacion",codigo.trim().toUpperCase())
+      .eq(campoDoc,docLimpio)
+      .single();
+    if(e||!data){setError(`${leadParcial?.pais==="México"?"CURP":"RUT"} incorrecto. Verifica tus datos.`);setCargando(false);return;}
     onIngresar(data);
     setCargando(false);
   };
+
+  const esMexico=leadParcial?.pais==="México";
 
   return(
     <div>
@@ -1568,24 +1589,42 @@ function OnboardingLogin({ onIngresar, onVolver }) {
           <div style={{textAlign:"center",marginBottom:24}}>
             <div style={{fontSize:32,marginBottom:8}}>📋</div>
             <div style={{fontSize:18,fontWeight:700,color:"#1a1a1a",marginBottom:6}}>Formulario de incorporación</div>
-            <div style={{fontSize:13,color:"#666"}}>Ingresa con tu código de postulación y RUT para continuar</div>
+            <div style={{fontSize:13,color:"#666"}}>
+              {paso===1?"Ingresa tu código de postulación para continuar":`Ingresa tu ${esMexico?"CURP":"RUT"} para verificar tu identidad`}
+            </div>
           </div>
-          <div className="field-row">
-            <span className="field-label">Código de postulación</span>
-            <input value={codigo} onChange={e=>setCodigo(e.target.value.toUpperCase())}
-              placeholder="Ej: BT-K7M2X3" style={{fontFamily:"monospace",fontWeight:700,letterSpacing:1}}/>
-          </div>
-          <div className="field-row">
-            <span className="field-label">RUT (sin puntos ni guión)</span>
-            <input value={rut} onChange={e=>setRut(e.target.value)} placeholder="Ej: 12345678k"/>
-          </div>
-          {error&&<div style={{background:"#fee2e2",borderRadius:8,padding:"10px 14px",fontSize:13,color:"#c0392b",marginBottom:14}}>{error}</div>}
-          <button className="btn-orange" onClick={ingresar} disabled={cargando}>
-            {cargando?"Verificando...":"Ingresar →"}
-          </button>
-          <button onClick={onVolver} style={{width:"100%",marginTop:10,background:"none",border:"0.5px solid #d0d5dd",borderRadius:10,padding:"10px",fontSize:13,color:"#555",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>
+          {paso===1&&(
+            <>
+              <div className="field-row">
+                <span className="field-label">Código de postulación</span>
+                <input value={codigo} onChange={e=>setCodigo(e.target.value.toUpperCase())}
+                  placeholder="Ej: BT-K7M2X3" style={{fontFamily:"monospace",fontWeight:700,letterSpacing:1}}/>
+              </div>
+              {error&&<div style={{background:"#fee2e2",borderRadius:8,padding:"10px 14px",fontSize:13,color:"#c0392b",marginBottom:14}}>{error}</div>}
+              <button className="btn-orange" onClick={validarCodigo} disabled={cargando}>
+                {cargando?"Verificando...":"Continuar →"}
+              </button>
+            </>
+          )}
+          {paso===2&&(
+            <>
+              <div className="field-row">
+                <span className="field-label">{esMexico?"CURP":"RUT (sin puntos ni guión)"}</span>
+                <input value={documento} onChange={e=>setDocumento(e.target.value)}
+                  placeholder={esMexico?"Ej: ABCD123456HDFXXX00":"Ej: 12345678k"}/>
+              </div>
+              {error&&<div style={{background:"#fee2e2",borderRadius:8,padding:"10px 14px",fontSize:13,color:"#c0392b",marginBottom:14}}>{error}</div>}
+              <button className="btn-orange" onClick={validarDocumento} disabled={cargando}>
+                {cargando?"Verificando...":"Ingresar →"}
+              </button>
+              <button onClick={()=>{setPaso(1);setError("");setDocumento("");}} style={{width:"100%",marginTop:10,background:"none",border:"0.5px solid #d0d5dd",borderRadius:10,padding:"10px",fontSize:13,color:"#555",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>
+                ← Volver
+              </button>
+            </>
+          )}
+          {paso===1&&<button onClick={onVolver} style={{width:"100%",marginTop:10,background:"none",border:"0.5px solid #d0d5dd",borderRadius:10,padding:"10px",fontSize:13,color:"#555",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>
             ← Volver al portal
-          </button>
+          </button>}
         </div>
       </div>
     </div>
@@ -2342,6 +2381,18 @@ export default function App() {
 // App separado para onboarding (acceso por URL ?onboarding=1)
 function OnboardingApp() {
   const [lead,setLead]=useState(null);
+  const [listo,setListo]=useState(false);
+  useEffect(()=>{ setTimeout(()=>setListo(true),0); },[]);
+  if(!listo) return(
+    <><style>{css}</style>
+      <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#f8f9fa"}}>
+        <div style={{textAlign:"center"}}>
+          <div style={{fontSize:32,marginBottom:12}}>🚛</div>
+          <div style={{fontSize:14,color:"#888",fontFamily:"'DM Sans',sans-serif"}}>Cargando...</div>
+        </div>
+      </div>
+    </>
+  );
   return(
     <><style>{css}</style>
       {!lead
