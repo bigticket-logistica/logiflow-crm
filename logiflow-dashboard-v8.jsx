@@ -34,8 +34,8 @@ const sb = {
 };
 
 // ─── CONSTANTES ───────────────────────────────────────────────────────────────
-const ETAPAS_PIPELINE = ["Nuevo Lead","Propuesta Enviada","Propuesta Aceptada","Propuesta Rechazada"];
-const ETAPAS_CIERRE   = ["Contrato Firmado","Contrato No Firmado"];
+const ETAPAS_PIPELINE = ["Nuevo Lead","Propuesta Enviada","Propuesta Aceptada","Propuesta Rechazada","Entrevistas y Validaciones"];
+const ETAPAS_CIERRE   = ["Postulante Aprobado","Postulante No Calificado"];
 const ETAPAS_TODAS    = [...ETAPAS_PIPELINE, ...ETAPAS_CIERRE];
 const ETAPAS_BASE_DATOS = ["Base Datos Leads"]; // leads tibios y fríos
 
@@ -44,8 +44,9 @@ const ETAPA_CFG = {
   "Propuesta Enviada":   { color:"#F97316", icon:"📄" },
   "Propuesta Aceptada":  { color:"#10B981", icon:"✅" },
   "Propuesta Rechazada": { color:"#EF4444", icon:"❌" },
-  "Contrato Firmado":    { color:"#059669", icon:"📝" },
-  "Contrato No Firmado": { color:"#DC2626", icon:"🚫" },
+  "Entrevistas y Validaciones": { color:"#8B5CF6", icon:"🎤" },
+  "Postulante Aprobado":  { color:"#059669", icon:"🏆" },
+  "Postulante No Calificado": { color:"#DC2626", icon:"🚫" },
   "Base Datos Leads":    { color:"#8B5CF6", icon:"🗄️" },
 };
 
@@ -743,7 +744,7 @@ const Pipeline = ({ leads, onSelect, onEtapaChange }) => {
   const handleDrop=async(e,nuevaEtapa)=>{e.preventDefault();if(!dragLead||dragLead.etapa===nuevaEtapa)return;await onEtapaChange(dragLead,nuevaEtapa);setDragLead(null);};
   const normalizarEtapa=(e)=>{
     if(!e) return "Nuevo Lead";
-    const mapa={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Contrato Firmado","contrato no firmado":"Contrato No Firmado","ganado":"Contrato Firmado","perdido":"Contrato No Firmado","base datos leads":"Base Datos Leads"};
+    const mapa={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};
     return mapa[e.toLowerCase().trim()]||e;
   };
   const lpe=(etapa)=>leads.filter(l=>normalizarEtapa(l.etapa)===etapa);
@@ -767,7 +768,7 @@ const Pipeline = ({ leads, onSelect, onEtapaChange }) => {
 const KPIsView = ({ leads }) => {
   const [descargando,setDescargando]=useState(false);
   const reporteRef=useRef(null);
-  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Contrato Firmado","contrato no firmado":"Contrato No Firmado","ganado":"Contrato Firmado","perdido":"Contrato No Firmado","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
+  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
 
   const descargarPDF=async()=>{
     if(!reporteRef.current) return;
@@ -787,13 +788,13 @@ const KPIsView = ({ leads }) => {
     finally{setDescargando(false);}
   };
 
-  const ganados=leads.filter(l=>norm(l.etapa)==="Contrato Firmado"),perdidos=leads.filter(l=>norm(l.etapa)==="Contrato No Firmado");
+  const ganados=leads.filter(l=>norm(l.etapa)==="Postulante Aprobado"),perdidos=leads.filter(l=>norm(l.etapa)==="Postulante No Calificado");
   const cerrados=ganados.length+perdidos.length;
   const tasaCierre=cerrados>0?Math.round((ganados.length/cerrados)*100):0;
   const tiempos=ganados.map(l=>diasEntre(l.created_at,l.updated_at)).filter(d=>d!==null);
   const tiempoPromedio=tiempos.length?Math.round(tiempos.reduce((a,b)=>a+b,0)/tiempos.length):null;
   const canales={};
-  leads.forEach(l=>{const c=(l.fuente_contacto||l.canal||"desconocido").toLowerCase();if(!canales[c])canales[c]={total:0,ganados:0};canales[c].total++;if(norm(l.etapa)==="Contrato Firmado")canales[c].ganados++;});
+  leads.forEach(l=>{const c=(l.fuente_contacto||l.canal||"desconocido").toLowerCase();if(!canales[c])canales[c]={total:0,ganados:0};canales[c].total++;if(norm(l.etapa)==="Postulante Aprobado")canales[c].ganados++;});
   const canalStats=Object.entries(canales).map(([canal,d])=>({canal,total:d.total,ganados:d.ganados,eficacia:d.total>0?Math.round((d.ganados/d.total)*100):0})).sort((a,b)=>b.eficacia-a.eficacia);
   const canalEficaz=canalStats[0],canalMenos=canalStats[canalStats.length-1],canalVol=[...canalStats].sort((a,b)=>b.total-a.total)[0];
   const scoreEtapa=ETAPAS_TODAS.map(e=>{const ls=leads.filter(l=>norm(l.etapa)===e);return{etapa:e,score:ls.length?Math.round(ls.reduce((a,l)=>a+(l.score||0),0)/ls.length):0,count:ls.length};}).filter(e=>e.count>0);
@@ -806,7 +807,7 @@ const KPIsView = ({ leads }) => {
         </button>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
-        {[["✅","Tasa de cierre",`${tasaCierre}%`,"#10B981",`${ganados.length} contratos firmados de ${cerrados}`],["⏱","Tiempo promedio",tiempoPromedio!==null?`${tiempoPromedio}d`:"—","#3B82F6","Días lead→Contrato Firmado"],["📝","Contratos firmados",ganados.length,"#10B981",`${perdidos.length} no firmados`],["🚫","Contratos no firmados",perdidos.length,"#EF4444",`${cerrados>0?Math.round((perdidos.length/cerrados)*100):0}% del total cerrado`]].map(([icon,label,val,color,sub])=>(
+        {[["✅","Tasa de cierre",`${tasaCierre}%`,"#10B981",`${ganados.length} postulantes aprobados de ${cerrados}`],["⏱","Tiempo promedio",tiempoPromedio!==null?`${tiempoPromedio}d`:"—","#3B82F6","Días lead→Postulante Aprobado"],["📝","Postulantes Aprobados",ganados.length,"#10B981",`${perdidos.length} no calificados`],["🚫","Postulantes No Calificados",perdidos.length,"#EF4444",`${cerrados>0?Math.round((perdidos.length/cerrados)*100):0}% del total cerrado`]].map(([icon,label,val,color,sub])=>(
           <div key={label} style={{background:"#ffffff",border:`1px solid ${color}22`,borderRadius:12,padding:16}}>
             <div style={{fontSize:22}}>{icon}</div>
             <div style={{fontSize:28,fontWeight:900,color,fontFamily:"monospace",marginTop:6}}>{val}</div>
@@ -1023,7 +1024,7 @@ const KPIsCampanaView = ({ leads }) => {
   const [campanaFiltro,setCampanaFiltro]=useState("todas");
   const [descargando,setDescargando]=useState(false);
   const reporteRef=useRef(null);
-  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Contrato Firmado","contrato no firmado":"Contrato No Firmado","ganado":"Contrato Firmado","perdido":"Contrato No Firmado","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
+  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
 
   const descargarPDF=async()=>{
     if(!reporteRef.current) return;
@@ -1068,11 +1069,11 @@ const KPIsCampanaView = ({ leads }) => {
   );
 
   const pct=(n)=>total>0?Math.round((n/total)*100):0;
-  const propAceptadas=leadsFiltered.filter(l=>norm(l.etapa)==="Propuesta Aceptada"||norm(l.etapa)==="Contrato Firmado"||norm(l.etapa)==="Contrato No Firmado").length;
+  const propAceptadas=leadsFiltered.filter(l=>["Propuesta Aceptada","Entrevistas y Validaciones","Postulante Aprobado","Postulante No Calificado"].includes(norm(l.etapa))).length;
   const propRechazadas=leadsFiltered.filter(l=>norm(l.etapa)==="Propuesta Rechazada").length;
-  const contratosFirmados=leadsFiltered.filter(l=>norm(l.etapa)==="Contrato Firmado").length;
-  const contratosNoFirmados=leadsFiltered.filter(l=>norm(l.etapa)==="Contrato No Firmado").length;
-  const enProceso=leadsFiltered.filter(l=>!["Contrato Firmado","Contrato No Firmado","Propuesta Rechazada","Base Datos Leads"].includes(norm(l.etapa))).length;
+  const contratosFirmados=leadsFiltered.filter(l=>norm(l.etapa)==="Postulante Aprobado").length;
+  const contratosNoFirmados=leadsFiltered.filter(l=>norm(l.etapa)==="Postulante No Calificado").length;
+  const enProceso=leadsFiltered.filter(l=>!["Postulante Aprobado","Postulante No Calificado","Propuesta Rechazada","Base Datos Leads"].includes(norm(l.etapa))).length;
 
   // Canal con más ingresos
   const canalesMap={};
@@ -1080,7 +1081,7 @@ const KPIsCampanaView = ({ leads }) => {
   const canalTop=Object.entries(canalesMap).sort((a,b)=>b[1]-a[1]);
 
   // Tiempo promedio de cierre
-  const tiempos=leadsFiltered.filter(l=>norm(l.etapa)==="Contrato Firmado").map(l=>diasEntre(l.created_at,l.updated_at)).filter(d=>d!==null);
+  const tiempos=leadsFiltered.filter(l=>norm(l.etapa)==="Postulante Aprobado").map(l=>diasEntre(l.created_at,l.updated_at)).filter(d=>d!==null);
   const tiempoPromedio=tiempos.length?Math.round(tiempos.reduce((a,b)=>a+b,0)/tiempos.length):null;
 
   // Score promedio
@@ -1093,8 +1094,8 @@ const KPIsCampanaView = ({ leads }) => {
     ["📋","Total postulaciones",total,"#3B82F6","leads en esta campaña"],
     ["✅","Propuestas aceptadas",`${pct(propAceptadas)}%`,"#10B981",`${propAceptadas} de ${total}`],
     ["❌","Propuestas rechazadas",`${pct(propRechazadas)}%`,"#EF4444",`${propRechazadas} de ${total}`],
-    ["📝","Contratos firmados",`${pct(contratosFirmados)}%`,"#059669",`${contratosFirmados} de ${total}`],
-    ["🚫","Contratos no firmados",`${pct(contratosNoFirmados)}%`,"#DC2626",`${contratosNoFirmados} de ${total}`],
+    ["📝","Postulantes Aprobados",`${pct(contratosFirmados)}%`,"#059669",`${contratosFirmados} de ${total}`],
+    ["🚫","Postulantes No Calificados",`${pct(contratosNoFirmados)}%`,"#DC2626",`${contratosNoFirmados} de ${total}`],
     ["⏳","En proceso",enProceso,"#F59E0B","leads activos en pipeline"],
     ["⭐","Score promedio",scorePromedio,"#F59E0B","puntos promedio"],
     ["🔴","Leads calientes",`${pct(calientes)}%`,"#EF4444",`${calientes} calientes`],
@@ -1155,7 +1156,7 @@ const KPIsCampanaView = ({ leads }) => {
           {campanas.map(c=>{
             const ls=leads.filter(l=>(l.origen||"").includes(c));
             const tot=ls.length;
-            const firm=ls.filter(l=>norm(l.etapa)==="Contrato Firmado").length;
+            const firm=ls.filter(l=>norm(l.etapa)==="Postulante Aprobado").length;
             const tasa=tot>0?Math.round((firm/tot)*100):0;
             return(
               <div key={c} style={{marginBottom:12}}>
@@ -1184,7 +1185,7 @@ const EmbudoView = ({ leads }) => {
   const [descargando, setDescargando] = useState(false);
   const reporteRef = useRef(null);
 
-  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Contrato Firmado","contrato no firmado":"Contrato No Firmado","ganado":"Contrato Firmado","perdido":"Contrato No Firmado","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
+  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
 
   const campanas = [...new Set(leads.filter(l=>l.campana_id&&l.origen).map(l=>l.origen.replace("Campaña: ","")))].filter(Boolean).sort();
 
@@ -1197,18 +1198,18 @@ const EmbudoView = ({ leads }) => {
   const preCalif     = leadsFiltered.filter(l => {
     const e = norm(l.etapa);
     return (l.clasificacion||"").toLowerCase().includes("caliente") ||
-      ["Propuesta Enviada","Propuesta Aceptada","Propuesta Rechazada","Contrato Firmado","Contrato No Firmado"].includes(e);
+      ["Propuesta Enviada","Propuesta Aceptada","Propuesta Rechazada","Postulante Aprobado","Postulante No Calificado"].includes(e);
   }).length;
   const potenciales  = leadsFiltered.filter(l => {
     const e = norm(l.etapa);
-    return ["Propuesta Aceptada","Contrato Firmado","Contrato No Firmado"].includes(e);
+    return ["Propuesta Aceptada","Postulante Aprobado","Postulante No Calificado"].includes(e);
   }).length;
   const validacion   = leadsFiltered.filter(l => {
     const e = norm(l.etapa);
-    return ["Contrato Firmado","Contrato No Firmado","Onboarding Pendiente"].includes(e) ||
+    return ["Postulante Aprobado","Postulante No Calificado","Entrevistas y Validaciones","Onboarding Pendiente"].includes(e) ||
       (l.onboarding_completado === true);
   }).length;
-  const aprobados    = leadsFiltered.filter(l => norm(l.etapa) === "Contrato Firmado").length;
+  const aprobados    = leadsFiltered.filter(l => norm(l.etapa) === "Postulante Aprobado").length;
 
   const pct = (n, base) => base > 0 ? Math.round((n / base) * 100) : 0;
 
@@ -1349,7 +1350,7 @@ const EmbudoView = ({ leads }) => {
               {campanas.map(c => {
                 const ls = leads.filter(l=>(l.origen||"").includes(c));
                 const tot = ls.length;
-                const aprov = ls.filter(l=>norm(l.etapa)==="Contrato Firmado").length;
+                const aprov = ls.filter(l=>norm(l.etapa)==="Postulante Aprobado").length;
                 const tasa = pct(aprov, tot);
                 return (
                   <div key={c} style={{background:"#f8f9fa",borderRadius:8,padding:12,border:"1px solid #e4e7ec"}}>
@@ -1371,7 +1372,7 @@ const EmbudoView = ({ leads }) => {
 
         {/* Footer */}
         <div style={{marginTop:16,textAlign:"center",fontSize:10,color:"#aaa"}}>
-          Generado por BigTicket CRM · {new Date().toLocaleString("es-CL")}
+          Generado por BIGPRO FLOTA CRM · {new Date().toLocaleString("es-CL")}
         </div>
       </div>
     </div>
@@ -1380,12 +1381,12 @@ const EmbudoView = ({ leads }) => {
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 const DashboardMetrics = ({ leads }) => {
-  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Contrato Firmado","contrato no firmado":"Contrato No Firmado","ganado":"Contrato Firmado","perdido":"Contrato No Firmado","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
+  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
   const hoy=new Date();hoy.setHours(0,0,0,0);
   const nuevosHoy=leads.filter(l=>l.created_at&&new Date(l.created_at)>=hoy).length;
   const scorePromedio=leads.length?Math.round(leads.reduce((a,l)=>a+(l.score||0),0)/leads.length):0;
-  const ganados=leads.filter(l=>norm(l.etapa)==="Contrato Firmado").length;
-  const cerrados=ganados+leads.filter(l=>norm(l.etapa)==="Contrato No Firmado").length;
+  const ganados=leads.filter(l=>norm(l.etapa)==="Postulante Aprobado").length;
+  const cerrados=ganados+leads.filter(l=>norm(l.etapa)==="Postulante No Calificado").length;
   const tasaCierre=cerrados>0?Math.round((ganados/cerrados)*100):0;
   const canalData=Object.entries(leads.reduce((a,l)=>{const c=(l.fuente_contacto||l.canal)?.toLowerCase()||"otro";a[c]=(a[c]||0)+1;return a},{})).sort((a,b)=>b[1]-a[1]);
   const etapaData=ETAPAS_TODAS.map(e=>({etapa:e,count:leads.filter(l=>norm(l.etapa)===e).length}));
@@ -1473,7 +1474,7 @@ const HORAS_OLVIDADO=24;
 const HORAS_ESTANCADO=48;
 
 const calcAlertas=(leads)=>{
-  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Contrato Firmado","contrato no firmado":"Contrato No Firmado","ganado":"Contrato Firmado","perdido":"Contrato No Firmado","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
+  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
   const ahora=Date.now();
   const olvidados=[];
   const estancados=[];
@@ -1585,7 +1586,7 @@ export default function App() {
   const alertasMostradas=useRef(false);
 
   const fetchLeads=async()=>{
-    const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Contrato Firmado","contrato no firmado":"Contrato No Firmado","ganado":"Contrato Firmado","perdido":"Contrato No Firmado","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
+    const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
     try{const data=await sb.from("leads").select("*",{order:"created_at.desc"});
       if(Array.isArray(data)){
         const normalized=data.map(l=>({...l,etapa:norm(l.etapa)}));
@@ -1603,7 +1604,7 @@ export default function App() {
 
   useEffect(()=>{fetchLeads();refreshInterval.current=setInterval(fetchLeads,30000);return()=>clearInterval(refreshInterval.current);},[]);
 
-  const NORM=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Contrato Firmado","contrato no firmado":"Contrato No Firmado","ganado":"Contrato Firmado","perdido":"Contrato No Firmado","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
+  const NORM=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
 
   const [confirmModal,setConfirmModal]=useState(null); // {lead, nuevaEtapa}
 
@@ -1660,7 +1661,7 @@ export default function App() {
   const leadsBaseDatos=[...leads]
     .filter(l=>NORM(l.etapa)==="Base Datos Leads"||
       NORM(l.etapa)==="Propuesta Rechazada"||
-      NORM(l.etapa)==="Contrato No Firmado"||
+      NORM(l.etapa)==="Postulante No Calificado"||
       (!esCaliente(l)&&["Contactado","Reunión Agendada","Negociación"].includes(l.etapa)))
     .filter(busquedaFilter)
     .sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
@@ -1689,9 +1690,9 @@ export default function App() {
       <div style={{width:200,background:"#1a3a6b",borderRight:"1px solid #ffffff20",display:"flex",flexDirection:"column",flexShrink:0}}>
         <div style={{padding:"20px 16px",borderBottom:"1px solid #ffffff20"}}>
           <div style={{fontSize:20,fontWeight:900,letterSpacing:-1,fontFamily:"'Outfit',sans-serif"}}>
-            <span style={{color:"#3B82F6"}}>Logi</span><span style={{color:"#1a1a1a"}}>Flow</span>
+            <span style={{color:"#FF6B00"}}>BIGPRO</span><span style={{color:"#ffffff"}}> FLOTA</span>
           </div>
-          <div style={{fontSize:9,color:"#ffffff88",fontWeight:700,letterSpacing:2,marginTop:3}}>CRM · LIVE</div>
+          <div style={{fontSize:9,color:"#ffffff88",fontWeight:700,letterSpacing:2,marginTop:3}}>BIGPRO · CRM LIVE</div>
         </div>
         <nav style={{flex:1,padding:"10px 10px"}}>
           {NAV.map(item=>(
@@ -1744,7 +1745,7 @@ export default function App() {
               {seccion==="dashboard"  &&"📊 Resumen en tiempo real"}
               {seccion==="campana"    &&`🎯 ${leadsCampana.length} leads de campaña · ordenados por fecha y puntaje`}
               {seccion==="libre"      &&`📋 ${leadsLibre.length} leads postulación libre · ordenados por fecha`}
-              {seccion==="basedatos"  &&`🗄️ ${leadsBaseDatos.length} leads · tibios, fríos, rechazados y no firmados`}
+              {seccion==="basedatos"  &&`🗄️ ${leadsBaseDatos.length} leads · tibios, fríos, rechazados y no calificados`}
               {seccion==="kpis"       &&"📊 KPIs Generales"}
               {seccion==="kpiscampana"&&"🎯 KPIs por Campaña"}
             </div>
