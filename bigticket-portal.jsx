@@ -1945,9 +1945,13 @@ function ViewOnboarding({ lead, onVolver }) {
 
     setGuardando(true);
     try {
-      // Guardar en Supabase
-      const { data: existe } = await sb.from("onboarding_terceros").select("id").eq("lead_id", lead.id).single();
+      // Guardar en Supabase — manejamos el 406 por separado para no detener el flujo
       const dbPayload = { ...payload, updated_at: new Date().toISOString() };
+      let existe = null;
+      try {
+        const { data } = await sb.from("onboarding_terceros").select("id").eq("lead_id", lead.id).single();
+        existe = data;
+      } catch (_) { existe = null; }
       if (existe) { await sb.from("onboarding_terceros").update(dbPayload).eq("lead_id", lead.id); }
       else { await sb.from("onboarding_terceros").insert(dbPayload); }
       await sb.from("leads").update({ etapa: "Entrevistas y Validaciones" }).eq("id", lead.id);
