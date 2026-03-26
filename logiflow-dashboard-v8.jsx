@@ -1,1810 +1,2407 @@
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// ─── CONFIGURACIÓN SUPABASE ───────────────────────────────────────────────────
 const SUPABASE_URL = "https://psvdtgjvognbmxfvqbaa.supabase.co";
 const SUPABASE_KEY = "sb_publishable_RayW0wqgesNI6FYZ6i0CFQ_6YHaHELP";
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+const SUPERADMIN_KEY = "PortalTerceros2026";
+const DONB_URL = "https://psvdtgjvognbmxfvqbaa.supabase.co/storage/v1/object/public/assets/Don_B1.jpeg";
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
-// wrapper compatible con el código existente
-const sb = {
-  from: (table) => ({
-    select: async (cols="*", opts={}) => {
-      let q = supabase.from(table).select(cols);
-      if (opts.order) { const parts=opts.order.split("."); q=q.order(parts[0],{ascending:parts[1]==="asc"}); }
-      if (opts.filter) { const m=opts.filter.match(/^(\w+)=eq\.(.+)$/); if(m) q=q.eq(m[1],m[2]); }
-      const {data,error}=await q; if(error) throw error; return data||[];
-    },
-    update: async (data, filter) => {
-      const m=filter.match(/^(\w+)=eq\.(.+)$/);
-      const {data:r,error}=await supabase.from(table).update(data).eq(m[1],m[2]).select();
-      if(error) throw error; return r;
-    },
-    insert: async (data) => {
-      const {data:r,error}=await supabase.from(table).insert(data).select();
-      if(error) throw error; return r;
-    },
-    delete: async (filter) => {
-      const m=filter.match(/^(\w+)=eq\.(.+)$/);
-      const {error}=await supabase.from(table).delete().eq(m[1],m[2]);
-      if(error) throw error; return true;
-    },
-  }),
+const CANALES = {
+  whatsapp: { label: "WhatsApp", color: "#25D366", initial: "W" },
+  facebook: { label: "Facebook", color: "#1877F2", initial: "f" },
+  instagram: { label: "Instagram", color: "#E1306C", initial: "I" },
+  portal:    { label: "Portal web", color: "#1a3a6b", initial: "P" },
 };
 
-// ─── CONSTANTES ───────────────────────────────────────────────────────────────
-const ETAPAS_PIPELINE = ["Nuevo Lead","Propuesta Enviada","Propuesta Aceptada","Propuesta Rechazada","Entrevistas y Validaciones"];
-const ETAPAS_CIERRE   = ["Postulante Aprobado","Postulante No Calificado"];
-const ETAPAS_TODAS    = [...ETAPAS_PIPELINE, ...ETAPAS_CIERRE];
-const ETAPAS_BASE_DATOS = ["Base Datos Leads"]; // leads tibios y fríos
-
-const ETAPA_CFG = {
-  "Nuevo Lead":          { color:"#3B82F6", icon:"🎯" },
-  "Propuesta Enviada":   { color:"#F97316", icon:"📄" },
-  "Propuesta Aceptada":  { color:"#10B981", icon:"✅" },
-  "Propuesta Rechazada": { color:"#EF4444", icon:"❌" },
-  "Entrevistas y Validaciones": { color:"#8B5CF6", icon:"🎤" },
-  "Postulante Aprobado":  { color:"#059669", icon:"🏆" },
-  "Postulante No Calificado": { color:"#DC2626", icon:"🚫" },
-  "Base Datos Leads":    { color:"#8B5CF6", icon:"🗄️" },
+const PAISES = {
+  Chile:  { bandera: "https://flagcdn.com/w80/cl.png", emoji: "🇨🇱", label: "Chile" },
+  México: { bandera: "https://flagcdn.com/w80/mx.png", emoji: "🇲🇽", label: "México" },
 };
 
-const CANAL_CFG = {
-  whatsapp:   { color:"#25D366", icon:"💬", label:"WhatsApp" },
-  email:      { color:"#EA4335", icon:"📧", label:"Email" },
-  facebook:   { color:"#1877F2", icon:"📘", label:"Facebook" },
-  instagram:  { color:"#E1306C", icon:"📸", label:"Instagram" },
-  linkedin:   { color:"#0A66C2", icon:"💼", label:"LinkedIn" },
-  referido:   { color:"#F97316", icon:"🤝", label:"Referido" },
-  formulario: { color:"#8B5CF6", icon:"📝", label:"Formulario" },
-};
+const TIPOS_PREGUNTA = [
+  { value: "sino",      label: "Sí / No" },
+  { value: "escala",    label: "Escala por rangos" },
+  { value: "seleccion", label: "Selección con puntaje" },
+  { value: "texto",     label: "Texto informativo" },
+];
 
-const CANALES_PLANTILLA = ["WhatsApp","Email","Facebook","Instagram","Todos"];
+const VARIABLES_LIST = [
+  "Tipo de vehículo","Volumen del vehículo (m³)","Cantidad de vehículos",
+  "Zona de reparto","Facturación","Modalidad de pago","Disponibilidad",
+  "Experiencia requerida","Rango de ingresos","Vehículo propio",
+  "Licencia vigente","Disponibilidad inmediata","Conocimiento de zona",
+];
 
-const getCanalCfg = (canal) => {
-  if (!canal) return { color:"#888888", icon:"•", label:"Desconocido" };
-  return CANAL_CFG[canal.toLowerCase()] || { color:"#888888", icon:"•", label:canal };
-};
+function getCanal() {
+  if (typeof window === "undefined") return "portal";
+  return new URLSearchParams(window.location.search).get("canal") || "portal";
+}
+function isCampActive(c) {
+  if (!c.toggle_activo) return false;
+  const now = new Date(); now.setHours(0,0,0,0);
+  if (c.fecha_inicio && new Date(c.fecha_inicio) > now) return false;
+  if (c.fecha_fin && new Date(c.fecha_fin + "T23:59:59") < now) return false;
+  return true;
+}
+function getDiasRestantes(fechaFin) {
+  if (!fechaFin) return null;
+  const diff = Math.ceil((new Date(fechaFin) - new Date()) / (1000*60*60*24));
+  return diff > 0 ? diff : 0;
+}
+function calcClasificacion(score, scoreMax) {
+  if (!scoreMax) return "Frío";
+  const pct = (score / scoreMax) * 100;
+  if (pct >= 70) return "Caliente";
+  if (pct >= 40) return "Tibio";
+  return "Frío";
+}
+function calcScoreRespuestas(vars, respuestas) {
+  return vars.reduce((total, v) => {
+    const r = respuestas[v.id];
+    const opts = v.opciones || [];
+    if (v.tipo === "sino") return total + (r === "si" ? (opts[0]?.puntos || 0) : 0);
+    if (v.tipo === "escala" || v.tipo === "seleccion") {
+      const opt = opts.find(o => o.valor === r);
+      return total + (opt?.puntos || 0);
+    }
+    if (v.tipo === "texto") return total + (r && r.trim() ? (opts[0]?.puntos || 0) : 0);
+    return total;
+  }, 0);
+}
+function maxScoreField(sf) {
+  const opts = sf.opciones || [];
+  if (sf.tipo === "sino") return opts[0]?.puntos || 0;
+  if (!opts.length) return 0;
+  return Math.max(...opts.map(o => o.puntos || 0));
+}
 
-const getScoreColor = (s) => s>=80?"#10B981":s>=60?"#F59E0B":s>=40?"#F97316":"#EF4444";
+const css = `
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'DM Sans',sans-serif;background:#f0f2f5;min-height:100vh;}
+  .topbar{background:#1a3a6b;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;}
+  .logo{color:#fff;font-size:16px;font-weight:600;}.logo span{color:#F47B20;}
+  .tag-op{background:#F47B20;color:#fff;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:500;}
+  .canal-badge{font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(255,255,255,0.15);color:#fff;}
+  .btn-gw{background:transparent;color:#fff;border:0.5px solid rgba(255,255,255,0.3);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;}
+  .btn-gw:hover{background:rgba(255,255,255,0.1);}
+  .pg{padding:20px;max-width:960px;margin:0 auto;} .pg-form{padding:20px;max-width:960px;margin:0 auto;padding-top:16px;}
+  .sec-title{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:4px;}
+  .sec-sub{font-size:13px;color:#666;margin-bottom:20px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:28px;}
+  .camp-card{background:#fff;border:0.5px solid #e4e7ec;border-radius:14px;padding:18px;transition:border-color 0.15s,transform 0.1s;}
+  .camp-card:hover{border-color:#F47B20;transform:translateY(-1px);}
+  .badge-active{font-size:11px;padding:3px 8px;border-radius:20px;background:#dcfce7;color:#166534;white-space:nowrap;}
+  .badge-days{font-size:11px;padding:3px 8px;border-radius:20px;background:#dbeafe;color:#1e40af;white-space:nowrap;}
+  .tags{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;}
+  .ctag{font-size:11px;padding:3px 8px;border-radius:6px;background:#f4f5f7;color:#555;}
+  .libre-card{background:#fff;border:1.5px dashed #d0d5dd;border-radius:14px;padding:24px;text-align:center;margin-bottom:28px;}
+  .btn-orange{background:#F47B20;color:#fff;border:none;border-radius:10px;padding:11px 20px;font-size:13px;font-weight:600;cursor:pointer;width:100%;margin-top:14px;font-family:'DM Sans',sans-serif;transition:background 0.15s;}
+  .btn-orange:hover{background:#d96a10;}.btn-orange:disabled{background:#ccc;cursor:not-allowed;}
+  .btn-blue{background:#1a3a6b;color:#fff;border:none;border-radius:10px;padding:11px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;}
+  .btn-blue:hover{background:#142d54;}
+  .btn-back{background:transparent;border:none;cursor:pointer;font-size:13px;color:#1a3a6b;font-weight:600;font-family:'DM Sans',sans-serif;padding:0;}
+  .btn-danger{background:transparent;color:#c0392b;border:0.5px solid #f5a7a7;border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;}
+  .btn-danger:hover{background:#fff5f5;}
+  .detail-header{background:#fff;border-bottom:0.5px solid #e4e7ec;padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:9;}
+  .form-card{background:#fff;border:0.5px solid #e4e7ec;border-radius:14px;padding:20px;margin-bottom:16px;}
+  .form-title{font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:14px;}
+  .field-row{margin-bottom:14px;}
+  .field-label{font-size:12px;color:#555;margin-bottom:4px;display:block;font-weight:500;}
+  input,select,textarea{width:100%;padding:9px 12px;border:0.5px solid #d0d5dd;border-radius:8px;font-size:13px;background:#fff;color:#1a1a1a;font-family:'DM Sans',sans-serif;outline:none;transition:border-color 0.15s;}
+  input:focus,select:focus,textarea:focus{border-color:#1a3a6b;}
+  textarea{height:80px;resize:none;}
+  .two-col{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;}
+  .canal-info{background:#eef2ff;border-radius:10px;padding:10px 14px;margin-bottom:16px;margin-top:0;display:flex;align-items:center;gap:10px;}
+  .canal-icon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#fff;flex-shrink:0;}
+  .radio-group{display:flex;flex-direction:column;gap:8px;}
+  .radio-opt{display:flex;align-items:center;gap:8px;padding:9px 12px;border:0.5px solid #e4e7ec;border-radius:8px;cursor:pointer;transition:border-color 0.15s;}
+  .radio-opt:hover{border-color:#1a3a6b;}
+  .radio-opt.sel{border-color:#1a3a6b;background:#eef2ff;}
+  .radio-opt input[type=radio]{width:auto;margin:0;flex-shrink:0;}
+  .success-wrap{max-width:440px;margin:60px auto;padding:20px;}
+  .success-card{background:#fff;border-radius:16px;padding:40px 32px;text-align:center;border:0.5px solid #e4e7ec;}
+  .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f0f2f5;padding:20px;}
+  .login-card{background:#fff;border-radius:16px;padding:40px 32px;width:100%;max-width:380px;border:0.5px solid #e4e7ec;}
+  .login-error{background:#fee2e2;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;margin-bottom:14px;text-align:center;}
+  .input-wrap{position:relative;}.input-wrap input{padding-right:40px;}
+  .eye-btn{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#888;font-size:16px;padding:0;}
+  .admin-nav{display:flex;gap:6px;padding:12px 20px;background:#fff;border-bottom:0.5px solid #e4e7ec;overflow-x:auto;}
+  .nav-btn{padding:7px 14px;font-size:13px;border-radius:8px;border:none;cursor:pointer;background:transparent;color:#666;font-family:'DM Sans',sans-serif;white-space:nowrap;}
+  .nav-btn.active{background:#eef2ff;color:#1a3a6b;font-weight:600;}
+  .camp-row{background:#fff;border:0.5px solid #e4e7ec;border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .toggle{width:40px;height:22px;border-radius:11px;border:none;cursor:pointer;position:relative;flex-shrink:0;}
+  .toggle.on{background:#2e7d32;}.toggle.off{background:#c0392b;}
+  .toggle-dot{width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;top:3px;transition:left 0.2s;}
+  .toggle.on .toggle-dot{left:21px;}.toggle.off .toggle-dot{left:3px;}
+  .score-block{background:#f8f9fa;border:0.5px solid #e4e7ec;border-radius:10px;padding:14px;margin-bottom:10px;}
+  .score-block-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .tipo-badge{font-size:10px;padding:2px 8px;border-radius:20px;}
+  .tipo-sino{background:#e8eef8;color:#1a3a6b;}.tipo-escala{background:#fff3e0;color:#e65100;}
+  .tipo-seleccion{background:#e8f5e9;color:#1b5e20;}.tipo-texto{background:#f3e8ff;color:#4a1080;}
+  .opt-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+  .opt-row input{flex:1;padding:6px 10px;font-size:12px;}
+  .opt-row input[type=number]{width:70px;flex:none;}
+  .pts-label{font-size:11px;color:#888;white-space:nowrap;}
+  .add-opt-btn{font-size:11px;color:#1a3a6b;background:transparent;border:0.5px dashed #1a3a6b;border-radius:6px;padding:6px 12px;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:4px;}
+  .post-row{background:#fff;border:0.5px solid #e4e7ec;border-radius:10px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;}
+  .ch-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#fff;flex-shrink:0;}
+  .stat-card{background:#fff;border:0.5px solid #e4e7ec;border-radius:12px;padding:16px;text-align:center;}
+  .stat-val{font-size:26px;font-weight:700;color:#1a3a6b;}
+  .stat-label{font-size:12px;color:#888;margin-top:4px;}
+  .url-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid #f0f0f0;}
+  .url-text{font-size:11px;color:#888;font-family:'DM Mono',monospace;}
+  .country-card{background:#fff;border:0.5px solid #e4e7ec;border-radius:14px;padding:28px 20px;text-align:center;cursor:pointer;transition:border-color 0.15s,transform 0.1s;}
+  .country-card:hover{border-color:#F47B20;transform:translateY(-1px);}
+  .loading{text-align:center;padding:40px;color:#888;font-size:14px;}
+  .empty{text-align:center;padding:32px;color:#888;font-size:13px;background:#fff;border-radius:12px;border:0.5px dashed #e4e7ec;}
+`;
 
-const formatFecha = (iso) => {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  const now = new Date();
-  const esHoy = d.toDateString() === now.toDateString();
-  const ayer = new Date(now); ayer.setDate(now.getDate()-1);
-  const esAyer = d.toDateString() === ayer.toDateString();
-  const hora = d.toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"});
-  if (esHoy)  return `Hoy ${hora}`;
-  if (esAyer) return `Ayer ${hora}`;
-  return `${d.toLocaleDateString("es-CL",{day:"2-digit",month:"short"})} ${hora}`;
-};
-
-const diasEntre = (a,b) => (!a||!b)?null:Math.round(Math.abs(new Date(b)-new Date(a))/86400000);
-
-// ─── COMPONENTES BASE ─────────────────────────────────────────────────────────
-const ScoreDot = ({ score }) => {
-  const c=getScoreColor(score||0), s=Math.min(score||0,100);
+function CanalInfo({ canal }) {
+  const c = CANALES[canal] || CANALES.portal;
   return (
-    <svg width={36} height={36} viewBox="0 0 36 36" style={{flexShrink:0}}>
-      <circle cx={18} cy={18} r={15} fill="none" stroke="#f0f2f5" strokeWidth={3}/>
-      <circle cx={18} cy={18} r={15} fill="none" stroke={c} strokeWidth={3}
-        strokeDasharray={`${s*0.942} 94.2`} strokeLinecap="round"
-        transform="rotate(-90 18 18)" style={{transition:"stroke-dasharray .6s ease"}}/>
-      <text x={18} y={22} textAnchor="middle" fontSize={9} fill={c} fontWeight={700}>{s}</text>
-    </svg>
-  );
-};
-
-const Tag = ({ label, color }) => (
-  <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:20,
-    background:color+"22",color,border:`1px solid ${color}44`,letterSpacing:.5}}>{label}</span>
-);
-
-const PAIS_CFG = {
-  "Chile":  { bandera:"https://flagcdn.com/w40/cl.png", color:"#c0392b" },
-  "México": { bandera:"https://flagcdn.com/w40/mx.png", color:"#27ae60" },
-};
-
-const CanalTag = ({ canal }) => { const cfg=getCanalCfg(canal); return <Tag label={`${cfg.icon} ${cfg.label}`} color={cfg.color}/>; };
-
-const PaisFlag = ({ pais }) => {
-  if(!pais) return null;
-  const cfg=PAIS_CFG[pais];
-  if(!cfg) return <span style={{fontSize:11,color:"#888"}}>{pais}</span>;
-  return <img src={cfg.bandera} alt={pais} title={pais} style={{width:20,height:14,objectFit:"cover",borderRadius:2,display:"inline-block"}}/>;
-};
-
-const Spinner = () => (
-  <div style={{display:"flex",alignItems:"center",justifyContent:"center",padding:60}}>
-    <div style={{width:32,height:32,border:"3px solid #e4e7ec",borderTopColor:"#1a3a6b",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
-  </div>
-);
-
-const Modal = ({ title, onClose, children }) => (
-  <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200}}>
-    <div style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:14,padding:28,width:560,maxHeight:"90vh",overflow:"auto"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-        <div style={{fontSize:16,fontWeight:900,color:"#1a1a1a",fontFamily:"'Outfit',sans-serif"}}>{title}</div>
-        <button onClick={onClose} style={{background:"#eef2ff",border:"1px solid #dbeafe",color:"#666666",borderRadius:8,width:32,height:32,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+    <div className="canal-info">
+      <div className="canal-icon" style={{ background: c.color }}>{c.initial}</div>
+      <div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "#1a3a6b" }}>Canal: {c.label}</div>
+        <div style={{ fontSize: 11, color: "#666" }}>Se registra automáticamente en CRM LogiFlow</div>
       </div>
-      {children}
     </div>
-  </div>
-);
+  );
+}
 
-const Btn = ({ children, onClick, color="#3B82F6", outline=false, small=false }) => (
-  <button onClick={onClick} style={{
-    background:outline?"transparent":color, color:outline?color:"white",
-    border:`1px solid ${color}`, borderRadius:8,
-    padding:small?"5px 12px":"9px 18px", fontSize:small?11:12,
-    cursor:"pointer", fontWeight:700, fontFamily:"'Outfit',sans-serif", transition:"all .2s"
-  }}>{children}</button>
-);
+function Toggle({ on, onChange }) {
+  return <button className={`toggle ${on?"on":"off"}`} onClick={onChange}><div className="toggle-dot"/></button>;
+}
 
-const Input = ({ value, onChange, placeholder, type="text", style={} }) => (
-  <input type={type} value={value} onChange={onChange} placeholder={placeholder}
-    style={{width:"100%",background:"#f0f2f5",color:"#1a1a1a",border:"1px solid #e4e7ec",
-      borderRadius:8,padding:"9px 12px",fontSize:12,...style}}/>
-);
-
-const Textarea = ({ value, onChange, placeholder, rows=4 }) => (
-  <textarea value={value} onChange={onChange} placeholder={placeholder} rows={rows}
-    style={{width:"100%",background:"#f0f2f5",color:"#1a1a1a",border:"1px solid #e4e7ec",
-      borderRadius:8,padding:"9px 12px",fontSize:12,resize:"vertical"}}/>
-);
-
-const Select = ({ value, onChange, children, style={} }) => (
-  <select value={value} onChange={onChange}
-    style={{width:"100%",background:"#f0f2f5",color:"#1a1a1a",border:"1px solid #e4e7ec",
-      borderRadius:8,padding:"9px 12px",fontSize:12,cursor:"pointer",...style}}>
-    {children}
-  </select>
-);
-
-const Label = ({ children }) => (
-  <div style={{fontSize:9,color:"#555555",fontWeight:800,letterSpacing:1,
-    textTransform:"uppercase",marginBottom:6}}>{children}</div>
-);
-
-// ─── SECCIÓN: PLANTILLAS ──────────────────────────────────────────────────────
-const PlantillasView = () => {
-  const [plantillas, setPlantillas] = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [modal, setModal]           = useState(false);
-  const [editando, setEditando]     = useState(null);
-  const [filtroCanal, setFiltroCanal] = useState("Todos");
-  const [form, setForm] = useState({ nombre:"", canal:"WhatsApp", asunto:"", contenido:"", activa:true });
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved]   = useState(false);
-
-  const fetchPlantillas = async () => {
-    setLoading(true);
-    const data = await sb.from("plantillas").select("*", { order:"created_at.asc" });
-    if (Array.isArray(data)) setPlantillas(data);
-    setLoading(false);
-  };
-
-  useEffect(() => { fetchPlantillas(); }, []);
-
-  const abrirNueva = () => {
-    setEditando(null);
-    setForm({ nombre:"", canal:"WhatsApp", asunto:"", contenido:"", activa:true });
-    setModal(true);
-  };
-
-  const abrirEditar = (p) => {
-    setEditando(p);
-    setForm({ nombre:p.nombre, canal:p.canal, asunto:p.asunto||"", contenido:p.contenido, activa:p.activa });
-    setModal(true);
-  };
-
-  const guardar = async () => {
-    if (!form.nombre.trim() || !form.contenido.trim()) return;
-    setSaving(true);
-    try {
-      if (editando) {
-        await sb.from("plantillas").update({ ...form, updated_at: new Date().toISOString() }, `id=eq.${editando.id}`);
-      } else {
-        await sb.from("plantillas").insert({ ...form });
-      }
-      await fetchPlantillas();
-      setModal(false);
-      setSaved(true); setTimeout(()=>setSaved(false), 2000);
-    } finally { setSaving(false); }
-  };
-
-  const eliminar = async (id) => {
-    if (!confirm("¿Eliminar esta plantilla?")) return;
-    await sb.from("plantillas").delete(`id=eq.${id}`);
-    await fetchPlantillas();
-  };
-
-  const toggleActiva = async (p) => {
-    await sb.from("plantillas").update({ activa:!p.activa }, `id=eq.${p.id}`);
-    await fetchPlantillas();
-  };
-
-  const filtradas = filtroCanal==="Todos" ? plantillas : plantillas.filter(p=>p.canal===filtroCanal);
-
-  const VARS = ["{nombre}","{empresa}","{telefono}","{zona}","{volumen}"];
-
-  const canalColor = (c) => {
-    const map = { WhatsApp:"#25D366", Email:"#EA4335", Facebook:"#1877F2", Instagram:"#E1306C", Todos:"#64748b" };
-    return map[c] || "#64748b";
-  };
-
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:16}}>
-
-      {/* Header */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div>
-          <div style={{fontSize:16,fontWeight:800,color:"#1a1a1a",fontFamily:"'Outfit',sans-serif"}}>
-            Plantillas de Mensajes
-          </div>
-          <div style={{fontSize:11,color:"#555555",marginTop:2}}>
-            Crea y gestiona plantillas para cada canal · Las variables se reemplazan automáticamente
-          </div>
-        </div>
-        <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          {saved && <span style={{fontSize:11,color:"#10B981"}}>✓ Guardado</span>}
-          <Btn onClick={abrirNueva}>+ Nueva plantilla</Btn>
-        </div>
-      </div>
-
-      {/* Filtro canal */}
-      <div style={{display:"flex",gap:8}}>
-        {CANALES_PLANTILLA.map(c=>(
-          <button key={c} onClick={()=>setFiltroCanal(c)}
-            style={{padding:"6px 14px",borderRadius:20,border:`1px solid ${filtroCanal===c?canalColor(c):"#e4e7ec"}`,
-              background:filtroCanal===c?canalColor(c)+"22":"none",
-              color:filtroCanal===c?canalColor(c):"#475569",
-              cursor:"pointer",fontSize:11,fontWeight:700,transition:"all .2s"}}>
-            {c}
-          </button>
+function PreguntaDinamica({ variable: v, value, onChange }) {
+  const opts = v.opciones || [];
+  if (v.tipo === "sino") return (
+    <div className="field-row">
+      <span className="field-label">{v.pregunta}</span>
+      <div className="radio-group">
+        {[{valor:"si",label:"Sí"},{valor:"no",label:"No"}].map(o => (
+          <label key={o.valor} className={`radio-opt ${value===o.valor?"sel":""}`}>
+            <input type="radio" value={o.valor} checked={value===o.valor} onChange={()=>onChange(o.valor)} style={{width:"auto"}}/>
+            <span style={{fontSize:13,flex:1}}>{o.label}</span>
+          </label>
         ))}
       </div>
+    </div>
+  );
+  if (v.tipo === "escala" || v.tipo === "seleccion") return (
+    <div className="field-row">
+      <span className="field-label">{v.pregunta}</span>
+      <div className="radio-group">
+        {opts.map((o,i) => (
+          <label key={i} className={`radio-opt ${value===o.valor?"sel":""}`}>
+            <input type="radio" value={o.valor} checked={value===o.valor} onChange={()=>onChange(o.valor)} style={{width:"auto"}}/>
+            <span style={{fontSize:13,flex:1}}>{o.valor}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+  return (
+    <div className="field-row">
+      <span className="field-label">{v.pregunta}</span>
+      <input type="text" value={value||""} onChange={e=>onChange(e.target.value)} placeholder="Tu respuesta"/>
+    </div>
+  );
+}
 
-      {/* Lista plantillas */}
-      {loading ? <Spinner/> : (
-        <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12}}>
-          {filtradas.map(p=>{
-            const color=canalColor(p.canal);
-            return (
-              <div key={p.id} style={{background:"#ffffff",border:`1px solid ${p.activa?color+"33":"#f4f5f7"}`,
-                borderRadius:12,padding:16,opacity:p.activa?1:.6,transition:"all .2s"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
-                  <div>
-                    <div style={{fontSize:13,fontWeight:800,color:"#1a1a1a"}}>{p.nombre}</div>
-                    <div style={{marginTop:4}}>
-                      <Tag label={p.canal} color={color}/>
-                    </div>
+function ScoreFieldBuilder({ field, onUpdate, onRemove, usedVariables }) {
+  const opts = field.opciones || [];
+  function addOpt() { onUpdate({...field, opciones:[...opts,{valor:"",puntos:0}]}); }
+  function updOpt(i,k,v) { onUpdate({...field, opciones:opts.map((o,idx)=>idx===i?{...o,[k]:v}:o)}); }
+  function rmOpt(i) { onUpdate({...field, opciones:opts.filter((_,idx)=>idx!==i)}); }
+
+  return (
+    <div className="score-block">
+      <div className="score-block-header">
+        <span style={{fontSize:13,fontWeight:600,color:"#1a1a1a"}}>{field.variable||"Nueva variable"}</span>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span className={`tipo-badge tipo-${field.tipo}`}>{TIPOS_PREGUNTA.find(t=>t.value===field.tipo)?.label}</span>
+          <button className="btn-danger" onClick={onRemove} style={{padding:"3px 8px",fontSize:11}}>×</button>
+        </div>
+      </div>
+      <div className="two-col" style={{marginBottom:10}}>
+        <div>
+          <span className="field-label">Variable</span>
+          <select value={field.variable} onChange={e=>onUpdate({...field,variable:e.target.value})}>
+            <option value="">-- Seleccionar --</option>
+            {VARIABLES_LIST.filter(v=>v===field.variable||!usedVariables.includes(v)).map(v=><option key={v}>{v}</option>)}
+          </select>
+        </div>
+        <div>
+          <span className="field-label">Tipo de pregunta</span>
+          <select value={field.tipo} onChange={e=>{
+            const t=e.target.value;
+            let o=[];
+            if(t==="sino") o=[{valor:"si",puntos:10}];
+            else if(t==="escala") o=[{valor:"Sin experiencia",puntos:0},{valor:"1-2 años",puntos:10},{valor:"Más de 3 años",puntos:20}];
+            else if(t==="seleccion") o=[{valor:"Opción 1",puntos:10},{valor:"Opción 2",puntos:20}];
+            else if(t==="texto") o=[{valor:"respuesta",puntos:10}];
+            onUpdate({...field,tipo:t,opciones:o});
+          }}>
+            {TIPOS_PREGUNTA.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
+        </div>
+      </div>
+      <div className="field-row">
+        <span className="field-label">Pregunta al postulante</span>
+        <input value={field.pregunta} onChange={e=>onUpdate({...field,pregunta:e.target.value})} placeholder="¿Cómo quieres preguntarle?"/>
+      </div>
+      {field.tipo==="sino" && (
+        <div>
+          <span className="field-label">Puntos si responde SÍ (No = 0 automático)</span>
+          <div className="opt-row">
+            <input type="number" value={opts[0]?.puntos||0} min={0} max={200} onChange={e=>updOpt(0,"puntos",parseInt(e.target.value)||0)} style={{maxWidth:80}}/>
+            <span className="pts-label">pts</span>
+          </div>
+        </div>
+      )}
+      {field.tipo==="texto" && (
+        <div>
+          <span className="field-label">Puntos por responder</span>
+          <div className="opt-row">
+            <input type="number" value={opts[0]?.puntos||0} min={0} max={200} onChange={e=>updOpt(0,"puntos",parseInt(e.target.value)||0)} style={{maxWidth:80}}/>
+            <span className="pts-label">pts si escribe algo</span>
+          </div>
+        </div>
+      )}
+      {(field.tipo==="escala"||field.tipo==="seleccion") && (
+        <div>
+          <span className="field-label" style={{marginBottom:6,display:"block"}}>
+            {field.tipo==="escala"?"Tramos — define cada rango y sus puntos":"Opciones — cada una con sus puntos (valores libres)"}
+          </span>
+          {opts.map((o,i)=>(
+            <div key={i} className="opt-row">
+              <input value={o.valor} onChange={e=>updOpt(i,"valor",e.target.value)} placeholder={field.tipo==="escala"?"Ej: 1 a 3 años":"Ej: Furgón"}/>
+              <input type="number" value={o.puntos} min={0} max={200} onChange={e=>updOpt(i,"puntos",parseInt(e.target.value)||0)} style={{maxWidth:70}}/>
+              <span className="pts-label">pts</span>
+              {opts.length>1 && <button className="btn-danger" onClick={()=>rmOpt(i)} style={{padding:"2px 7px",fontSize:12}}>×</button>}
+            </div>
+          ))}
+          <button className="add-opt-btn" onClick={addOpt}>+ {field.tipo==="escala"?"Agregar tramo":"Agregar opción"}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ViewCountry({ onSelect, busquedaCodigo, setBusquedaCodigo, buscarPostulacion, buscando, errorBusqueda, onAdmin }) {
+  return (
+    <div>
+      <div className="topbar">
+        <span className="logo">Big<span>ticket</span></span>
+        <button className="btn-gw" onClick={onAdmin}>Admin ⚙</button>
+      </div>
+      <div className="pg" style={{maxWidth:440,paddingTop:48}}>
+        <div className="sec-title" style={{textAlign:"center",marginBottom:6}}>Selecciona tu operación</div>
+        <div className="sec-sub" style={{textAlign:"center"}}>¿En qué país trabajarás?</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:32}}>
+          {Object.entries(PAISES).map(([key,p])=>(
+            <div key={key} className="country-card" onClick={()=>onSelect(key)}>
+              <img src={p.bandera} alt={p.label} style={{width:64,height:44,objectFit:"cover",borderRadius:4,margin:"0 auto 12px",display:"block"}} onError={e=>{e.target.style.display="none";e.target.nextSibling.style.display="block";}}/>
+              <span style={{fontSize:40,display:"none",marginBottom:8}}>{p.emoji}</span>
+              <div style={{fontSize:15,fontWeight:600,color:"#1a1a1a"}}>{p.label}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{background:"#f8f9fa",border:"1px solid #e4e7ec",borderRadius:14,padding:"20px 20px",marginBottom:16}}>
+          <div style={{fontSize:14,fontWeight:700,color:"#1a1a1a",marginBottom:4}}>🔍 Consultar estado de postulación</div>
+          <div style={{fontSize:12,color:"#888",marginBottom:14}}>Ingresa tu código para ver el estado e historial de tu postulación</div>
+          <div style={{display:"flex",gap:8}}>
+            <input
+              value={busquedaCodigo}
+              onChange={e=>setBusquedaCodigo(e.target.value.toUpperCase())}
+              onKeyDown={e=>e.key==="Enter"&&buscarPostulacion()}
+              placeholder="Ej: BT-K7M2X3"
+              style={{flex:1,padding:"10px 14px",borderRadius:8,border:"1px solid #e4e7ec",fontSize:14,fontFamily:"monospace",fontWeight:700,letterSpacing:1,background:"#fff"}}
+            />
+            <button onClick={buscarPostulacion} disabled={buscando}
+              style={{background:"#F47B20",color:"#fff",border:"none",borderRadius:8,padding:"10px 18px",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
+              {buscando?"...":"Consultar"}
+            </button>
+          </div>
+          {errorBusqueda&&<div style={{fontSize:12,color:"#EF4444",marginTop:8}}>{errorBusqueda}</div>}
+        </div>
+        <div style={{background:"#eef2ff",border:"1px solid #c7d7f9",borderRadius:14,padding:"20px 20px"}}>
+          <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:4}}>📋 Formulario de incorporación</div>
+          <div style={{fontSize:12,color:"#555",marginBottom:14}}>¿Tu propuesta fue aceptada? Completa tu formulario de incorporación a BigTicket</div>
+          <button onClick={e=>{e.currentTarget.textContent="Cargando...";e.currentTarget.disabled=true;window.location.href="?onboarding=1";}}
+            style={{background:"#1a3a6b",color:"#fff",border:"none",borderRadius:8,padding:"10px 18px",fontSize:13,fontWeight:700,cursor:"pointer",width:"100%"}}>
+            Completar formulario →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ViewPortal({ op, canal, campaigns, loading, onChangePais, onDetail, onLibre }) {
+  const active = campaigns.filter(c=>isCampActive(c)&&c.pais===op);
+  const ch = CANALES[canal]||CANALES.portal;
+  return (
+    <div>
+      <div className="topbar">
+        <span className="logo">Big<span>ticket</span> — Portal terceros</span>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span className="tag-op">{op}</span>
+          <span className="canal-badge">{ch.label}</span>
+          <button className="btn-gw" onClick={onChangePais}>Cambiar</button>
+        </div>
+      </div>
+      <div className="pg">
+        <div className="libre-card">
+          <div style={{fontSize:15,fontWeight:600,color:"#1a1a1a",marginBottom:6}}>Postulación abierta permanente</div>
+          <div style={{fontSize:13,color:"#666",marginBottom:16}}>¿No ves una campaña que se ajuste? Postula igual — te contactaremos cuando surja una oportunidad.</div>
+          <button className="btn-orange" style={{maxWidth:220,margin:"0 auto"}} onClick={onLibre}>Postular ahora</button>
+        </div>
+        <div className="sec-title">Campañas activas</div>
+        <div className="sec-sub">Selecciona una campaña para ver los detalles y postular</div>
+        {loading ? <div className="loading">Cargando campañas...</div> :
+          active.length===0 ? <div className="empty">No hay campañas activas para esta operación ahora mismo.</div> :
+          <div className="grid">
+            {active.map(c=>{
+              const dias=getDiasRestantes(c.fecha_fin);
+              return (
+                <div key={c.id} className="camp-card">
+                  <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:10}}>
+                    <span style={{fontSize:14,fontWeight:600,color:"#1a1a1a",flex:1,marginRight:8}}>{c.nombre}</span>
+                    {dias!==null?<span className="badge-days">{dias} días</span>:<span className="badge-active">Activa</span>}
                   </div>
-                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                    <button onClick={()=>toggleActiva(p)}
-                      style={{background:p.activa?"#10B98122":"#f4f5f7",color:p.activa?"#10B981":"#475569",
-                        border:`1px solid ${p.activa?"#10B98144":"#aaaaaa"}`,borderRadius:6,
-                        padding:"3px 10px",fontSize:10,cursor:"pointer",fontWeight:700}}>
-                      {p.activa?"Activa":"Inactiva"}
-                    </button>
+                  <div className="tags">
+                    {[c.vehiculo,c.volumen_m3,c.zona,c.disponibilidad].filter(Boolean).map((t,i)=><span key={i} className="ctag">{t}</span>)}
                   </div>
+                  {c.fecha_fin && <div style={{fontSize:11,color:"#e65100",marginTop:6}}>Cierra el {c.fecha_fin}</div>}
+                  <button className="btn-orange" onClick={()=>onDetail(c)}>Ver detalles y postular</button>
                 </div>
+              );
+            })}
+          </div>
+        }
+      </div>
+    </div>
+  );
+}
 
-                {p.asunto && (
-                  <div style={{fontSize:11,color:"#555555",marginBottom:6}}>
-                    <span style={{color:"#aaaaaa"}}>Asunto: </span>{p.asunto}
-                  </div>
-                )}
+function ViewDetail({ camp, canal, onBack, onPostular }) {
+  const dias=getDiasRestantes(camp.fecha_fin);
+  const rows=[
+    ["Tipo de vehículo",camp.vehiculo],["Volumen del vehículo",camp.volumen_m3],
+    ["Cantidad requerida",camp.cantidad?`${camp.cantidad} vehículos`:null],
+    ["Zona de reparto",camp.zona],["Facturación",camp.factura],
+    ["Modalidad de pago",camp.modalidad_pago],["Disponibilidad",camp.disponibilidad],
+    ["Experiencia requerida",camp.experiencia_anios!=null?`${camp.experiencia_anios} año(s)`:null],
+    ["Ingresos estimados",camp.ingreso_rango],
+    camp.fecha_fin?["Cierre",`${camp.fecha_fin}${dias!==null?` (${dias} días)`:""}`]:null,
+  ].filter(r=>r&&r[1]);
+  return (
+    <div>
+      <div className="detail-header">
+        <button className="btn-back" onClick={onBack}>← Volver</button>
+        <span style={{fontSize:15,fontWeight:600,color:"#1a1a1a"}}>{camp.nombre}</span>
+      </div>
+      <div className="pg">
+        <div className="form-card">
+          <div className="form-title">Detalles de la campaña</div>
+          <div className="two-col">
+            {rows.map(([label,val])=>(
+              <div key={label}><span className="field-label">{label}</span><p style={{fontSize:13,color:"#1a1a1a",marginTop:2}}>{val}</p></div>
+            ))}
+          </div>
+          {camp.descripcion&&<div style={{marginTop:12}}><span className="field-label">Descripción</span><p style={{fontSize:13,color:"#1a1a1a",marginTop:2}}>{camp.descripcion}</p></div>}
+        </div>
+        <button className="btn-orange" onClick={onPostular}>Postular a esta campaña</button>
+      </div>
+    </div>
+  );
+}
 
-                <div style={{background:"#f0f2f5",borderRadius:8,padding:10,marginBottom:10,
-                  fontSize:12,color:"#666666",lineHeight:1.6,
-                  maxHeight:80,overflow:"hidden",textOverflow:"ellipsis"}}>
-                  {p.contenido}
-                </div>
+const REGIONES_CHILE = [
+  "Región de Arica y Parinacota","Región de Tarapacá","Región de Antofagasta",
+  "Región de Atacama","Región de Coquimbo","Región de Valparaíso",
+  "Región Metropolitana de Santiago","Región del Libertador Gral. Bernardo O'Higgins",
+  "Región del Maule","Región de Ñuble","Región del Biobío",
+  "Región de La Araucanía","Región de Los Ríos","Región de Los Lagos",
+  "Región de Aysén del Gral. Carlos Ibáñez del Campo","Región de Magallanes y de la Antártica Chilena"
+];
 
-                <div style={{display:"flex",gap:8}}>
-                  <Btn onClick={()=>abrirEditar(p)} outline small>✏️ Editar</Btn>
-                  <Btn onClick={()=>eliminar(p.id)} color="#EF4444" outline small>🗑 Eliminar</Btn>
-                </div>
+const ESTADOS_MEXICO = [
+  "SMX1 San Jerónimo Tepetlacalco",
+  "SMX2 Complejo Industrial Tecnológico/Iztapalapa",
+  "SMX3 Lomas de Santo Domingo Reacomodo",
+  "SMX4 Bondojito",
+  "SMX5 Iztapalapa",
+  "SMX6 Industrial Tlaxcoapan",
+  "SMX7 Cuajimalpa",
+  "SMX8 Los Héroes Tecámac / Ojo de agua",
+  "SMX9 Granjas México, Iztacalco",
+  "SMX10 Vallejo",
+  "SMX11 Outlets Punta Norte",
+  "SCQ1 Colima",
+  "STX1 Tlaxcala",
+  "SHP1 Pachuca",
+  "SCY1 Celaya",
+  "SLT1 Toluca",
+  "SPV1 Puebla",
+  "SVR1 Veracruz",
+  "SVH1 Villahermosa",
+];
+
+const PREFIJOS = { "Chile": "+569", "México": "+521" };
+
+function ViewForm({ camp, canal, op, onBack, onSuccess }) {
+  const [form,setForm]=useState({nombre:"",empresa:"",rut:"",telefono:PREFIJOS[op]||"+569",email:"",fuente_contacto:"",pais_form:op||"Chile",region_estado:""});
+  const [respuestas,setRespuestas]=useState({});
+  const [vars,setVars]=useState([]);
+  const [loading,setLoading]=useState(false);
+  const isLibre=!camp;
+
+  const handlePaisChange=(nuevoPais)=>{
+    const prefijo=PREFIJOS[nuevoPais]||"+569";
+    setForm(p=>({...p,pais_form:nuevoPais,region_estado:"",telefono:prefijo}));
+  };
+
+  const regionesOpciones=form.pais_form==="México"?ESTADOS_MEXICO:REGIONES_CHILE;
+
+  useEffect(()=>{if(camp)loadVars();},[camp]);
+
+  async function loadVars() {
+    const {data}=await sb.from("campana_variables").select("*").eq("campana_id",camp.id).order("orden");
+    const parsed=(data||[]).map(v=>({
+      ...v,
+      opciones: typeof v.opciones==="string" ? JSON.parse(v.opciones) : (v.opciones||[])
+    }));
+    setVars(parsed);
+  }
+
+  async function submit() {
+    if(!form.nombre||!form.telefono){alert("Completa nombre y teléfono.");return;}
+    if(!form.fuente_contacto){alert("Indica cómo nos conociste.");return;}
+    setLoading(true);
+    try {
+      const score=isLibre?0:calcScoreRespuestas(vars,respuestas);
+      const scoreMax=isLibre?0:(camp.score_max||0);
+      const clasificacion=calcClasificacion(score,scoreMax);
+
+      // Generar código único de postulación
+      const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      const codigo="BT-"+Array.from({length:6},()=>chars[Math.floor(Math.random()*chars.length)]).join("");
+
+      // Enviar al webhook de N8N
+      const payload = {
+        nombre: form.nombre,
+        empresa: form.empresa||null,
+        telefono: form.telefono,
+        email: form.email||null,
+        rut: form.rut||null,
+        canal,
+        pais: op,
+        score,
+        clasificacion,
+        etapa: clasificacion==="Caliente"?"Propuesta Enviada":"Base Datos Leads",
+        origen: isLibre?"Postulación libre":`Campaña: ${camp?.nombre||""}`,
+        campana_id: camp?.id||null,
+        campana_nombre: camp?.nombre||null,
+        tipo_postulacion: isLibre?"libre":"campaña",
+        fuente_contacto: form.fuente_contacto||null,
+        codigo_postulacion: codigo,
+        respuestas: isLibre?respuestas:Object.fromEntries(
+          vars.map(v=>([v.pregunta, respuestas[v.id]||""]))
+        ),
+      };
+
+      // 1. Guardar en Supabase
+      const {data:lead,error:le}=await sb.from("leads").insert({
+        nombre:form.nombre,empresa:form.empresa||null,telefono:form.telefono,email:form.email||null,
+        rut: (form.pais_form||op)==='México' ? null : (form.rut||null),
+        curp: (form.pais_form||op)==='México' ? (form.rut||null) : null,
+        canal,pais:form.pais_form||op,score,clasificacion,etapa:clasificacion==="Caliente"?"Propuesta Enviada":"Base Datos Leads",
+        origen:isLibre?"Postulación libre":`Campaña: ${camp?.nombre||""}`,
+        campana_id:camp?.id||null,fuente_contacto:form.fuente_contacto||null,
+        tipo_postulacion:isLibre?"libre":"campaña",
+        codigo_postulacion:codigo,
+        region_estado:form.region_estado||null,
+      }).select().single();
+      if(le) throw le;
+      await sb.from("postulaciones").insert({
+        campana_id:camp?.id||null,lead_id:lead.id,
+        tipo:isLibre?"libre":"campaña",canal,pais:op,
+        score_calculado:score,respuestas,
+      });
+
+      // 2. Llamar a N8N para enviar WhatsApp + correo
+      try {
+        await fetch("https://bigticket2026.app.n8n.cloud/webhook/confirmacion-postulacion", {
+          method: "POST", mode: "no-cors",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nombre: form.nombre, telefono: form.telefono,
+            email: form.email||null, canal, pais: op, score, clasificacion,
+            campana_nombre: camp?.nombre||"Postulación libre",
+            origen: isLibre?"Postulación libre":`Campaña: ${camp?.nombre||""}`,
+            fuente_contacto: form.fuente_contacto||null,
+            codigo_postulacion: codigo,
+            fecha_postulacion: new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"}),
+            rut: (op||form.pais_form)==='México' ? null : (form.rut||null),
+            curp: (op||form.pais_form)==='México' ? (form.rut||null) : null,
+            empresa: form.empresa||null,
+            region_estado: form.region_estado||null,
+          }),
+        });
+      } catch(fetchErr) { console.log("N8N WhatsApp error:", fetchErr); }
+
+      // 2b. Enviar correo de confirmación si tiene email
+      if(form.email){
+        try {
+          await fetch("https://bigticket2026.app.n8n.cloud/webhook/correo-postulacion", {
+            method: "POST", mode: "no-cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: form.email,
+              nombre: form.nombre,
+              empresa: form.empresa||null,
+              rut: form.rut||null,
+              telefono: form.telefono,
+              canal,
+              pais: op,
+              region_estado: form.region_estado||null,
+              score,
+              clasificacion,
+              campana_nombre: camp?.nombre||"Postulación libre",
+              origen: isLibre?"Postulación libre":`Campaña: ${camp?.nombre||""}`,
+              fuente_contacto: form.fuente_contacto||null,
+              codigo_postulacion: codigo,
+              fecha_postulacion: new Date().toLocaleString("es-CL",{day:"2-digit",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"}),
+            }),
+          });
+        } catch(e){ console.log("N8N correo error:",e); }
+      }
+
+      // 3. Si es caliente, notificar a N8N para enviar WhatsApp de propuesta
+      if(clasificacion==="Caliente"&&lead.id){
+        try {
+          await fetch("https://bigticket2026.app.n8n.cloud/webhook/propuesta-enviada", {
+            method: "POST", mode: "no-cors",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({
+              lead_id: lead.id,
+              nombre: form.nombre,
+              telefono: form.telefono,
+              campana_nombre: camp?.nombre||"",
+              clasificacion,
+            }),
+          });
+        } catch(e){ console.log("N8N propuesta error:",e); }
+      }
+
+      onSuccess(codigo);
+    } catch(e){alert("Error al enviar: "+e.message);}
+    finally{setLoading(false);}
+  }
+
+  return (
+    <div>
+      <div className="detail-header">
+        <button className="btn-back" onClick={onBack}>← Volver</button>
+        <span style={{fontSize:15,fontWeight:600,color:"#1a1a1a"}}>{isLibre?"Postulación abierta":`Postular: ${camp.nombre}`}</span>
+      </div>
+      <div className="pg">
+        <CanalInfo canal={canal}/>
+        <div className="form-card">
+          <div className="form-title">Datos personales</div>
+
+          {/* Fila 1: Nombre + Empresa */}
+          <div className="two-col">
+            <div className="field-row"><span className="field-label">Nombre completo *</span><input value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})} placeholder="Tu nombre"/></div>
+            <div className="field-row"><span className="field-label">Empresa / Razón social</span><input value={form.empresa} onChange={e=>setForm({...form,empresa:e.target.value})} placeholder="Nombre de tu empresa (opcional)"/></div>
+          </div>
+
+          {/* Fila 2: RUT (Chile) / CURP (México) + Correo */}
+          <div className="two-col">
+            <div className="field-row">
+              <span className="field-label">{form.pais_form==="México"?"CURP":"RUT"}</span>
+              <input value={form.rut} onChange={e=>setForm({...form,rut:e.target.value})} placeholder={form.pais_form==="México"?"Ej: ABCD123456HDFXXX00":"Ej: 12345678k"}/>
+            </div>
+            <div className="field-row"><span className="field-label">Correo electrónico</span><input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="correo@..."/></div>
+          </div>
+
+          {/* Fila 3: País + Región (postulación libre) */}
+          {isLibre&&(
+            <div className="two-col">
+              <div className="field-row">
+                <span className="field-label">País *</span>
+                <select value={form.pais_form} onChange={e=>handlePaisChange(e.target.value)}
+                  style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #e4e7ec",background:"#f8f9fa",fontSize:14,cursor:"pointer"}}>
+                  <option value="Chile">🇨🇱 Chile</option>
+                  <option value="México">🇲🇽 México</option>
+                </select>
               </div>
-            );
-          })}
+              <div className="field-row">
+                <span className="field-label">{form.pais_form==="México"?"Estado *":"Región *"}</span>
+                <select value={form.region_estado} onChange={e=>setForm({...form,region_estado:e.target.value})}
+                  style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #e4e7ec",background:"#f8f9fa",fontSize:14,cursor:"pointer",color:form.region_estado?"#1a1a1a":"#888888"}}>
+                  <option value="">-- Seleccionar --</option>
+                  {regionesOpciones.map(r=><option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+            </div>
+          )}
 
-          {filtradas.length===0 && (
-            <div style={{gridColumn:"1/-1",textAlign:"center",padding:40,color:"#aaaaaa",fontSize:13}}>
-              No hay plantillas para este canal · Haz clic en "+ Nueva plantilla" para crear una
+          {/* Fila 3 campaña: Región + Teléfono */}
+          {!isLibre&&(
+            <div className="two-col">
+              <div className="field-row">
+                <span className="field-label">{op==="México"?"Estado *":"Región *"}</span>
+                <select value={form.region_estado} onChange={e=>setForm({...form,region_estado:e.target.value})}
+                  style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #e4e7ec",background:"#f8f9fa",fontSize:14,cursor:"pointer",color:form.region_estado?"#1a1a1a":"#888888"}}>
+                  <option value="">-- Seleccionar --</option>
+                  {(op==="México"?ESTADOS_MEXICO:REGIONES_CHILE).map(r=><option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <div className="field-row">
+                <span className="field-label">Teléfono WhatsApp *</span>
+                <input value={form.telefono} onChange={e=>setForm({...form,telefono:e.target.value})}
+                  placeholder={op==="México"?"+521 ...":"+569 ..."}/>
+              </div>
+            </div>
+          )}
+
+          {/* Fila 4 libre: Teléfono + ¿Cómo nos conociste? */}
+          {isLibre&&(
+            <div className="two-col">
+              <div className="field-row">
+                <span className="field-label">Teléfono WhatsApp *</span>
+                <input value={form.telefono} onChange={e=>setForm({...form,telefono:e.target.value})}
+                  placeholder={form.pais_form==="México"?"+521 ...":"+569 ..."}/>
+              </div>
+              <div className="field-row">
+                <span className="field-label">¿Cómo nos conociste? *</span>
+                <select value={form.fuente_contacto} onChange={e=>setForm({...form,fuente_contacto:e.target.value})}
+                  style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #e4e7ec",background:"#f8f9fa",fontSize:14,color:form.fuente_contacto?"#1a1a1a":"#888888",cursor:"pointer"}}>
+                  <option value="">Selecciona una opción...</option>
+                  <option value="Instagram">📸 Instagram</option>
+                  <option value="Facebook">📘 Facebook</option>
+                  <option value="WhatsApp">💬 WhatsApp</option>
+                  <option value="Referido">🤝 Me lo recomendó alguien</option>
+                  <option value="Google">🔍 Google / Búsqueda web</option>
+                  <option value="Portal web">🌐 Entré directo al portal</option>
+                  <option value="Otro">💬 Otro</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* ¿Cómo nos conociste? para campaña — fila completa */}
+          {!isLibre&&(
+            <div className="field-row">
+              <span className="field-label">¿Cómo nos conociste? *</span>
+              <select value={form.fuente_contacto} onChange={e=>setForm({...form,fuente_contacto:e.target.value})}
+                style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #e4e7ec",background:"#f8f9fa",fontSize:14,color:form.fuente_contacto?"#1a1a1a":"#888888",cursor:"pointer"}}>
+                <option value="">Selecciona una opción...</option>
+                <option value="Instagram">📸 Instagram</option>
+                <option value="Facebook">📘 Facebook</option>
+                <option value="WhatsApp">💬 WhatsApp</option>
+                <option value="Referido">🤝 Me lo recomendó alguien</option>
+                <option value="Google">🔍 Google / Búsqueda web</option>
+                <option value="Portal web">🌐 Entré directo al portal</option>
+                <option value="Otro">💬 Otro</option>
+              </select>
             </div>
           )}
         </div>
-      )}
-
-      {/* Variables disponibles */}
-      <div style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:12,padding:14}}>
-        <div style={{fontSize:10,fontWeight:800,color:"#555555",letterSpacing:1,marginBottom:8,textTransform:"uppercase"}}>
-          Variables disponibles en plantillas
-        </div>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          {VARS.map(v=>(
-            <span key={v} style={{background:"#f4f5f7",color:"#3B82F6",border:"1px solid #3B82F633",
-              borderRadius:6,padding:"3px 10px",fontSize:11,fontFamily:"monospace"}}>{v}</span>
-          ))}
-        </div>
-        <div style={{fontSize:10,color:"#aaaaaa",marginTop:6}}>
-          Estas variables se reemplazan automáticamente con los datos del lead al enviar
-        </div>
-      </div>
-
-      {/* Modal crear/editar */}
-      {modal && (
-        <Modal title={editando?"✏️ Editar plantilla":"➕ Nueva plantilla"} onClose={()=>setModal(false)}>
-          <div style={{display:"flex",flexDirection:"column",gap:14}}>
-            <div>
-              <Label>Nombre de la plantilla</Label>
-              <Input value={form.nombre} onChange={e=>setForm(p=>({...p,nombre:e.target.value}))}
-                placeholder="Ej: Bienvenida WhatsApp"/>
-            </div>
-
-            <div>
-              <Label>Canal</Label>
-              <Select value={form.canal} onChange={e=>setForm(p=>({...p,canal:e.target.value}))}>
-                {["WhatsApp","Email","Facebook","Instagram","Todos"].map(c=><option key={c}>{c}</option>)}
-              </Select>
-            </div>
-
-            {form.canal==="Email" && (
-              <div>
-                <Label>Asunto del correo</Label>
-                <Input value={form.asunto} onChange={e=>setForm(p=>({...p,asunto:e.target.value}))}
-                  placeholder="Ej: Propuesta LogiFlow para {empresa}"/>
+        {!isLibre && vars.length>0 && (
+          <div className="form-card">
+            <div className="form-title">Preguntas de la campaña</div>
+            {vars.map(v=>(
+              <PreguntaDinamica key={v.id} variable={v} value={respuestas[v.id]} onChange={val=>setRespuestas({...respuestas,[v.id]:val})}/>
+            ))}
+          </div>
+        )}
+        {isLibre && (
+          <div className="form-card">
+            <div className="form-title">Tu vehículo y disponibilidad</div>
+            <div className="two-col">
+              <div className="field-row"><span className="field-label">Tipo de vehículo</span>
+                <select value={respuestas.vehiculo||""} onChange={e=>setRespuestas({...respuestas,vehiculo:e.target.value})}>
+                  <option value="">-- Seleccionar --</option>
+                  {["Moto","Auto","Furgón","Camión"].map(v=><option key={v}>{v}</option>)}
+                </select>
               </div>
-            )}
-
-            <div>
-              <Label>Contenido del mensaje</Label>
-              <Textarea value={form.contenido} onChange={e=>setForm(p=>({...p,contenido:e.target.value}))}
-                placeholder={`Ej: Hola {nombre}! 👋 Somos LogiFlow...\n\nPuedes usar: ${VARS.join(", ")}`}
-                rows={6}/>
-              <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
-                {VARS.map(v=>(
-                  <button key={v} onClick={()=>setForm(p=>({...p,contenido:p.contenido+v}))}
-                    style={{background:"#f4f5f7",color:"#3B82F6",border:"1px solid #3B82F633",
-                      borderRadius:6,padding:"3px 8px",fontSize:10,cursor:"pointer",fontFamily:"monospace"}}>
-                    +{v}
-                  </button>
-                ))}
+              <div className="field-row"><span className="field-label">Volumen (m³)</span>
+                <select value={respuestas.volumen||""} onChange={e=>setRespuestas({...respuestas,volumen:e.target.value})}>
+                  <option value="">-- Seleccionar --</option>
+                  {["1 m³","2 m³","3 m³","4 m³","6 m³","8 m³","9 m³","12 m³","16 m³","20 m³","24 m³","Más de 24 m³"].map(v=><option key={v}>{v}</option>)}
+                </select>
               </div>
             </div>
-
-            <div style={{display:"flex",gap:8,marginTop:4}}>
-              <Btn onClick={()=>setModal(false)} color="#475569" outline>Cancelar</Btn>
-              <button onClick={guardar} disabled={saving}
-                style={{flex:1,background:"#3B82F6",color:"white",border:"none",borderRadius:8,
-                  padding:"10px",fontSize:12,cursor:"pointer",fontWeight:800,
-                  fontFamily:"'Outfit',sans-serif",opacity:saving?.7:1}}>
-                {saving?"Guardando...":editando?"💾 Guardar cambios":"✅ Crear plantilla"}
-              </button>
+            <div className="two-col">
+              <div className="field-row"><span className="field-label">Zona donde opera</span><input value={respuestas.zona||""} onChange={e=>setRespuestas({...respuestas,zona:e.target.value})} placeholder="Ej: Santiago Norte"/></div>
+              <div className="field-row"><span className="field-label">Disponibilidad</span>
+                <select value={respuestas.disp||""} onChange={e=>setRespuestas({...respuestas,disp:e.target.value})}>
+                  <option value="">-- Seleccionar --</option>
+                  {["Diurno","Nocturno","Mixto"].map(v=><option key={v}>{v}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="two-col">
+              <div className="field-row"><span className="field-label">¿Vehículo propio?</span>
+                <select value={respuestas.propio||""} onChange={e=>setRespuestas({...respuestas,propio:e.target.value})}>
+                  <option value="">-- Seleccionar --</option>
+                  <option>Sí, vehículo propio</option><option>No, arrendado</option>
+                </select>
+              </div>
+              <div className="field-row"><span className="field-label">¿Emite factura?</span>
+                <select value={respuestas.factura||""} onChange={e=>setRespuestas({...respuestas,factura:e.target.value})}>
+                  <option value="">-- Seleccionar --</option>
+                  <option>Sí, emito factura</option><option>No emito factura</option>
+                </select>
+              </div>
+            </div>
+            <div className="field-row"><span className="field-label">Experiencia en reparto</span>
+              <select value={respuestas.exp||""} onChange={e=>setRespuestas({...respuestas,exp:e.target.value})}>
+                <option value="">-- Seleccionar --</option>
+                {["Sin experiencia","Menos de 1 año","1 a 2 años","3 a 5 años","Más de 5 años"].map(v=><option key={v}>{v}</option>)}
+              </select>
+            </div>
+            <div className="field-row"><span className="field-label">Comentario (opcional)</span>
+              <textarea value={respuestas.comentario||""} onChange={e=>setRespuestas({...respuestas,comentario:e.target.value})} placeholder="Cuéntanos algo más..."/>
             </div>
           </div>
-        </Modal>
-      )}
+        )}
+        <button className="btn-orange" onClick={submit} disabled={loading}>{loading?"Enviando...":"Enviar postulación"}</button>
+      </div>
     </div>
   );
-};
+}
 
-// ─── SECCIÓN: CONFIG SCORE ────────────────────────────────────────────────────
-const ConfigScoreView = () => {
-  const [dimensiones, setDimensiones]   = useState([]);
-  const [loading, setLoading]           = useState(true);
-  const [modalDim, setModalDim]         = useState(false);
-  const [modalRegla, setModalRegla]     = useState(null);
-  const [editandoDim, setEditandoDim]   = useState(null);
-  const [formDim, setFormDim]           = useState({ nombre:"", dimension:"", descripcion:"" });
-  const [formRegla, setFormRegla]       = useState({ etiqueta:"", palabras_clave:"", puntos:0 });
-  const [editandoReglaIdx, setEditandoReglaIdx] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved]   = useState(false);
+// ─── BIGGI — ASISTENTE VIRTUAL ────────────────────────────────────────────────
+const BIGGI_PROMPT = `Eres Biggy, el asistente virtual de BigTicket 🚛, una empresa de logística que conecta conductores terceros con campañas de reparto en Chile y México.
 
-  const fetchDimensiones = async () => {
-    setLoading(true);
-    const data = await sb.from("config_score").select("*", { order:"orden.asc" });
-    if (Array.isArray(data)) setDimensiones(data);
-    setLoading(false);
-  };
+Tu rol es ayudar a prospectos y conductores activos con sus consultas de forma amable, clara y con emojis ocasionales.
 
-  useEffect(() => { fetchDimensiones(); }, []);
+INFORMACIÓN DE BIGTICKET:
 
-  const totalPuntos = dimensiones.reduce((total, dim) => {
-    if (!dim.activa) return total;
-    return total + (dim.reglas||[]).reduce((a,r) => Math.max(a, r.puntos||0), 0);
-  }, 0);
+REQUISITOS PARA POSTULAR:
+- Los requisitos varían según la campaña (tipo de vehículo, zona, volumen)
+- Lo más importante es poder emitir facturas y tener documentación al día
+- Cada campaña tiene sus propios criterios de selección
 
-  // Guardar dimensión completa
-  const guardarReglas = async (dim, nuevasReglas) => {
-    setSaving(true);
+OPERACIONES:
+- Presencia en diferentes regiones de Chile y estados de México
+- Campañas activas disponibles en el portal
+
+MODALIDADES DE CONTRATO:
+- Apoyo: soporte puntual según demanda
+- Planta: contrato estable con ruta fija
+- Temporada: contrato por período específico
+- Cada modalidad tiene su propio flujo y forma de pago
+
+PAGOS:
+- Por cantidad de envíos: ganas según cuánto entregues
+- Por ruta fija: valor fijo por ruta completada
+- La documentación para pagos se solicita periódicamente
+
+CONSULTAS FRECUENTES DE TERCEROS ACTIVOS:
+- Certificación de flotas: proceso de verificación del vehículo
+- Documentación para pagos: boletas, facturas, liquidaciones
+- Carga y descarga de documentos: se hace a través del sistema
+- Incidentes (choque/robo): reportar inmediatamente al coordinador
+
+PORTAL:
+- Los prospectos pueden postular en: https://bigticket-portal.vercel.app
+- Pueden consultar el estado de su postulación con su código BT-XXXXXX
+
+REGLAS:
+- Si no sabes algo específico, sé honesto y deriva al equipo: +56957730804
+- No inventes información sobre pagos, rutas o campañas específicas
+- Siempre invita a postular si detectas que es un prospecto nuevo
+- Responde en el idioma del usuario (español)
+- Sé conciso — máximo 3-4 líneas por respuesta`;
+
+function BiggiBubble({ paginaPrincipal=false }) {
+  const [abierto,setAbierto]=useState(false);
+  const [mensajes,setMensajes]=useState([{rol:"biggi",texto:"¡Hola! Soy Biggy 🚛 el asistente virtual de BigTicket. ¿En qué puedo ayudarte hoy?"}]);
+  const [input,setInput]=useState("");
+  const [cargando,setCargando]=useState(false);
+  const endRef=useRef(null);
+
+  useEffect(()=>{endRef.current?.scrollIntoView({behavior:"smooth"});},[mensajes]);
+
+  const enviar=async()=>{
+    if(!input.trim()||cargando) return;
+    const texto=input.trim();
+    setInput("");
+    setMensajes(p=>[...p,{rol:"usuario",texto}]);
+    setCargando(true);
+
     try {
-      await sb.from("config_score").update({ reglas:nuevasReglas, updated_at:new Date().toISOString() }, `id=eq.${dim.id}`);
-      await fetchDimensiones();
-      setSaved(true); setTimeout(()=>setSaved(false),2000);
-    } finally { setSaving(false); }
-  };
+      const historial=mensajes
+        .filter((m,i)=>m.rol!=="biggi" || i>0)
+        .map(m=>({
+          role:m.rol==="usuario"?"user":"assistant",
+          content:m.texto
+        }));
 
-  // Toggle activa
-  const toggleDim = async (dim) => {
-    await sb.from("config_score").update({ activa:!dim.activa }, `id=eq.${dim.id}`);
-    await fetchDimensiones();
-  };
+      const res=await fetch("https://bigticket2026.app.n8n.cloud/webhook/biggi-chat",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          system:BIGGI_PROMPT,
+          messages:[...historial,{role:"user",content:texto}]
+        })
+      });
 
-  // Eliminar dimensión
-  const eliminarDim = async (id) => {
-    if (!confirm("¿Eliminar esta dimensión del score?")) return;
-    await sb.from("config_score").delete(`id=eq.${id}`);
-    await fetchDimensiones();
-  };
-
-  // Nueva dimensión
-  const guardarDim = async () => {
-    if (!formDim.nombre.trim()) return;
-    setSaving(true);
-    try {
-      const orden = dimensiones.length + 1;
-      if (editandoDim) {
-        await sb.from("config_score").update({ nombre:formDim.nombre, descripcion:formDim.descripcion, updated_at:new Date().toISOString() }, `id=eq.${editandoDim.id}`);
-      } else {
-        await sb.from("config_score").insert({ dimension:formDim.dimension||formDim.nombre.toLowerCase().replace(/\s+/g,"_"), nombre:formDim.nombre, descripcion:formDim.descripcion, orden, reglas:[], activa:true });
+      if(!res.ok){
+        throw new Error(`HTTP ${res.status}`);
       }
-      await fetchDimensiones();
-      setModalDim(false);
-    } finally { setSaving(false); }
-  };
 
-  // Reglas
-  const abrirRegla = (dim, idx=null) => {
-    setModalRegla(dim);
-    if (idx!==null) {
-      const r = dim.reglas[idx];
-      setFormRegla({ etiqueta:r.etiqueta, palabras_clave:(r.palabras_clave||[]).join(", "), puntos:r.puntos });
-      setEditandoReglaIdx(idx);
-    } else {
-      setFormRegla({ etiqueta:"", palabras_clave:"", puntos:0 });
-      setEditandoReglaIdx(null);
+      const contentType = res.headers.get("content-type") || "";
+      let respuesta = "";
+
+      if(contentType.includes("application/json")){
+        const data = await res.json();
+        respuesta =
+          data.respuesta ||
+          data.content?.[0]?.text ||
+          data.text ||
+          "Lo siento, no pude procesar tu consulta. Contacta al equipo: +56957730804";
+      } else {
+        respuesta = await res.text();
+      }
+
+      setMensajes(p=>[...p,{rol:"biggi",texto:respuesta}]);
+    } catch(e){
+      console.error("Error Biggy:", e);
+      setMensajes(p=>[...p,{rol:"biggi",texto:"Tuve un problema técnico. Por favor contacta al equipo: +56957730804 📞"}]);
+    } finally {
+      setCargando(false);
     }
   };
 
-  const guardarRegla = async () => {
-    const nuevaRegla = {
-      etiqueta: formRegla.etiqueta,
-      palabras_clave: formRegla.palabras_clave.split(",").map(s=>s.trim().toLowerCase()).filter(Boolean),
-      puntos: parseInt(formRegla.puntos)||0,
-    };
-    const reglas = [...(modalRegla.reglas||[])];
-    if (editandoReglaIdx!==null) reglas[editandoReglaIdx]=nuevaRegla;
-    else reglas.push(nuevaRegla);
-    await guardarReglas(modalRegla, reglas);
-    setModalRegla(null);
-  };
+  const BiggiFace = ({ size = 54 }) => (
+  <div
+    style={{
+      width: size,
+      height: size,
+      borderRadius: "50%",
+      position: "relative",
+      overflow: "hidden",
+      flexShrink: 0,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      background: "radial-gradient(circle at 30% 30%, #1C5E97 0%, #0B3A63 70%)",
+      border: "2px solid rgba(255,255,255,0.95)",
+      boxShadow:
+        "0 10px 24px rgba(11,58,99,0.30), 0 4px 14px rgba(244,123,32,0.22)",
+    }}
+  >
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        borderRadius: "50%",
+        background:
+          "linear-gradient(180deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.02) 40%, transparent 100%)",
+        pointerEvents: "none",
+      }}
+    />
+    <img
+      src={DONB_URL}
+      alt="Biggy"
+      style={{
+        width: "86%",
+        height: "86%",
+        objectFit: "contain",
+        objectPosition: "center",
+        display: "block",
+      }}
+    />
+  </div>
+);
 
-  const eliminarRegla = async (dim, idx) => {
-    const reglas = dim.reglas.filter((_,i)=>i!==idx);
-    await guardarReglas(dim, reglas);
-  };
+  return(
+    <>
+      {/* Botón flotante */}
+      {!abierto&&(
+        <div onClick={()=>setAbierto(true)} style={{position:"fixed",bottom:24,right:24,zIndex:999,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+          {paginaPrincipal&&(
+            <div style={{background:"#1a3a6b",color:"#fff",borderRadius:12,padding:"8px 14px",fontSize:12,fontWeight:600,boxShadow:"0 4px 16px rgba(0,0,0,0.2)",whiteSpace:"nowrap",animation:"pulse 2s infinite"}}>
+              💬 ¿Tienes dudas? ¡Pregúntale a Biggy!
+            </div>
+          )}
+          <div style={{width:80,height:80,borderRadius:"50%",overflow:"hidden",boxShadow:"0 4px 20px rgba(244,123,32,0.5)",border:"3px solid #F47B20"}}>
+            <img src={DONB_URL} alt="Biggy" style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:"top"}}/>
+          </div>
+          <div style={{background:"#1a3a6b",color:"#fff",borderRadius:8,padding:"3px 10px",fontSize:11,fontWeight:700}}>Biggy</div>
+        </div>
+      )}
+
+      {/* Ventana del chat */}
+      {abierto&&(
+        <div style={{position:"fixed",bottom:24,right:24,zIndex:999,width:340,height:480,background:"#fff",borderRadius:16,boxShadow:"0 8px 40px rgba(0,0,0,0.2)",display:"flex",flexDirection:"column",overflow:"hidden",border:"1px solid #e4e7ec"}}>
+          {/* Header */}
+          <div style={{background:"linear-gradient(135deg,#1a3a6b,#2a5a9b)",padding:"12px 16px",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+            <BiggiFace size={48}/>
+            <div style={{flex:1}}>
+              <div style={{color:"#fff",fontSize:14,fontWeight:700}}>Biggy</div>
+              <div style={{color:"#aac3e8",fontSize:11}}>Asistente Virtual BigTicket</div>
+            </div>
+            <button onClick={()=>setAbierto(false)} style={{background:"rgba(255,255,255,0.15)",border:"none",color:"#fff",borderRadius:"50%",width:28,height:28,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+          </div>
+
+          {/* Mensajes */}
+          <div style={{flex:1,overflow:"auto",padding:12,display:"flex",flexDirection:"column",gap:10,background:"#f8f9fa"}}>
+            {mensajes.map((m,i)=>(
+              <div key={i} style={{display:"flex",gap:8,justifyContent:m.rol==="usuario"?"flex-end":"flex-start",alignItems:"flex-end"}}>
+                {m.rol==="biggi"&&<BiggiFace size={40}/>}
+                <div style={{maxWidth:"78%",background:m.rol==="usuario"?"#1a3a6b":"#fff",color:m.rol==="usuario"?"#fff":"#1a1a1a",borderRadius:m.rol==="usuario"?"12px 12px 2px 12px":"12px 12px 12px 2px",padding:"9px 12px",fontSize:12,lineHeight:1.5,border:m.rol==="usuario"?"none":"1px solid #e4e7ec",boxShadow:"0 1px 3px rgba(0,0,0,0.06)"}}>
+                  {m.texto}
+                </div>
+              </div>
+            ))}
+            {cargando&&(
+              <div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
+                <BiggiFace size={40}/>
+                <div style={{background:"#fff",border:"1px solid #e4e7ec",borderRadius:"12px 12px 12px 2px",padding:"9px 12px",fontSize:12,color:"#888"}}>
+                  <span style={{animation:"pulse 1s infinite"}}>Biggy está escribiendo...</span>
+                </div>
+              </div>
+            )}
+            <div ref={endRef}/>
+          </div>
+
+          {/* Input */}
+          <div style={{padding:"10px 12px",background:"#fff",borderTop:"1px solid #e4e7ec",display:"flex",gap:8,flexShrink:0}}>
+            <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&enviar()}
+              placeholder="Escribe tu consulta..."
+              style={{flex:1,padding:"8px 12px",borderRadius:20,border:"1px solid #e4e7ec",fontSize:12,outline:"none",background:"#f8f9fa"}}/>
+            <button onClick={enviar} disabled={cargando||!input.trim()}
+              style={{background:"#F47B20",color:"#fff",border:"none",borderRadius:"50%",width:34,height:34,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,opacity:cargando||!input.trim()?0.5:1}}>
+              ↑
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+
+function ViewSuccess({ codigo, onVolver }) {
+  const [copiado,setCopiado]=useState(false);
+  const copiar=()=>{navigator.clipboard?.writeText(codigo||"");setCopiado(true);setTimeout(()=>setCopiado(false),2000);};
+  return (
+    <div>
+      <div className="topbar"><span className="logo">Big<span>ticket</span></span></div>
+      <div style={{maxWidth:440,margin:"60px auto",padding:"20px"}}>
+        <div style={{background:"#fff",borderRadius:16,padding:"40px 32px",textAlign:"center",border:"0.5px solid #e4e7ec"}}>
+          <div style={{width:56,height:56,background:"#dcfce7",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px",fontSize:24,color:"#166534"}}>✓</div>
+          <div style={{fontSize:17,fontWeight:700,color:"#166534",marginBottom:8}}>¡Postulación enviada!</div>
+          <div style={{fontSize:13,color:"#555",marginBottom:20}}>Tus datos fueron recibidos. Te contactaremos por WhatsApp a la brevedad.</div>
+          {codigo&&(
+            <div style={{background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:12,padding:"16px 20px",marginBottom:20}}>
+              <div style={{fontSize:11,color:"#0369a1",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>Tu código de postulación</div>
+              <div style={{fontSize:28,fontWeight:900,color:"#0369a1",letterSpacing:3,fontFamily:"monospace",marginBottom:10}}>{codigo}</div>
+              <div style={{fontSize:12,color:"#555",marginBottom:12}}>Guarda este código — con él puedes consultar el estado de tu postulación en cualquier momento.</div>
+              <button onClick={copiar} style={{background:copiado?"#dcfce7":"#e0f2fe",color:copiado?"#166534":"#0369a1",border:"none",borderRadius:8,padding:"8px 16px",fontSize:12,fontWeight:700,cursor:"pointer",width:"100%"}}>
+                {copiado?"✓ Código copiado":"Copiar código"}
+              </button>
+            </div>
+          )}
+          <button className="btn-orange" style={{maxWidth:200,margin:"0 auto"}} onClick={onVolver}>Volver al inicio</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ViewPostulacion({ data, onVolver }) {
+  const {lead,historial}=data;
+  const ETAPA_COLOR={"Nuevo Lead":"#3B82F6","Nuevo":"#3B82F6","Contactado":"#8B5CF6","Reunión Agendada":"#F59E0B","Propuesta Enviada":"#F97316","Negociación":"#EC4899","Propuesta Aceptada":"#10B981","Propuesta Rechazada":"#EF4444","Contrato Firmado":"#10B981","Base Datos Leads":"#6B7280","Ganado":"#10B981","Perdido":"#EF4444"};
+  const ETAPA_ICON={"Nuevo Lead":"🎯","Nuevo":"🎯","Contactado":"📞","Reunión Agendada":"📅","Propuesta Enviada":"📄","Negociación":"🤝","Propuesta Aceptada":"✅","Propuesta Rechazada":"❌","Contrato Firmado":"📝","Base Datos Leads":"🗃️","Ganado":"✅","Perdido":"❌"};
+  const etapaColor=ETAPA_COLOR[lead.etapa]||"#888";
+  // Construir historial completo incluyendo etapa inicial
+  const historialCompleto=[
+    {etapa_nueva:"Postulación recibida",created_at:lead.created_at,etapa_anterior:null},
+    ...historial,
+    ...(lead.etapa&&!historial.find(h=>h.etapa_nueva===lead.etapa)?[{etapa_nueva:lead.etapa,created_at:lead.updated_at||lead.created_at,etapa_anterior:historial[historial.length-1]?.etapa_nueva||"Postulación recibida"}]:[]),
+  ];
+  return(
+    <div>
+      <div className="topbar"><span className="logo">Big<span>ticket</span></span></div>
+      <div style={{maxWidth:480,margin:"0 auto",padding:"20px 16px"}}>
+        <button onClick={onVolver} style={{background:"none",border:"none",color:"#888",fontSize:13,cursor:"pointer",marginBottom:16}}>← Volver</button>
+        <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",padding:"20px 24px",marginBottom:16}}>
+          <div style={{fontSize:11,color:"#888",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Código</div>
+          <div style={{fontSize:22,fontWeight:900,color:"#1a1a1a",letterSpacing:2,fontFamily:"monospace",marginBottom:16}}>{lead.codigo_postulacion}</div>
+          <div style={{fontSize:16,fontWeight:700,color:"#1a1a1a",marginBottom:4}}>{lead.nombre}</div>
+          {lead.empresa&&<div style={{fontSize:13,color:"#555",marginBottom:12}}>{lead.empresa}</div>}
+          <div style={{display:"inline-flex",alignItems:"center",gap:8,background:etapaColor+"18",border:`1px solid ${etapaColor}44`,borderRadius:20,padding:"6px 14px"}}>
+            <span style={{fontSize:16}}>{ETAPA_ICON[lead.etapa]||"📋"}</span>
+            <span style={{fontSize:13,fontWeight:700,color:etapaColor}}>{lead.etapa||"En revisión"}</span>
+          </div>
+        </div>
+        <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",padding:"20px 24px",marginBottom:16}}>
+          <div style={{fontSize:11,color:"#888",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:16}}>Datos de tu postulación</div>
+          {[["📅","Postulado el",new Date(lead.created_at).toLocaleDateString("es-CL",{day:"2-digit",month:"long",year:"numeric"})],["📋","Campaña",lead.origen],["📍","País",lead.pais],["📞","Teléfono",lead.telefono],["📧","Correo",lead.email]].filter(([,,v])=>v).map(([icon,k,v])=>(
+            <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #f4f5f7"}}>
+              <span style={{fontSize:13,color:"#888"}}>{icon} {k}</span>
+              <span style={{fontSize:13,color:"#1a1a1a",fontWeight:600,textAlign:"right",maxWidth:"55%"}}>{v}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",padding:"20px 24px"}}>
+            <div style={{fontSize:11,color:"#888",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:16}}>Historial de tu postulación</div>
+            <div style={{position:"relative",paddingLeft:28}}>
+              <div style={{position:"absolute",left:10,top:0,bottom:0,width:2,background:"#e4e7ec"}}/>
+              {historialCompleto.map((h,i)=>(
+                <div key={i} style={{marginBottom:16,position:"relative"}}>
+                  <div style={{position:"absolute",left:-24,top:2,width:10,height:10,borderRadius:"50%",background:ETAPA_COLOR[h.etapa_nueva]||"#F47B20",border:"2px solid #fff",boxShadow:i===historialCompleto.length-1?"0 0 0 3px "+((ETAPA_COLOR[h.etapa_nueva]||"#F47B20")+"33"):"none"}}/>
+                  <div style={{fontSize:13,fontWeight:700,color:ETAPA_COLOR[h.etapa_nueva]||"#1a1a1a"}}>{ETAPA_ICON[h.etapa_nueva]||"📋"} {h.etapa_nueva}{i===historialCompleto.length-1&&<span style={{fontSize:10,background:"#F47B20",color:"#fff",borderRadius:10,padding:"1px 7px",marginLeft:6,fontWeight:600}}>Actual</span>}</div>
+                  <div style={{fontSize:11,color:"#888",marginTop:2}}>{new Date(h.created_at).toLocaleDateString("es-CL",{day:"2-digit",month:"short",year:"numeric"})} · {new Date(h.created_at).toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminLogin({ onSuccess, onClose }) {
+  const [clave,setClave]=useState("");
+  const [error,setError]=useState("");
+  const [show,setShow]=useState(false);
+  function login() {
+    if(clave===SUPERADMIN_KEY){sessionStorage.setItem("admin_auth","1");onSuccess();}
+    else{setError("Clave incorrecta.");setClave("");}
+  }
+  return (
+    <div className="login-wrap">
+      <div className="login-card">
+        <div style={{textAlign:"center",marginBottom:28}}>
+          <div style={{background:"#1a3a6b",borderRadius:10,padding:"10px 20px",display:"inline-flex",alignItems:"center"}}>
+            <span style={{color:"#F47B20",fontSize:20,fontWeight:700}}>big</span>
+            <span style={{color:"#fff",fontSize:20,fontWeight:700}}>ticket</span>
+          </div>
+        </div>
+        <div style={{fontSize:16,fontWeight:600,color:"#1a1a1a",marginBottom:6,textAlign:"center"}}>Acceso administrador</div>
+        <div style={{fontSize:13,color:"#888",textAlign:"center",marginBottom:24}}>Solo para personal autorizado BigTicket</div>
+        {error&&<div className="login-error">{error}</div>}
+        <div className="field-row">
+          <span className="field-label">Clave de acceso</span>
+          <div className="input-wrap">
+            <input type={show?"text":"password"} value={clave} onChange={e=>{setClave(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&login()} placeholder="Ingresa tu clave" autoFocus/>
+            <button className="eye-btn" onClick={()=>setShow(!show)}>{show?"🙈":"👁"}</button>
+          </div>
+        </div>
+        <button className="btn-blue" onClick={login} style={{width:"100%",marginTop:8}}>Ingresar</button>
+        <div style={{textAlign:"center",marginTop:16}}>
+          <button className="btn-back" style={{fontSize:12,color:"#888"}} onClick={onClose}>← Volver al portal</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminPanel({ onClose, campaigns, setCampaigns }) {
+  const [tab,setTab]=useState("camps");
+  const [postulaciones,setPostulaciones]=useState([]);
+  const [loadingPost,setLoadingPost]=useState(false);
+  const [uploadingId,setUploadingId]=useState(null);
+
+  useEffect(()=>{if(tab==="postulaciones")loadPost();},[tab]);
+
+  async function loadPost() {
+    setLoadingPost(true);
+    const {data}=await sb.from("postulaciones").select("*, leads(nombre,telefono), campanas(nombre)").order("created_at",{ascending:false}).limit(50);
+    setPostulaciones(data||[]);setLoadingPost(false);
+  }
+  async function toggleCamp(camp) {
+    const v=!camp.toggle_activo;
+    await sb.from("campanas").update({toggle_activo:v}).eq("id",camp.id);
+    setCampaigns(campaigns.map(c=>c.id===camp.id?{...c,toggle_activo:v}:c));
+  }
+  async function deleteCamp(id) {
+    if(!confirm("¿Eliminar esta campaña?"))return;
+    await sb.from("campanas").delete().eq("id",id);
+    setCampaigns(campaigns.filter(c=>c.id!==id));
+  }
+  async function subirPropuesta(camp, file) {
+    if(!file) return;
+    if(file.type!=="application/pdf"){alert("Solo se permiten archivos PDF.");return;}
+    setUploadingId(camp.id);
+    try {
+      const path=`campana_${camp.id}.pdf`;
+      const {error:upErr}=await sb.storage.from("propuestas").upload(path, file, {upsert:true, contentType:"application/pdf"});
+      if(upErr) throw upErr;
+      const {data:urlData}=sb.storage.from("propuestas").getPublicUrl(path);
+      const url=urlData.publicUrl;
+      await sb.from("campanas").update({propuesta_url:url}).eq("id",camp.id);
+      setCampaigns(campaigns.map(c=>c.id===camp.id?{...c,propuesta_url:url}:c));
+      alert("✅ Propuesta cargada correctamente.");
+    } catch(e){alert("Error subiendo PDF: "+e.message);}
+    finally{setUploadingId(null);}
+  }
 
   return (
-    <div style={{display:"flex",flexDirection:"column",gap:16}}>
-
-      {/* Header */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+    <div>
+      <div style={{background:"#1a3a6b",padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <div>
-          <div style={{fontSize:16,fontWeight:800,color:"#1a1a1a",fontFamily:"'Outfit',sans-serif"}}>
-            Configuración del Score
-          </div>
-          <div style={{fontSize:11,color:"#555555",marginTop:2}}>
-            Ajusta las dimensiones y puntajes · Los cambios aplican en el próximo cálculo de N8N
-          </div>
+          <div style={{color:"#fff",fontSize:15,fontWeight:600}}>Panel administrador</div>
+          <div style={{color:"#aac3e8",fontSize:12}}>BigTicket — Gestión de campañas</div>
         </div>
-        <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          {saved && <span style={{fontSize:11,color:"#10B981"}}>✓ Guardado en Supabase</span>}
-          <Btn onClick={()=>{ setEditandoDim(null); setFormDim({nombre:"",dimension:"",descripcion:""}); setModalDim(true); }}>
-            + Nueva dimensión
-          </Btn>
-        </div>
+        <button className="btn-gw" onClick={onClose}>Ver portal →</button>
       </div>
-
-      {/* Score total estimado */}
-      <div style={{background:"linear-gradient(135deg,#1a3a6b,#1a3a6b)",border:"1px solid #e4e7ec",
-        borderRadius:12,padding:16,display:"flex",gap:20,alignItems:"center"}}>
-        <div>
-          <div style={{fontSize:10,fontWeight:800,color:"#555555",letterSpacing:1,textTransform:"uppercase"}}>
-            Puntaje máximo posible
-          </div>
-          <div style={{fontSize:40,fontWeight:900,color:getScoreColor(totalPuntos),fontFamily:"monospace"}}>
-            {totalPuntos}
-          </div>
-        </div>
-        <div style={{flex:1}}>
-          <div style={{height:8,background:"#f4f5f7",borderRadius:4}}>
-            <div style={{height:"100%",width:`${Math.min(totalPuntos,100)}%`,
-              background:getScoreColor(totalPuntos),borderRadius:4,transition:"width .8s"}}/>
-          </div>
-          <div style={{fontSize:10,color:"#555555",marginTop:4}}>
-            Umbrales: Lead Frío &lt;40 · Prospecto 41-70 · Candidato 71-85 · Lead Caliente &gt;86
-          </div>
-        </div>
+      <div className="admin-nav">
+        {[["camps","Campañas"],["nueva","Nueva campaña"],["postulaciones","Postulaciones"],["canales","Canales"],["centros_mx","Centros México"]].map(([k,l])=>(
+          <button key={k} className={`nav-btn ${tab===k?"active":""}`} onClick={()=>setTab(k)}>{l}</button>
+        ))}
       </div>
-
-      {/* Dimensiones */}
-      {loading ? <Spinner/> : (
-        <div style={{display:"flex",flexDirection:"column",gap:12}}>
-          {dimensiones.map(dim=>{
-            const maxPts = (dim.reglas||[]).reduce((a,r)=>Math.max(a,r.puntos||0),0);
-            return (
-              <div key={dim.id} style={{background:"#ffffff",border:`1px solid ${dim.activa?"#e4e7ec":"#f4f5f7"}`,
-                borderRadius:12,overflow:"hidden",opacity:dim.activa?1:.5,transition:"all .2s"}}>
-
-                {/* Header dimensión */}
-                <div style={{padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",
-                  borderBottom:"1px solid #f4f5f7"}}>
-                  <div>
-                    <div style={{fontSize:13,fontWeight:800,color:"#1a1a1a"}}>{dim.nombre}</div>
-                    {dim.descripcion && <div style={{fontSize:11,color:"#555555",marginTop:2}}>{dim.descripcion}</div>}
-                  </div>
-                  <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                    <div style={{textAlign:"center"}}>
-                      <div style={{fontSize:18,fontWeight:900,color:getScoreColor(maxPts),fontFamily:"monospace"}}>{maxPts}</div>
-                      <div style={{fontSize:8,color:"#aaaaaa"}}>MAX PTS</div>
-                    </div>
-                    <button onClick={()=>toggleDim(dim)}
-                      style={{background:dim.activa?"#10B98122":"#f4f5f7",color:dim.activa?"#10B981":"#475569",
-                        border:`1px solid ${dim.activa?"#10B98144":"#aaaaaa"}`,borderRadius:6,
-                        padding:"4px 10px",fontSize:10,cursor:"pointer",fontWeight:700}}>
-                      {dim.activa?"Activa":"Inactiva"}
-                    </button>
-                    <Btn onClick={()=>abrirRegla(dim)} color="#3B82F6" outline small>+ Regla</Btn>
-                    <Btn onClick={()=>eliminarDim(dim.id)} color="#EF4444" outline small>🗑</Btn>
-                  </div>
-                </div>
-
-                {/* Reglas */}
-                <div style={{padding:12,display:"flex",flexDirection:"column",gap:6}}>
-                  {(dim.reglas||[]).map((regla,idx)=>(
-                    <div key={idx} style={{display:"flex",alignItems:"center",gap:10,
-                      background:"#f0f2f5",borderRadius:8,padding:"8px 12px"}}>
+      <div className="pg">
+        {tab==="camps"&&(
+          <div>
+            <div className="sec-title" style={{marginBottom:16}}>Campañas creadas</div>
+            {campaigns.length===0?<div className="empty">No hay campañas aún.</div>:
+              campaigns.map(c=>{
+                const active=isCampActive(c);
+                return (
+                  <div key={c.id} className="camp-row" style={{flexDirection:"column",alignItems:"flex-start",gap:12}}>
+                    <div style={{display:"flex",width:"100%",alignItems:"center",gap:10}}>
                       <div style={{flex:1}}>
-                        <div style={{fontSize:12,color:"#1a1a1a",fontWeight:600}}>{regla.etiqueta}</div>
-                        {regla.palabras_clave?.length>0 && (
-                          <div style={{display:"flex",gap:4,marginTop:4,flexWrap:"wrap"}}>
-                            {regla.palabras_clave.map(k=>(
-                              <span key={k} style={{background:"#f4f5f7",color:"#888888",border:"1px solid #aaaaaa",
-                                borderRadius:4,padding:"1px 6px",fontSize:9,fontFamily:"monospace"}}>{k}</span>
-                            ))}
-                          </div>
-                        )}
-                        {regla.palabras_clave?.length===0 && (
-                          <div style={{fontSize:9,color:"#aaaaaa",marginTop:2}}>Sin palabras clave (condición por defecto)</div>
-                        )}
-                      </div>
-                      <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                        <div style={{textAlign:"center",minWidth:40}}>
-                          <div style={{fontSize:16,fontWeight:900,color:getScoreColor(regla.puntos),fontFamily:"monospace"}}>
-                            +{regla.puntos}
-                          </div>
-                          <div style={{fontSize:8,color:"#aaaaaa"}}>PTS</div>
+                        <div style={{fontSize:14,fontWeight:600,color:"#1a1a1a"}}>{c.nombre}
+                          <span style={{fontSize:11,padding:"2px 8px",borderRadius:20,marginLeft:8,background:active?"#dcfce7":"#fee2e2",color:active?"#166534":"#c0392b"}}>{active?"Activa":"Inactiva"}</span>
                         </div>
-                        <Btn onClick={()=>abrirRegla(dim,idx)} color="#F59E0B" outline small>✏️</Btn>
-                        <Btn onClick={()=>eliminarRegla(dim,idx)} color="#EF4444" outline small>×</Btn>
+                        <div style={{fontSize:12,color:"#888",marginTop:2}}>{c.pais} · {c.vehiculo} · Score máx: {c.score_max} pts{c.fecha_inicio?` · ${c.fecha_inicio} → ${c.fecha_fin}`:""}</div>
+                      </div>
+                      <div style={{display:"flex",alignItems:"center",gap:10}}>
+                        <Toggle on={c.toggle_activo} onChange={()=>toggleCamp(c)}/>
+                        <button className="btn-danger" onClick={()=>deleteCamp(c.id)}>Eliminar</button>
                       </div>
                     </div>
-                  ))}
-                  {(dim.reglas||[]).length===0 && (
-                    <div style={{textAlign:"center",color:"#aaaaaa",fontSize:11,padding:10}}>
-                      Sin reglas · Haz clic en "+ Regla" para agregar
+                    {/* Propuesta PDF */}
+                    <div style={{width:"100%",background:"#f8f9fa",borderRadius:10,padding:"12px 14px",border:"1px solid #e4e7ec"}}>
+                      <div style={{fontSize:12,fontWeight:700,color:"#1a1a1a",marginBottom:8}}>📄 Propuesta económica</div>
+                      {c.propuesta_url?(
+                        <div style={{display:"flex",alignItems:"center",gap:10}}>
+                          <span style={{fontSize:12,color:"#10B981"}}>✅ PDF cargado</span>
+                          <a href={c.propuesta_url} target="_blank" style={{fontSize:12,color:"#1a3a6b",fontWeight:600}}>Ver PDF</a>
+                          <label style={{fontSize:12,color:"#F47B20",fontWeight:600,cursor:"pointer"}}>
+                            Reemplazar
+                            <input type="file" accept=".pdf" style={{display:"none"}} onChange={e=>subirPropuesta(c,e.target.files[0])}/>
+                          </label>
+                        </div>
+                      ):(
+                        <label style={{display:"inline-flex",alignItems:"center",gap:8,background:"#F47B20",color:"#fff",borderRadius:8,padding:"8px 16px",fontSize:12,fontWeight:700,cursor:"pointer",opacity:uploadingId===c.id?0.6:1}}>
+                          {uploadingId===c.id?"Subiendo...":"⬆ Subir propuesta PDF"}
+                          <input type="file" accept=".pdf" style={{display:"none"}} disabled={uploadingId===c.id} onChange={e=>subirPropuesta(c,e.target.files[0])}/>
+                        </label>
+                      )}
                     </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Modal nueva dimensión */}
-      {modalDim && (
-        <Modal title={editandoDim?"Editar dimensión":"Nueva dimensión"} onClose={()=>setModalDim(false)}>
-          <div style={{display:"flex",flexDirection:"column",gap:14}}>
-            <div>
-              <Label>Nombre</Label>
-              <Input value={formDim.nombre} onChange={e=>setFormDim(p=>({...p,nombre:e.target.value}))}
-                placeholder="Ej: Tipo de Vehículo"/>
-            </div>
-            <div>
-              <Label>Descripción (opcional)</Label>
-              <Input value={formDim.descripcion} onChange={e=>setFormDim(p=>({...p,descripcion:e.target.value}))}
-                placeholder="Ej: Tipo de vehículo que necesita el prospecto"/>
-            </div>
-            <div style={{display:"flex",gap:8}}>
-              <Btn onClick={()=>setModalDim(false)} color="#475569" outline>Cancelar</Btn>
-              <button onClick={guardarDim} disabled={saving}
-                style={{flex:1,background:"#3B82F6",color:"white",border:"none",borderRadius:8,
-                  padding:"10px",fontSize:12,cursor:"pointer",fontWeight:800,
-                  fontFamily:"'Outfit',sans-serif"}}>
-                {saving?"Guardando...":"✅ Crear dimensión"}
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* Modal nueva/editar regla */}
-      {modalRegla && (
-        <Modal title={editandoReglaIdx!==null?"Editar regla":"Nueva regla"} onClose={()=>setModalRegla(null)}>
-          <div style={{display:"flex",flexDirection:"column",gap:14}}>
-            <div style={{background:"#f0f2f5",borderRadius:8,padding:10,fontSize:11,color:"#555555"}}>
-              Dimensión: <span style={{color:"#1a1a1a",fontWeight:700}}>{modalRegla.nombre}</span>
-            </div>
-            <div>
-              <Label>Etiqueta de la regla</Label>
-              <Input value={formRegla.etiqueta} onChange={e=>setFormRegla(p=>({...p,etiqueta:e.target.value}))}
-                placeholder="Ej: Zona principal"/>
-            </div>
-            <div>
-              <Label>Palabras clave (separadas por coma)</Label>
-              <Input value={formRegla.palabras_clave} onChange={e=>setFormRegla(p=>({...p,palabras_clave:e.target.value}))}
-                placeholder="Ej: santiago, providencia, las condes"/>
-              <div style={{fontSize:9,color:"#aaaaaa",marginTop:4}}>
-                Déjalo vacío para que sea la condición por defecto (cuando no coincide ninguna otra)
-              </div>
-            </div>
-            <div>
-              <Label>Puntos a otorgar</Label>
-              <Input value={formRegla.puntos} onChange={e=>setFormRegla(p=>({...p,puntos:e.target.value}))}
-                type="number" placeholder="Ej: 15"/>
-            </div>
-            <div style={{display:"flex",gap:8}}>
-              <Btn onClick={()=>setModalRegla(null)} color="#475569" outline>Cancelar</Btn>
-              <button onClick={guardarRegla} disabled={saving}
-                style={{flex:1,background:"#3B82F6",color:"white",border:"none",borderRadius:8,
-                  padding:"10px",fontSize:12,cursor:"pointer",fontWeight:800,
-                  fontFamily:"'Outfit',sans-serif"}}>
-                {saving?"Guardando...":"✅ Guardar regla"}
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
-    </div>
-  );
-};
-
-// ─── LEAD CARD ────────────────────────────────────────────────────────────────
-const LeadCard = ({ lead, onSelect, onDragStart }) => {
-  const cfg=ETAPA_CFG[lead.etapa]||{color:"#888888"};
-  return (
-    <div draggable onDragStart={(e)=>onDragStart(e,lead)} onClick={()=>onSelect(lead)}
-      style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:10,
-        padding:12,cursor:"grab",transition:"all .2s",userSelect:"none"}}
-      onMouseEnter={e=>{e.currentTarget.style.borderColor=cfg.color;e.currentTarget.style.transform="translateY(-2px)";}}
-      onMouseLeave={e=>{e.currentTarget.style.borderColor="#e4e7ec";e.currentTarget.style.transform="translateY(0)";}}>
-      <div style={{display:"flex",justifyContent:"space-between",marginBottom:7}}>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:12,fontWeight:700,color:"#1a1a1a",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{lead.nombre||"Sin nombre"}</div>
-          <div style={{fontSize:10,color:"#555555",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{lead.empresa||"Sin empresa"}</div>
-        </div>
-        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3}}>
-          <ScoreDot score={lead.score}/>
-          {lead.pais&&<PaisFlag pais={lead.pais}/>}
-        </div>
-      </div>
-      <div style={{marginBottom:6}}><CanalTag canal={lead.canal}/></div>
-      {lead.volumen&&<div style={{fontSize:10,color:"#555555"}}>📦 {lead.volumen}</div>}
-      <div style={{fontSize:10,color:"#aaaaaa",marginTop:3}}>⏱ {formatFecha(lead.updated_at)}</div>
-      {lead.clasificacion&&(
-        <div style={{marginTop:6}}>
-          <Tag label={`${lead.emoji||""} ${lead.clasificacion}`}
-            color={lead.clasificacion?.includes("Caliente")?"#EF4444":lead.clasificacion?.includes("Candidato")?"#F59E0B":"#F97316"}/>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const KanbanCol = ({ etapa, leads, onSelect, onDragStart, onDrop, isDragOver, setDragOver }) => {
-  const cfg=ETAPA_CFG[etapa]||{color:"#888888",icon:"•"};
-  return (
-    <div style={{width:ETAPAS_CIERRE.includes(etapa)?220:245,flexShrink:0,display:"flex",flexDirection:"column",height:"100%"}}
-      onDragOver={e=>{e.preventDefault();setDragOver(etapa);}}
-      onDragLeave={()=>setDragOver(null)}
-      onDrop={e=>{onDrop(e,etapa);setDragOver(null);}}>
-      <div style={{padding:"8px 12px",background:"#ffffff",borderRadius:"10px 10px 0 0",flexShrink:0,
-        borderBottom:`2px solid ${isDragOver?cfg.color:"#888888"}`,
-        display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <span style={{fontSize:10,fontWeight:800,color:isDragOver?cfg.color:"#888888",textTransform:"uppercase",letterSpacing:1}}>{cfg.icon} {etapa}</span>
-        <span style={{fontSize:10,fontWeight:800,background:cfg.color+"22",color:cfg.color,padding:"2px 8px",borderRadius:20}}>{leads.length}</span>
-      </div>
-      <div style={{flex:1,overflowY:"auto",background:isDragOver?cfg.color+"08":"#f0f2f5",borderRadius:"0 0 10px 10px",
-        padding:8,display:"flex",flexDirection:"column",gap:7,minHeight:120,
-        border:isDragOver?`1px dashed ${cfg.color}44`:"1px solid transparent"}}>
-        {leads.map(lead=><LeadCard key={lead.id} lead={lead} onSelect={onSelect} onDragStart={onDragStart}/>)}
-        {leads.length===0&&(
-          <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",
-            color:isDragOver?cfg.color:"#888888",fontSize:12,minHeight:80}}>
-            {isDragOver?"Soltar aquí":"Sin leads"}
+                  </div>
+                );
+              })
+            }
           </div>
         )}
+        {tab==="nueva"&&<NuevaCampana campaigns={campaigns} setCampaigns={setCampaigns} onDone={()=>setTab("camps")}/>}
+        {tab==="postulaciones"&&(
+          <div>
+            <div className="sec-title" style={{marginBottom:4}}>Postulaciones recibidas</div>
+            <div className="sec-sub">Todas migran automáticamente al pipeline de LogiFlow CRM</div>
+            {loadingPost?<div className="loading">Cargando...</div>:
+              postulaciones.length===0?<div className="empty">No hay postulaciones aún.</div>:
+              postulaciones.map(p=>{
+                const ch=CANALES[p.canal]||CANALES.portal;
+                return (
+                  <div key={p.id} className="post-row">
+                    <div className="ch-dot" style={{background:ch.color}}>{ch.initial}</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:14,fontWeight:600,color:"#1a1a1a"}}>{p.leads?.nombre||"Sin nombre"}</div>
+                      <div style={{fontSize:12,color:"#888"}}>{p.campanas?.nombre||"Postulación libre"} · {ch.label} · {new Date(p.created_at).toLocaleDateString("es-CL")}</div>
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{fontSize:16,fontWeight:700,color:"#1a3a6b"}}>{p.score_calculado} pts</div>
+                      <div style={{fontSize:11,color:"#888"}}>CRM LogiFlow</div>
+                    </div>
+                  </div>
+                );
+              })
+            }
+          </div>
+        )}
+        {tab==="canales"&&<CanalesView postulaciones={postulaciones} onLoad={loadPost}/>}
+        {tab==="centros_mx"&&<CentrosMxAdmin/>}
       </div>
     </div>
   );
-};
+}
 
-const Pipeline = ({ leads, onSelect, onEtapaChange }) => {
-  const [dragLead,setDragLead]=useState(null);
-  const [dragOver,setDragOver]=useState(null);
-  const handleDragStart=(e,lead)=>{setDragLead(lead);e.dataTransfer.effectAllowed="move";};
-  const handleDrop=async(e,nuevaEtapa)=>{e.preventDefault();if(!dragLead||dragLead.etapa===nuevaEtapa)return;await onEtapaChange(dragLead,nuevaEtapa);setDragLead(null);};
-  const normalizarEtapa=(e)=>{
-    if(!e) return "Nuevo Lead";
-    const mapa={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};
-    return mapa[e.toLowerCase().trim()]||e;
+
+function CentrosMxAdmin() {
+  const CENTROS_DEFAULT = [
+    "SMX1 San Jerónimo Tepetlacalco","SMX2 Complejo Industrial Tecnológico/Iztapalapa",
+    "SMX3 Lomas de Santo Domingo Reacomodo","SMX4 Bondojito","SMX5 Iztapalapa",
+    "SMX6 Industrial Tlaxcoapan","SMX7 Cuajimalpa","SMX8 Los Héroes Tecámac / Ojo de agua",
+    "SMX9 Granjas México, Iztacalco","SMX10 Vallejo","SMX11 Outlets Punta Norte",
+    "SCQ1 Colima","STX1 Tlaxcala","SHP1 Pachuca","SCY1 Celaya","SLT1 Toluca",
+    "SPV1 Puebla","SVR1 Veracruz","SVH1 Villahermosa",
+  ];
+  const [centros,setCentros]=useState(()=>{
+    try{const s=localStorage.getItem("centros_mx");return s?JSON.parse(s):CENTROS_DEFAULT;}
+    catch{return CENTROS_DEFAULT;}
+  });
+  const [nuevo,setNuevo]=useState("");
+  const [error,setError]=useState("");
+
+  const guardar=(lista)=>{
+    setCentros(lista);
+    try{localStorage.setItem("centros_mx",JSON.stringify(lista));}catch(e){}
   };
-  const lpe=(etapa)=>leads.filter(l=>normalizarEtapa(l.etapa)===etapa);
-  return (
-    <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
-      <div style={{fontSize:10,color:"#aaaaaa",textAlign:"center",padding:"4px 0 8px",flexShrink:0}}>
-        💡 Arrastra tarjetas entre columnas · O haz clic para abrir el detalle
-      </div>
-      <div style={{flex:1,overflowX:"auto",overflowY:"hidden"}}>
-        <div style={{display:"flex",gap:10,minWidth:"fit-content",height:"100%"}}>
-          {ETAPAS_PIPELINE.map(e=><KanbanCol key={e} etapa={e} leads={lpe(e)} onSelect={onSelect} onDragStart={handleDragStart} onDrop={handleDrop} isDragOver={dragOver===e} setDragOver={setDragOver}/>)}
-          <div style={{width:2,background:"linear-gradient(to bottom,transparent,#aaaaaa,transparent)",borderRadius:4,flexShrink:0,margin:"0 4px"}}/>
-          {ETAPAS_CIERRE.map(e=><KanbanCol key={e} etapa={e} leads={lpe(e)} onSelect={onSelect} onDragStart={handleDragStart} onDrop={handleDrop} isDragOver={dragOver===e} setDragOver={setDragOver}/>)}
+  const agregar=()=>{
+    const val=nuevo.trim();
+    if(!val){setError("Ingresa el nombre del centro.");return;}
+    if(centros.includes(val)){setError("Ese centro ya existe.");return;}
+    guardar([...centros,val]);
+    setNuevo("");setError("");
+  };
+  const eliminar=(c)=>{
+    if(!confirm(`¿Eliminar "${c}"?`))return;
+    guardar(centros.filter(x=>x!==c));
+  };
+
+  return(
+    <div>
+      <div className="sec-title" style={{marginBottom:4}}>Centros de distribución México</div>
+      <div className="sec-sub">Estos valores aparecen en el selector de Estado/Centro al postular desde México</div>
+      <div style={{background:"#fff",borderRadius:12,border:"0.5px solid #e4e7ec",padding:"16px 20px",marginBottom:16,marginTop:16}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a",marginBottom:12}}>Agregar nuevo centro</div>
+        <div style={{display:"flex",gap:8}}>
+          <input value={nuevo} onChange={e=>{setNuevo(e.target.value);setError("");}}
+            onKeyDown={e=>e.key==="Enter"&&agregar()}
+            placeholder="Ej: SMX12 Nuevo Centro" style={{flex:1,padding:"9px 12px",borderRadius:8,border:"0.5px solid #d0d5dd",fontSize:13}}/>
+          <button onClick={agregar} className="btn-orange" style={{width:"auto",padding:"9px 20px",marginTop:0}}>+ Agregar</button>
         </div>
+        {error&&<div style={{fontSize:12,color:"#c0392b",marginTop:6}}>⚠ {error}</div>}
       </div>
-    </div>
-  );
-};
-
-// ─── KPIs ─────────────────────────────────────────────────────────────────────
-const KPIsView = ({ leads }) => {
-  const [descargando,setDescargando]=useState(false);
-  const reporteRef=useRef(null);
-  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
-
-  const descargarPDF=async()=>{
-    if(!reporteRef.current) return;
-    setDescargando(true);
-    try {
-      if(!window.html2canvas){const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";document.head.appendChild(s);await new Promise(r=>s.onload=r);}
-      if(!window.jspdf){const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";document.head.appendChild(s);await new Promise(r=>s.onload=r);}
-      const canvas=await window.html2canvas(reporteRef.current,{scale:2,backgroundColor:"#f0f2f5",useCORS:true});
-      const imgData=canvas.toDataURL("image/png");
-      const {jsPDF}=window.jspdf;
-      const pdf=new jsPDF({orientation:"portrait",unit:"mm",format:"a4"});
-      const pdfW=pdf.internal.pageSize.getWidth();
-      const pdfH=(canvas.height*pdfW)/canvas.width;
-      pdf.addImage(imgData,"PNG",0,0,pdfW,pdfH);
-      pdf.save(`BigTicket_KPIs_Generales_${new Date().toLocaleDateString("es-CL").replace(/\//g,"-")}.pdf`);
-    } catch(e){alert("Error generando PDF: "+e.message);}
-    finally{setDescargando(false);}
-  };
-
-  const ganados=leads.filter(l=>norm(l.etapa)==="Postulante Aprobado"),perdidos=leads.filter(l=>norm(l.etapa)==="Postulante No Calificado");
-  const cerrados=ganados.length+perdidos.length;
-  const tasaCierre=cerrados>0?Math.round((ganados.length/cerrados)*100):0;
-  const tiempos=ganados.map(l=>diasEntre(l.created_at,l.updated_at)).filter(d=>d!==null);
-  const tiempoPromedio=tiempos.length?Math.round(tiempos.reduce((a,b)=>a+b,0)/tiempos.length):null;
-  const canales={};
-  leads.forEach(l=>{const c=(l.fuente_contacto||l.canal||"desconocido").toLowerCase();if(!canales[c])canales[c]={total:0,ganados:0};canales[c].total++;if(norm(l.etapa)==="Postulante Aprobado")canales[c].ganados++;});
-  const canalStats=Object.entries(canales).map(([canal,d])=>({canal,total:d.total,ganados:d.ganados,eficacia:d.total>0?Math.round((d.ganados/d.total)*100):0})).sort((a,b)=>b.eficacia-a.eficacia);
-  const canalEficaz=canalStats[0],canalMenos=canalStats[canalStats.length-1],canalVol=[...canalStats].sort((a,b)=>b.total-a.total)[0];
-  const scoreEtapa=ETAPAS_TODAS.map(e=>{const ls=leads.filter(l=>norm(l.etapa)===e);return{etapa:e,score:ls.length?Math.round(ls.reduce((a,l)=>a+(l.score||0),0)/ls.length):0,count:ls.length};}).filter(e=>e.count>0);
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:16}} ref={reporteRef}>
-      <div style={{display:"flex",justifyContent:"flex-end"}}>
-        <button onClick={descargarPDF} disabled={descargando}
-          style={{background:"#1a3a6b",color:"white",border:"none",borderRadius:8,padding:"9px 18px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif",opacity:descargando?0.6:1}}>
-          {descargando?"Generando...":"⬇ Descargar PDF"}
-        </button>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
-        {[["✅","Tasa de cierre",`${tasaCierre}%`,"#10B981",`${ganados.length} postulantes aprobados de ${cerrados}`],["⏱","Tiempo promedio",tiempoPromedio!==null?`${tiempoPromedio}d`:"—","#3B82F6","Días lead→Postulante Aprobado"],["📝","Postulantes Aprobados",ganados.length,"#10B981",`${perdidos.length} no calificados`],["🚫","Postulantes No Calificados",perdidos.length,"#EF4444",`${cerrados>0?Math.round((perdidos.length/cerrados)*100):0}% del total cerrado`]].map(([icon,label,val,color,sub])=>(
-          <div key={label} style={{background:"#ffffff",border:`1px solid ${color}22`,borderRadius:12,padding:16}}>
-            <div style={{fontSize:22}}>{icon}</div>
-            <div style={{fontSize:28,fontWeight:900,color,fontFamily:"monospace",marginTop:6}}>{val}</div>
-            <div style={{fontSize:11,color:"#555555",fontWeight:700,marginTop:2}}>{label}</div>
-            <div style={{fontSize:10,color:"#aaaaaa",marginTop:3}}>{sub}</div>
+      <div style={{background:"#fff",borderRadius:12,border:"0.5px solid #e4e7ec",padding:"16px 20px"}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a",marginBottom:12}}>Centros activos ({centros.length})</div>
+        {centros.map((c,i)=>(
+          <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 0",borderBottom:"0.5px solid #f4f5f7"}}>
+            <span style={{fontSize:13,color:"#1a1a1a"}}>{c}</span>
+            <button onClick={()=>eliminar(c)} className="btn-danger">Eliminar</button>
           </div>
         ))}
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
-        {[["🏆","Canal más eficaz",canalEficaz,"#10B981"],["⚠️","Canal menos eficaz",canalMenos,"#EF4444"],["📊","Mayor volumen",canalVol,"#3B82F6"]].map(([icon,label,canal,color])=>{
-          if(!canal)return null;
-          const cfg=getCanalCfg(canal.canal);
-          return(
-            <div key={label} style={{background:"#ffffff",border:`1px solid ${color}22`,borderRadius:12,padding:16}}>
-              <div style={{fontSize:11,fontWeight:800,color:"#555555",letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>{icon} {label}</div>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-                <span style={{fontSize:24}}>{cfg.icon}</span>
-                <div><div style={{fontSize:16,fontWeight:800,color:cfg.color}}>{cfg.label}</div><div style={{fontSize:11,color:"#555555"}}>{canal.total} leads</div></div>
-              </div>
-              <div style={{display:"flex",gap:16}}>
-                <div style={{textAlign:"center"}}><div style={{fontSize:22,fontWeight:900,color,fontFamily:"monospace"}}>{canal.eficacia}%</div><div style={{fontSize:9,color:"#555555"}}>EFICACIA</div></div>
-                <div style={{textAlign:"center"}}><div style={{fontSize:22,fontWeight:900,color:"#10B981",fontFamily:"monospace"}}>{canal.ganados}</div><div style={{fontSize:9,color:"#555555"}}>FIRMADOS</div></div>
-              </div>
+    </div>
+  );
+}
+
+function newField() {
+  return {_id:Date.now()+Math.random(),variable:"",tipo:"sino",pregunta:"",opciones:[{valor:"si",puntos:10}]};
+}
+
+function NuevaCampana({ campaigns, setCampaigns, onDone }) {
+  const empty={nombre:"",pais:"Chile",vehiculo:"Furgón",volumen_m3:"",cantidad:"",zona:"",factura:"Sí requiere factura",modalidad_pago:"Semanal",disponibilidad:"Diurno",experiencia_anios:"0",ingreso_rango:"",descripcion:"",fecha_inicio:"",fecha_fin:""};
+  const [f,setF]=useState(empty);
+  const [scoreFields,setScoreFields]=useState([newField()]);
+  const [saving,setSaving]=useState(false);
+
+  function upd(k,v){setF(prev=>({...prev,[k]:v}));}
+  function totalScore(){return scoreFields.reduce((s,sf)=>s+maxScoreField(sf),0);}
+  function usedVars(){return scoreFields.map(sf=>sf.variable).filter(Boolean);}
+
+  async function save() {
+    if(!f.nombre){alert("Ingresa el nombre de la campaña.");return;}
+    if(f.fecha_inicio&&f.fecha_fin&&f.fecha_inicio>f.fecha_fin){alert("Fecha inicio no puede ser mayor a fecha fin.");return;}
+    setSaving(true);
+    try {
+      const autoOn=!f.fecha_inicio||new Date(f.fecha_inicio)<=new Date();
+      const scoreMax=totalScore();
+      const {data:camp,error}=await sb.from("campanas").insert({
+        nombre:f.nombre,pais:f.pais,vehiculo:f.vehiculo,
+        volumen_m3:f.volumen_m3||null,cantidad:parseInt(f.cantidad)||null,
+        zona:f.zona||null,factura:f.factura.includes("Sí")?"Sí":"No",
+        modalidad_pago:f.modalidad_pago,disponibilidad:f.disponibilidad,
+        experiencia_anios:parseInt(f.experiencia_anios)||0,
+        ingreso_rango:f.ingreso_rango||null,descripcion:f.descripcion||null,
+        toggle_activo:autoOn,fecha_inicio:f.fecha_inicio||null,
+        fecha_fin:f.fecha_fin||null,score_max:scoreMax,
+      }).select().single();
+      if(error)throw error;
+      const valid=scoreFields.filter(sf=>sf.variable&&sf.pregunta);
+      if(valid.length>0){
+        const varsToInsert=valid.map((sf,i)=>({
+          campana_id:camp.id,
+          variable:sf.variable,
+          pregunta:sf.pregunta,
+          tipo:sf.tipo,
+          opciones:JSON.stringify(sf.opciones),
+          puntos:maxScoreField(sf),
+          orden:i,
+        }));
+        const {error:ve}=await sb.from("campana_variables").insert(varsToInsert);
+        if(ve){
+          await sb.from("campanas").delete().eq("id",camp.id);
+          throw new Error("Error guardando preguntas: "+ve.message);
+        }
+      }
+      setCampaigns([...campaigns,camp]);
+      alert(`Campaña "${f.nombre}" creada con ${valid.length} pregunta(s) de scoring.`);
+      onDone();
+    } catch(e){alert("Error: "+e.message);}
+    finally{setSaving(false);}
+  }
+
+  const total=totalScore();
+  const scoreColor=total>100?"#c0392b":total>=80?"#e65100":"#166534";
+
+  return (
+    <div>
+      <div className="sec-title" style={{marginBottom:4}}>Crear nueva campaña</div>
+      <div className="sec-sub">Define los campos, fechas y modelo de puntuación</div>
+      <div className="form-card">
+        <div className="form-title">Información general</div>
+        <div className="field-row"><span className="field-label">Nombre de la campaña</span><input value={f.nombre} onChange={e=>upd("nombre",e.target.value)} placeholder="Ej: Conductores zona norte"/></div>
+        <div className="two-col">
+          <div className="field-row"><span className="field-label">País</span><select value={f.pais} onChange={e=>upd("pais",e.target.value)}><option>Chile</option><option>México</option></select></div>
+          <div className="field-row"><span className="field-label">Tipo de vehículo</span><select value={f.vehiculo} onChange={e=>upd("vehiculo",e.target.value)}>{["Moto","Auto","Furgón","Camión"].map(v=><option key={v}>{v}</option>)}</select></div>
+        </div>
+        <div className="two-col">
+          <div className="field-row"><span className="field-label">Volumen (m³)</span>
+            <select value={f.volumen_m3} onChange={e=>upd("volumen_m3",e.target.value)}>
+              <option value="">-- Seleccionar --</option>
+              {["1 m³","2 m³","3 m³","4 m³","6 m³","8 m³","9 m³","12 m³","16 m³","20 m³","24 m³","Más de 24 m³"].map(v=><option key={v}>{v}</option>)}
+            </select>
+          </div>
+          <div className="field-row"><span className="field-label">Cantidad de vehículos</span><input type="number" value={f.cantidad} onChange={e=>upd("cantidad",e.target.value)} placeholder="10"/></div>
+        </div>
+        <div className="two-col">
+          <div className="field-row"><span className="field-label">Zona de reparto</span><input value={f.zona} onChange={e=>upd("zona",e.target.value)} placeholder="Ej: RM Norte"/></div>
+          <div className="field-row"><span className="field-label">Factura</span><select value={f.factura} onChange={e=>upd("factura",e.target.value)}><option>Sí requiere factura</option><option>No requiere factura</option></select></div>
+        </div>
+        <div className="two-col">
+          <div className="field-row"><span className="field-label">Modalidad de pago</span><select value={f.modalidad_pago} onChange={e=>upd("modalidad_pago",e.target.value)}>{["Semanal","Quincenal","Mensual"].map(v=><option key={v}>{v}</option>)}</select></div>
+          <div className="field-row"><span className="field-label">Disponibilidad</span><select value={f.disponibilidad} onChange={e=>upd("disponibilidad",e.target.value)}>{["Diurno","Nocturno","Mixto"].map(v=><option key={v}>{v}</option>)}</select></div>
+        </div>
+        <div className="two-col">
+          <div className="field-row"><span className="field-label">Experiencia (años)</span><input type="number" value={f.experiencia_anios} onChange={e=>upd("experiencia_anios",e.target.value)}/></div>
+          <div className="field-row"><span className="field-label">Rango de ingresos</span><input value={f.ingreso_rango} onChange={e=>upd("ingreso_rango",e.target.value)} placeholder="Ej: 600.000 - 900.000"/></div>
+        </div>
+        <div className="field-row"><span className="field-label">Descripción</span><textarea value={f.descripcion} onChange={e=>upd("descripcion",e.target.value)} placeholder="Detalles..."/></div>
+      </div>
+      <div className="form-card">
+        <div className="form-title">Vigencia de la campaña</div>
+        <div style={{fontSize:12,color:"#666",marginBottom:14}}>Se activa automáticamente en la fecha inicio y se desactiva en la fecha fin.</div>
+        <div className="two-col">
+          <div className="field-row"><span className="field-label">Fecha de inicio</span><input type="date" value={f.fecha_inicio} onChange={e=>upd("fecha_inicio",e.target.value)}/></div>
+          <div className="field-row"><span className="field-label">Fecha de cierre</span><input type="date" value={f.fecha_fin} onChange={e=>upd("fecha_fin",e.target.value)}/></div>
+        </div>
+      </div>
+      <div className="form-card">
+        <div className="form-title">Modelo de puntuación (interno CRM)</div>
+        <div style={{fontSize:12,color:"#666",marginBottom:14}}>Define cada pregunta, su tipo y los puntos de cada opción. El postulante no ve puntajes. Puedes asignar cualquier valor — una moto puede valer más que un camión si la campaña lo requiere.</div>
+        {scoreFields.map((sf,idx)=>(
+          <ScoreFieldBuilder key={sf._id} field={sf}
+            onUpdate={updated=>setScoreFields(scoreFields.map((x,i)=>i===idx?updated:x))}
+            onRemove={()=>setScoreFields(scoreFields.filter((_,i)=>i!==idx))}
+            usedVariables={usedVars().filter(v=>v!==sf.variable)}
+          />
+        ))}
+        <button className="add-opt-btn" style={{width:"100%",padding:"9px",marginTop:4}} onClick={()=>setScoreFields([...scoreFields,newField()])}>
+          + Agregar pregunta de scoring
+        </button>
+        {total>100&&<div style={{fontSize:12,color:"#c0392b",marginTop:8}}>El score supera 100 puntos. Considera ajustar los valores.</div>}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"#eef2ff",borderRadius:10,padding:"10px 14px",marginTop:12}}>
+          <span style={{fontSize:13,fontWeight:600,color:scoreColor}}>Score máximo posible</span>
+          <span style={{fontSize:20,fontWeight:700,color:scoreColor}}>{total} pts</span>
+        </div>
+      </div>
+      <button className="btn-blue" onClick={save} disabled={saving} style={{width:"100%"}}>{saving?"Guardando...":"Crear y publicar campaña"}</button>
+    </div>
+  );
+}
+
+function CanalesView({ postulaciones, onLoad }) {
+  useEffect(()=>{onLoad();},[]);
+  const stats={};
+  postulaciones.forEach(p=>{stats[p.canal]=(stats[p.canal]||0)+1;});
+  const total=postulaciones.length;
+  return (
+    <div>
+      <div className="sec-title" style={{marginBottom:4}}>Análisis de canales</div>
+      <div className="sec-sub">Origen de todas las postulaciones recibidas</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:12,marginBottom:28}}>
+        {Object.entries(CANALES).map(([k,c])=>{
+          const count=stats[k]||0;const pct=total?Math.round(count/total*100):0;
+          return (
+            <div key={k} className="stat-card">
+              <div style={{width:36,height:36,borderRadius:"50%",background:c.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:600,color:"#fff",margin:"0 auto 8px"}}>{c.initial}</div>
+              <div style={{fontSize:13,fontWeight:600,color:"#1a1a1a"}}>{c.label}</div>
+              <div className="stat-val">{count}</div>
+              <div className="stat-label">{pct}% del total</div>
             </div>
           );
         })}
       </div>
-      <div style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:12,padding:16}}>
-        <div style={{fontSize:10,fontWeight:800,color:"#555555",letterSpacing:2,marginBottom:14,textTransform:"uppercase"}}>Tasa de conversión por canal</div>
-        {canalStats.map(({canal,total,ganados:g,eficacia})=>{const cfg=getCanalCfg(canal);return(
-          <div key={canal} style={{marginBottom:12}}>
-            <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-              <span style={{fontSize:12,color:"#666666"}}>{cfg.icon} {cfg.label}</span>
-              <div style={{display:"flex",gap:12}}><span style={{fontSize:10,color:"#555555"}}>{total} leads · {g} firmados</span><span style={{fontSize:12,fontWeight:800,color:cfg.color}}>{eficacia}%</span></div>
-            </div>
-            <div style={{height:6,background:"#f4f5f7",borderRadius:4}}><div style={{height:"100%",width:`${eficacia}%`,background:cfg.color,borderRadius:4,transition:"width .8s ease"}}/></div>
-          </div>
-        );})}
-      </div>
-      <div style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:12,padding:16}}>
-        <div style={{fontSize:10,fontWeight:800,color:"#555555",letterSpacing:2,marginBottom:14,textTransform:"uppercase"}}>Score promedio por etapa</div>
-        {scoreEtapa.map(({etapa,score,count})=>{const cfg=ETAPA_CFG[etapa]||{color:"#888888",icon:"•"};return(
-          <div key={etapa} style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
-            <div style={{width:150,fontSize:11,color:"#888888",flexShrink:0}}>{cfg.icon} {etapa}</div>
-            <div style={{flex:1,height:6,background:"#f4f5f7",borderRadius:4}}><div style={{height:"100%",width:`${score}%`,background:getScoreColor(score),borderRadius:4,transition:"width .8s ease"}}/></div>
-            <div style={{width:65,display:"flex",justifyContent:"space-between",flexShrink:0}}>
-              <span style={{fontSize:12,fontWeight:800,color:getScoreColor(score),fontFamily:"monospace"}}>{score}</span>
-              <span style={{fontSize:10,color:"#aaaaaa"}}>({count})</span>
+      <div className="form-card">
+        <div className="form-title">URLs de captación por canal</div>
+        <div style={{fontSize:12,color:"#666",marginBottom:12}}>Comparte estas URLs para rastrear el origen automáticamente</div>
+        {Object.entries(CANALES).map(([k,c])=>(
+          <div key={k} className="url-row">
+            <div style={{width:24,height:24,borderRadius:"50%",background:c.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff",flexShrink:0}}>{c.initial}</div>
+            <div>
+              <div style={{fontSize:12,fontWeight:600,color:"#1a1a1a"}}>{c.label}</div>
+              <div className="url-text">https://bigticket-portal.vercel.app?canal={k}</div>
             </div>
           </div>
-        );})}
+        ))}
       </div>
     </div>
   );
-};
+}
 
-// ─── TIMELINE VIEW ────────────────────────────────────────────────────────────
-const TimelineView = ({ lead }) => {
-  const [historial,setHistorial]=useState([]);
+// ─── ONBOARDING TERCEROS ──────────────────────────────────────────────────────
+const TIPOS_VEHICULO_CL = [
+  "Camión de 28 a 30m³ | 5000 KG",
+  "Camión de 25 a 28m³ | 5000 KG",
+  "Camión de 25m³ | 2500 a 3000 KG",
+  "Camión Plano 5000 KG",
+  "Rampla 100m³ | 30 TON",
+  "Furgón 4m³",
+  "Furgón 6 a 8m³",
+  "Furgón 10 a 12m³",
+  "Furgón 13m³ (Big Vans)",
+  "Vehículo Particular (Sedán, SUV o Hatchback)",
+];
+
+const REGIONES_CL = [
+  "Región de Arica y Parinacota","Región de Tarapacá","Región de Antofagasta",
+  "Región de Atacama","Región de Coquimbo","Región de Valparaíso",
+  "Región Metropolitana de Santiago","Región del Libertador Gral. Bernardo O'Higgins",
+  "Región del Maule","Región de Ñuble","Región del Biobío",
+  "Región de La Araucanía","Región de Los Ríos","Región de Los Lagos",
+  "Región de Aysén del Gral. Carlos Ibáñez del Campo",
+  "Región de Magallanes y de la Antártica Chilena",
+];
+
+
+const COMUNAS_CL = [
+  "Aisén","Algarrobo","Alhué","Alto Biobío","Alto del Carmen","Alto Hospicio",
+  "Ancud","Andacollo","Angol","Antártica","Antofagasta","Antuco","Arauco","Arica",
+  "Buin","Bulnes","Cabildo","Cabo de Hornos","Cabrero","Calama","Calbuco","Caldera",
+  "Calera","Calera de Tango","Calle Larga","Camarones","Camiña","Canela","Cañete",
+  "Carahue","Cartagena","Casablanca","Castro","Catemu","Cauquenes","Cerrillos",
+  "Cerro Navia","Chaitén","Chañaral","Chanco","Chépica","Chiguayante","Chile Chico",
+  "Chillán","Chillán Viejo","Chimbarongo","Cholchol","Chonchi","Cisnes","Cobquecura",
+  "Cochamó","Cochrane","Codegua","Coelemu","Coihaique","Coihueco","Coinco","Colbún",
+  "Colchane","Colina","Collipulli","Coltauco","Combarbalá","Concepción","Conchalí",
+  "Concón","Constitución","Contulmo","Copiapó","Coquimbo","Coronel","Corral","Cunco",
+  "Curacautín","Curacaví","Curaco de Vélez","Curanilahue","Curarrehue","Curepto",
+  "Curicó","Dalcahue","Diego de Almagro","Doñihue","El Bosque","El Carmen","El Monte",
+  "El Quisco","El Tabo","Empedrado","Ercilla","Estación Central","Florida","Freire",
+  "Freirina","Fresia","Frutillar","Futaleufú","Futrono","Galvarino","General Lagos",
+  "Gorbea","Graneros","Guaitecas","Hijuelas","Hualaihué","Hualañé","Hualpén","Hualqui",
+  "Huara","Huasco","Huechuraba","Illapel","Independencia","Iquique","Isla de Maipo",
+  "Isla de Pascua","Juan Fernández","La Cisterna","La Cruz","La Estrella","La Florida",
+  "La Granja","La Higuera","La Ligua","La Pintana","La Reina","La Serena","La Unión",
+  "Lago Ranco","Lago Verde","Laguna Blanca","Laja","Lampa","Lanco","Las Cabras",
+  "Las Condes","Lautaro","Lebu","Licantén","Limache","Linares","Litueche","Llaillay",
+  "Llanquihue","Lo Barnechea","Lo Espejo","Lo Prado","Lolol","Loncoche","Longaví",
+  "Lonquimay","Los Álamos","Los Andes","Los Ángeles","Los Lagos","Los Muermos",
+  "Los Sauces","Los Vilos","Lota","Lumaco","Machalí","Macul","Máfil","Maipú","Malloa",
+  "Marchihue","María Elena","María Pinto","Mariquina","Maule","Maullín","Mejillones",
+  "Melipeuco","Melipilla","Molina","Monte Patria","Mostazal","Mulchén","Nacimiento",
+  "Nancagua","Natales","Navidad","Negrete","Ninhue","Ñiquén","Nogales","Nueva Imperial",
+  "Ñuñoa","O'Higgins","Olivar","Ollagüe","Olmué","Osorno","Ovalle","Padre Hurtado",
+  "Padre Las Casas","Paiguano","Paillaco","Paine","Palena","Palmilla","Panguipulli",
+  "Panquehue","Papudo","Paredones","Parral","Pedro Aguirre Cerda","Pelarco","Pelluhue",
+  "Pemuco","Peñaflor","Peñalolén","Pencahue","Penco","Peralillo","Perquenco","Petorca",
+  "Peumo","Pica","Pichidegua","Pichilemu","Pinto","Pirque","Pitrufquén","Placilla",
+  "Portezuelo","Porvenir","Pozo Almonte","Primavera","Providencia","Puchuncaví","Pucón",
+  "Pudahuel","Puente Alto","Puerto Montt","Puerto Octay","Puerto Varas","Pumanque",
+  "Punitaqui","Punta Arenas","Puqueldón","Purén","Purranque","Putaendo","Putre",
+  "Puyehue","Queilén","Quellón","Quemchi","Quilaco","Quilicura","Quilleco","Quillón",
+  "Quillota","Quilpué","Quinchao","Quinta de Tilcoco","Quinta Normal","Quintero",
+  "Quirihue","Rancagua","Ránquil","Rauco","Recoleta","Renaico","Renca","Rengo",
+  "Requínoa","Retiro","Rinconada","Río Bueno","Río Claro","Río Hurtado","Río Ibáñez",
+  "Río Negro","Río Verde","Romeral","Saavedra","Sagrada Familia","Salamanca",
+  "San Antonio","San Bernardo","San Carlos","San Clemente","San Esteban","San Fabián",
+  "San Felipe","San Fernando","San Gregorio","San Ignacio","San Javier","San Joaquín",
+  "San José de Maipo","San Juan de la Costa","San Miguel","San Nicolás","San Pablo",
+  "San Pedro","San Pedro de Atacama","San Pedro de la Paz","San Rafael","San Ramón",
+  "San Rosendo","San Vicente","Santa Bárbara","Santa Cruz","Santa Juana","Santa María",
+  "Santiago","Santo Domingo","Sierra Gorda","Talagante","Talca","Talcahuano","Taltal",
+  "Temuco","Teno","Teodoro Schmidt","Tierra Amarilla","Tiltil","Timaukel","Tirúa",
+  "Tocopilla","Toltén","Tomé","Torres del Paine","Tortel","Traiguén","Treguaco",
+  "Tucapel","Valdivia","Vallenar","Valparaíso","Vichuquén","Victoria","Vicuña","Vilcún",
+  "Villa Alegre","Villa Alemana","Villarrica","Viña del Mar","Vitacura","Yerbas Buenas",
+  "Yumbel","Yungay","Zapallar",
+];
+
+function OnboardingLogin({ onIngresar, onVolver }) {
+  const [codigo,setCodigo]=useState("");
+  const [documento,setDocumento]=useState("");
+  const [error,setError]=useState("");
+  const [cargando,setCargando]=useState(false);
+  const [leadParcial,setLeadParcial]=useState(null); // guardamos el lead tras validar código
+  const [paso,setPaso]=useState(1); // paso 1: código, paso 2: RUT o CURP
+
+  const validarCodigo=async()=>{
+    if(!codigo.trim()){setError("Ingresa tu código de postulación.");return;}
+    setCargando(true);setError("");
+    const {data,error:e}=await sb.from("leads").select("*")
+      .eq("codigo_postulacion",codigo.trim().toUpperCase())
+      .single();
+    if(e||!data){setError("Código no encontrado. Verifica tus datos.");setCargando(false);return;}
+    if(!["Propuesta Aceptada","Contrato Firmado","Contrato No Firmado","Onboarding Pendiente"].includes(data.etapa)){
+      setError(`Tu postulación está en etapa "${data.etapa}". El formulario de incorporación se habilitará cuando el equipo BigTicket te lo indique.`);setCargando(false);return;}
+    setLeadParcial(data);
+    setPaso(2);
+    setCargando(false);
+  };
+
+  const validarDocumento=async()=>{
+    if(!documento.trim()){setError(`Ingresa tu ${leadParcial?.pais==="México"?"CURP":"RUT"}.`);return;}
+    setCargando(true);setError("");
+    const docLimpio=documento.trim().replace(/[.\-]/g,"").toUpperCase();
+    const campoDoc=leadParcial?.pais==="México"?"curp":"rut";
+    const {data,error:e}=await sb.from("leads").select("*")
+      .eq("codigo_postulacion",codigo.trim().toUpperCase())
+      .eq(campoDoc,docLimpio)
+      .single();
+    if(e||!data){setError(`${leadParcial?.pais==="México"?"CURP":"RUT"} incorrecto. Verifica tus datos.`);setCargando(false);return;}
+    onIngresar(data);
+    setCargando(false);
+  };
+
+  const esMexico=leadParcial?.pais==="México";
+
+  return(
+    <div>
+      <div className="topbar"><span className="logo">Big<span>ticket</span></span></div>
+      <div style={{maxWidth:440,margin:"60px auto",padding:"0 20px"}}>
+        <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",padding:"32px 28px"}}>
+          <div style={{textAlign:"center",marginBottom:24}}>
+            <div style={{fontSize:32,marginBottom:8}}>📋</div>
+            <div style={{fontSize:18,fontWeight:700,color:"#1a1a1a",marginBottom:6}}>Formulario de incorporación</div>
+            <div style={{fontSize:13,color:"#666"}}>
+              {paso===1?"Ingresa tu código de postulación para continuar":`Ingresa tu ${esMexico?"CURP":"RUT"} para verificar tu identidad`}
+            </div>
+          </div>
+          {paso===1&&(
+            <>
+              <div className="field-row">
+                <span className="field-label">Código de postulación</span>
+                <input value={codigo} onChange={e=>setCodigo(e.target.value.toUpperCase())}
+                  placeholder="Ej: BT-K7M2X3" style={{fontFamily:"monospace",fontWeight:700,letterSpacing:1}}/>
+              </div>
+              {error&&<div style={{background:"#fee2e2",borderRadius:8,padding:"10px 14px",fontSize:13,color:"#c0392b",marginBottom:14}}>{error}</div>}
+              <button className="btn-orange" onClick={validarCodigo} disabled={cargando}>
+                {cargando?"Verificando...":"Continuar →"}
+              </button>
+            </>
+          )}
+          {paso===2&&(
+            <>
+              <div className="field-row">
+                <span className="field-label">{esMexico?"CURP":"RUT (sin puntos ni guión)"}</span>
+                <input value={documento} onChange={e=>setDocumento(e.target.value)}
+                  placeholder={esMexico?"Ej: ABCD123456HDFXXX00":"Ej: 12345678k"}/>
+              </div>
+              {error&&<div style={{background:"#fee2e2",borderRadius:8,padding:"10px 14px",fontSize:13,color:"#c0392b",marginBottom:14}}>{error}</div>}
+              <button className="btn-orange" onClick={validarDocumento} disabled={cargando}>
+                {cargando?"Verificando...":"Ingresar →"}
+              </button>
+              <button onClick={()=>{setPaso(1);setError("");setDocumento("");}} style={{width:"100%",marginTop:10,background:"none",border:"0.5px solid #d0d5dd",borderRadius:10,padding:"10px",fontSize:13,color:"#555",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>
+                ← Volver
+              </button>
+            </>
+          )}
+          {paso===1&&<button onClick={onVolver} style={{width:"100%",marginTop:10,background:"none",border:"0.5px solid #d0d5dd",borderRadius:10,padding:"10px",fontSize:13,color:"#555",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>
+            ← Volver al portal
+          </button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+const OPERACIONES_CL = [
+  "ML_ARAUCO","ML_ARICA","ML_CORDILLERA","ML_MELIPILLA","ML_SALAMANCA",
+  "ML_SAN_ANTONIO","ML_SERENA","ML_VIÑA","ML_CAÑETE","ML_PICHILEMU",
+  "F_VIÑA","S_VIÑA","R_RM","R_VIÑA","BODEGA_VIÑA","BODEGA_RM",
+];
+
+const TIPOS_VEHICULO_MX = ["Small Van","Large Van","Small + Large Van","Extra Van"];
+const PUESTOS_MX = ["Driver","Ayudante","Propietario"];
+
+async function subirDocumento(file, leadId, nombre) {
+  if (!file) return null;
+  const ext = file.name.split('.').pop();
+  const path = `${leadId}/${nombre}_${Date.now()}.${ext}`;
+  const { error } = await sb.storage.from("documentos-terceros").upload(path, file, { upsert: true, contentType: file.type });
+  if (error) { console.error("Error subiendo:", error); return null; }
+  const { data } = sb.storage.from("documentos-terceros").getPublicUrl(path);
+  return data.publicUrl;
+}
+
+function UploadField({ label, valor, onChange, uploading }) {
+  return (
+    <div className="field-row">
+      <span className="field-label">{label}</span>
+      <label style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:8,
+        border:"0.5px solid #d0d5dd",background:"#f8f9fa",cursor:"pointer",fontSize:13}}>
+        <span style={{fontSize:16}}>📎</span>
+        <span style={{color:valor?"#10B981":"#888",flex:1}}>{uploading?"Subiendo...":valor?"✅ Archivo cargado":"Seleccionar archivo"}</span>
+        <input type="file" accept="image/*,.pdf" style={{display:"none"}} onChange={onChange} disabled={uploading}/>
+      </label>
+      {valor&&<a href={valor} target="_blank" style={{fontSize:11,color:"#1a3a6b",marginTop:3,display:"block"}}>Ver archivo →</a>}
+    </div>
+  );
+}
+
+
+function ErrMsg({ campo, errores }) {
+  return errores[campo] ?
+    <span style={{ fontSize: 11, color: "#EF4444", marginTop: 3, display: "block" }}>⚠ {errores[campo]}</span> : null;
+}
+
+function SelectField({ label, campo, opciones, value, onChange, required, errores, setErrores }) {
+  return (
+    <div className="field-row">
+      <span className="field-label">{label}{required ? " *" : ""}</span>
+      <select value={value} onChange={e => { onChange(e.target.value); setErrores(p => ({ ...p, [campo]: "" })); }}
+        style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `0.5px solid ${errores[campo] ? "#EF4444" : "#d0d5dd"}`, background: errores[campo] ? "#fff5f5" : "#fff", fontSize: 13, color: value ? "#1a1a1a" : "#888", cursor: "pointer" }}>
+        <option value="">-- Seleccionar --</option>
+        {opciones.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+      <ErrMsg campo={campo} errores={errores} />
+    </div>
+  );
+}
+
+function TextField({ label, campo, value, onChange, placeholder, required, type="text", errores, setErrores }) {
+  return (
+    <div className="field-row">
+      <span className="field-label">{label}{required ? " *" : ""}</span>
+      <input type={type} value={value} placeholder={placeholder || ""}
+        onChange={e => { onChange(e.target.value); setErrores(p => ({ ...p, [campo]: "" })); }}
+        style={errores[campo] ? { borderColor: "#EF4444", background: "#fff5f5" } : {}} />
+      <ErrMsg campo={campo} errores={errores} />
+    </div>
+  );
+}
+
+function ViewOnboarding({ lead, onVolver }) {
+  const pais = lead.pais || "Chile";
+  const esMexico = pais === "México";
+  const [guardando, setGuardando] = useState(false);
+  const [completado, setCompletado] = useState(false);
+  const [uploading, setUploading] = useState({});
+  const [showPrivacidad, setShowPrivacidad] = useState(false);
+  const [errores, setErrores] = useState({});
+
+  // Form Chile
+  const [formCL, setFormCL] = useState({
+    tipo_certificacion: "",
+    posee_inicio_actividades: "",
+    tipo_persona: "",
+    razon_social: "",
+    rut_empresa: "",
+    direccion_empresa: "",
+    nombre_representante: lead.nombre || "",
+    rut_representante: lead.rut || "",
+    correo: lead.email || "",
+    telefono: lead.telefono || "",
+    banco: "",
+    formato_cuenta: "",
+    tipo_cuenta: "",
+    nombre_titular: "",
+    rut_titular: "",
+    operacion: "",
+    supervisor: "",
+    acepta_privacidad: false,
+    url_carnet: "",
+  });
+
+  // Form México
+  const [formMX, setFormMX] = useState({
+    puesto: "",
+    tipo_vehiculo: "",
+    nombre: lead.nombre || "",
+    apellidos: "",
+    ine: "",
+    curp: lead.curp || "",
+    rfc: "",
+    licencia: "",
+    telefono: lead.telefono || "",
+    email: lead.email || "",
+    localidad: lead.region_estado || "",
+    colonia: "",
+    acepta_privacidad: false,
+    url_ine: "",
+    url_curp: "",
+    url_rfc: "",
+    url_licencia: "",
+  });
+
+  const [guardadoAvance, setGuardadoAvance] = useState(false);
+
+  const upd = (setter) => (k, v) => setter(f => ({ ...f, [k]: v }));
+  const updCL = upd(setFormCL);
+  const updMX = upd(setFormMX);
+
+  const guardarAvance = async () => {
+    setGuardando(true);
+    try {
+      const payload = esMexico ? {
+        pais: "México", lead_id: lead.id, codigo_postulacion: lead.codigo_postulacion,
+        puesto: formMX.puesto, tipos_vehiculo: [formMX.tipo_vehiculo],
+        nombre: formMX.nombre, apellidos: formMX.apellidos, rut: formMX.ine,
+        curp: formMX.curp, rfc: formMX.rfc, licencia: formMX.licencia,
+        telefono: formMX.telefono, email: formMX.email, localidad: formMX.localidad,
+        colonia: formMX.colonia, url_ine: formMX.url_ine, url_curp: formMX.url_curp,
+        url_rfc: formMX.url_rfc, url_licencia: formMX.url_licencia,
+        acepta_privacidad: formMX.acepta_privacidad, completado: false,
+        updated_at: new Date().toISOString(),
+      } : {
+        pais: "Chile", lead_id: lead.id, codigo_postulacion: lead.codigo_postulacion,
+        tipo_certificacion: formCL.tipo_certificacion, posee_inicio_actividades: formCL.posee_inicio_actividades,
+        tipo_persona: formCL.tipo_persona, razon_social: formCL.razon_social,
+        rut_empresa: formCL.rut_empresa, direccion_empresa: formCL.direccion_empresa,
+        nombre: formCL.nombre_representante, rut: formCL.rut_representante,
+        correo: formCL.correo, telefono: formCL.telefono, banco: formCL.banco,
+        formato_cuenta: formCL.formato_cuenta, tipo_cuenta: formCL.tipo_cuenta,
+        nombre_titular: formCL.nombre_titular, rut_titular: formCL.rut_titular,
+        operacion: formCL.operacion, supervisor: formCL.supervisor,
+        url_carnet: formCL.url_carnet, acepta_privacidad: formCL.acepta_privacidad,
+        completado: false, updated_at: new Date().toISOString(),
+      };
+      const { data: existe } = await sb.from("onboarding_terceros").select("id").eq("lead_id", lead.id).single();
+      if (existe) { await sb.from("onboarding_terceros").update(payload).eq("lead_id", lead.id); }
+      else { await sb.from("onboarding_terceros").insert(payload); }
+      setGuardadoAvance(true);
+      setTimeout(() => setGuardadoAvance(false), 3000);
+    } catch(e) { alert("Error al guardar: " + e.message); }
+    finally { setGuardando(false); }
+  };
+
+  // Cargar progreso guardado
+  useEffect(() => {
+    const cargar = async () => {
+      const { data: saved } = await sb.from("onboarding_terceros").select("*").eq("lead_id", lead.id).single();
+      if (!saved) return;
+      if (esMexico) {
+        setFormMX(f => ({...f,
+          puesto: saved.puesto || f.puesto,
+          tipo_vehiculo: Array.isArray(saved.tipos_vehiculo) ? saved.tipos_vehiculo[0] : f.tipo_vehiculo,
+          nombre: saved.nombre || f.nombre,
+          apellidos: saved.apellidos || f.apellidos,
+          ine: saved.rut || f.ine,
+          curp: saved.curp || f.curp,
+          rfc: saved.rfc || f.rfc,
+          licencia: saved.licencia || f.licencia,
+          telefono: saved.telefono || f.telefono,
+          email: saved.email || f.email,
+          localidad: saved.localidad || f.localidad,
+          colonia: saved.colonia || f.colonia,
+          url_ine: saved.url_ine || "",
+          url_curp: saved.url_curp || "",
+          url_rfc: saved.url_rfc || "",
+          url_licencia: saved.url_licencia || "",
+          acepta_privacidad: saved.acepta_privacidad || false,
+        }));
+      } else {
+        setFormCL(f => ({...f,
+          tipo_certificacion: saved.tipo_certificacion || f.tipo_certificacion,
+          posee_inicio_actividades: saved.posee_inicio_actividades || f.posee_inicio_actividades,
+          tipo_persona: saved.tipo_persona || f.tipo_persona,
+          razon_social: saved.razon_social || f.razon_social,
+          rut_empresa: saved.rut_empresa || f.rut_empresa,
+          direccion_empresa: saved.direccion_empresa || f.direccion_empresa,
+          nombre_representante: saved.nombre || f.nombre_representante,
+          rut_representante: saved.rut || f.rut_representante,
+          correo: saved.correo || f.correo,
+          telefono: saved.telefono || f.telefono,
+          banco: saved.banco || f.banco,
+          formato_cuenta: saved.formato_cuenta || f.formato_cuenta,
+          tipo_cuenta: saved.tipo_cuenta || f.tipo_cuenta,
+          nombre_titular: saved.nombre_titular || f.nombre_titular,
+          rut_titular: saved.rut_titular || f.rut_titular,
+          operacion: saved.operacion || f.operacion,
+          supervisor: saved.supervisor || f.supervisor,
+          url_carnet: saved.url_carnet || "",
+          acepta_privacidad: saved.acepta_privacidad || false,
+        }));
+      }
+    };
+    cargar();
+  }, [lead.id]);
+
+  const handleUpload = async (field, file, setter, leadId) => {
+    if (!file) return;
+    setUploading(u => ({ ...u, [field]: true }));
+    const url = await subirDocumento(file, leadId, field);
+    if (url) setter(f => ({ ...f, [`url_${field}`]: url }));
+    setUploading(u => ({ ...u, [field]: false }));
+  };
+
+  const enviar = async () => {
+    const payload = esMexico ? {
+      pais: "México",
+      lead_id: lead.id,
+      codigo_postulacion: lead.codigo_postulacion,
+      puesto: formMX.puesto,
+      tipos_vehiculo: [formMX.tipo_vehiculo],
+      nombre: formMX.nombre,
+      apellidos: formMX.apellidos,
+      rut: formMX.ine,
+      curp: formMX.curp,
+      rfc: formMX.rfc,
+      licencia: formMX.licencia,
+      telefono: formMX.telefono,
+      email: formMX.email,
+      localidad: formMX.localidad,
+      colonia: formMX.colonia,
+      url_ine: formMX.url_ine,
+      url_curp: formMX.url_curp,
+      url_rfc: formMX.url_rfc,
+      url_licencia: formMX.url_licencia,
+      acepta_privacidad: formMX.acepta_privacidad,
+      completado: true,
+      completado_at: new Date().toISOString(),
+    } : {
+      pais: "Chile",
+      lead_id: lead.id,
+      codigo_postulacion: lead.codigo_postulacion,
+      tipo_certificacion: formCL.tipo_certificacion,
+      posee_inicio_actividades: formCL.posee_inicio_actividades,
+      tipo_persona: formCL.tipo_persona,
+      razon_social: formCL.razon_social,
+      rut_empresa: formCL.rut_empresa,
+      direccion_empresa: formCL.direccion_empresa,
+      nombre: formCL.nombre_representante,
+      apellidos: "",
+      rut: formCL.rut_representante,
+      correo: formCL.correo,
+      telefono: formCL.telefono,
+      banco: formCL.banco,
+      formato_cuenta: formCL.formato_cuenta,
+      tipo_cuenta: formCL.tipo_cuenta,
+      nombre_titular: formCL.nombre_titular,
+      rut_titular: formCL.rut_titular,
+      operacion: formCL.operacion,
+      supervisor: formCL.supervisor,
+      url_carnet: formCL.url_carnet,
+      acepta_privacidad: formCL.acepta_privacidad,
+      completado: true,
+      completado_at: new Date().toISOString(),
+    };
+
+    // Validar campos obligatorios
+    const nuevosErrores = {};
+    if (!payload.acepta_privacidad) nuevosErrores.acepta_privacidad = "Debes aceptar las políticas";
+    if (esMexico) {
+      if (!formMX.puesto) nuevosErrores.puesto = "Campo obligatorio";
+      if (!formMX.tipo_vehiculo) nuevosErrores.tipo_vehiculo = "Campo obligatorio";
+      if (!formMX.nombre?.trim()) nuevosErrores.nombre = "Campo obligatorio";
+      if (!formMX.apellidos?.trim()) nuevosErrores.apellidos = "Campo obligatorio";
+      if (!formMX.ine?.trim()) nuevosErrores.ine = "Campo obligatorio";
+      if (!formMX.curp?.trim()) nuevosErrores.curp = "Campo obligatorio";
+      if (!formMX.rfc?.trim()) nuevosErrores.rfc = "Campo obligatorio";
+      if (!formMX.telefono?.trim()) nuevosErrores.telefono = "Campo obligatorio";
+      if (!formMX.localidad) nuevosErrores.localidad = "Campo obligatorio";
+      if (!formMX.url_ine) nuevosErrores.url_ine = "Debes adjuntar tu INE";
+      if (!formMX.url_curp) nuevosErrores.url_curp = "Debes adjuntar tu CURP";
+      if (!formMX.url_rfc) nuevosErrores.url_rfc = "Debes adjuntar tu RFC";
+    } else {
+      if (!formCL.tipo_certificacion) nuevosErrores.tipo_certificacion = "Campo obligatorio";
+      if (!formCL.posee_inicio_actividades) nuevosErrores.posee_inicio_actividades = "Campo obligatorio";
+      if (!formCL.nombre_representante?.trim()) nuevosErrores.nombre_representante = "Campo obligatorio";
+      if (!formCL.rut_representante?.trim()) nuevosErrores.rut_representante = "Campo obligatorio";
+      if (!formCL.correo?.trim()) nuevosErrores.correo = "Campo obligatorio";
+      if (!formCL.telefono?.trim()) nuevosErrores.telefono = "Campo obligatorio";
+      if (!formCL.banco?.trim()) nuevosErrores.banco = "Campo obligatorio";
+      if (!formCL.formato_cuenta) nuevosErrores.formato_cuenta = "Campo obligatorio";
+      if (!formCL.tipo_cuenta) nuevosErrores.tipo_cuenta = "Campo obligatorio";
+      if (!formCL.nombre_titular?.trim()) nuevosErrores.nombre_titular = "Campo obligatorio";
+      if (!formCL.rut_titular?.trim()) nuevosErrores.rut_titular = "Campo obligatorio";
+      if (!formCL.operacion) nuevosErrores.operacion = "Campo obligatorio";
+      if (!formCL.url_carnet) nuevosErrores.url_carnet = "Debes adjuntar tu cédula de identidad";
+    }
+    if (Object.keys(nuevosErrores).length > 0) {
+      setErrores(nuevosErrores);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    setErrores({});
+
+    setGuardando(true);
+    try {
+      // Guardar en Supabase
+      const { data: existe } = await sb.from("onboarding_terceros").select("id").eq("lead_id", lead.id).single();
+      const dbPayload = { ...payload, updated_at: new Date().toISOString() };
+      if (existe) { await sb.from("onboarding_terceros").update(dbPayload).eq("lead_id", lead.id); }
+      else { await sb.from("onboarding_terceros").insert(dbPayload); }
+      await sb.from("leads").update({ etapa: "Contrato Firmado" }).eq("id", lead.id);
+      // Notificar N8N
+      try {
+        await fetch("https://bigticket2026.app.n8n.cloud/webhook/nboarding-completado-v2", {
+          method: "POST", mode: "no-cors",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...payload, campana_nombre: lead.origen || "", pais: pais }),
+        });
+      } catch (e) { console.log("N8N error:", e); }
+      setCompletado(true);
+    } catch (e) { alert("Error al enviar: " + e.message); }
+    finally { setGuardando(false); }
+  };
+
+  if (completado) return (
+    <div>
+      <div className="topbar"><span className="logo">Big<span>ticket</span></span></div>
+      <div style={{ maxWidth: 480, margin: "60px auto", padding: "0 20px" }}>
+        <div style={{ background: "#fff", borderRadius: 16, border: "0.5px solid #e4e7ec", padding: "40px 32px", textAlign: "center" }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🎉</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: "#166534", marginBottom: 8 }}>¡Formulario enviado!</div>
+          <div style={{ fontSize: 13, color: "#555", marginBottom: 24 }}>Tu información fue recibida correctamente. Nuestro equipo la revisará y te contactará pronto por WhatsApp 🚛</div>
+          <button className="btn-orange" onClick={onVolver}>Volver al portal</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div>
+      <div className="topbar">
+        <span className="logo">Big<span>ticket</span></span>
+        <button className="btn-gw" onClick={onVolver}>Salir</button>
+      </div>
+      <div style={{ maxWidth: 640, margin: "0 auto", padding: "20px 16px" }}>
+
+        {/* Header */}
+        <div style={{ background: "#fff", borderRadius: 12, border: "0.5px solid #e4e7ec", padding: "16px 20px", marginBottom: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>
+                Formulario de incorporación — {esMexico ? "México 🇲🇽" : "Chile 🇨🇱"}
+              </div>
+              <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
+                {lead.nombre} · Código: <strong style={{ fontFamily: "monospace" }}>{lead.codigo_postulacion}</strong>
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {guardadoAvance && <span style={{ fontSize: 11, color: "#10B981", fontWeight: 600 }}>✓ Guardado</span>}
+              <button onClick={guardarAvance} disabled={guardando}
+                style={{ background: "#eef2ff", color: "#1a3a6b", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                {guardando ? "Guardando..." : "💾 Guardar avance"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ─── FORMULARIO MÉXICO ─── */}
+        {esMexico && (
+          <div className="form-card">
+            {Object.values(errores).some(e => e) && (
+              <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 12, color: "#c0392b" }}>
+                ⚠ Completa los campos obligatorios marcados con *
+              </div>
+            )}
+
+            <SelectField errores={errores} setErrores={setErrores} label="Puesto al que postula" campo="puesto" opciones={PUESTOS_MX}
+              value={formMX.puesto} onChange={v => updMX("puesto", v)} required />
+
+            <SelectField errores={errores} setErrores={setErrores} label="Tipo de Vehículo" campo="tipo_vehiculo" opciones={TIPOS_VEHICULO_MX}
+              value={formMX.tipo_vehiculo} onChange={v => updMX("tipo_vehiculo", v)} required />
+
+            <div className="two-col">
+              <TextField errores={errores} setErrores={setErrores} label="Nombres" campo="nombre" value={formMX.nombre} onChange={v => updMX("nombre", v)} placeholder="Tu nombre" required />
+              <TextField errores={errores} setErrores={setErrores} label="Apellidos" campo="apellidos" value={formMX.apellidos} onChange={v => updMX("apellidos", v)} placeholder="Tus apellidos" />
+            </div>
+            <div className="two-col">
+              <TextField errores={errores} setErrores={setErrores} label="INE" campo="ine" value={formMX.ine} onChange={v => updMX("ine", v)} placeholder="Número de INE" required />
+              <TextField errores={errores} setErrores={setErrores} label="CURP" campo="curp" value={formMX.curp} onChange={v => updMX("curp", v)} placeholder="CURP" />
+            </div>
+            <div className="two-col">
+              <TextField errores={errores} setErrores={setErrores} label="RFC" campo="rfc" value={formMX.rfc} onChange={v => updMX("rfc", v)} placeholder="RFC" />
+              {(formMX.puesto === "Driver" || formMX.puesto === "Propietario") && (
+                <TextField errores={errores} setErrores={setErrores} label="Licencia de Conducir" campo="licencia" value={formMX.licencia} onChange={v => updMX("licencia", v)} placeholder="Número de licencia" />
+              )}
+            </div>
+            <div className="two-col">
+              <TextField errores={errores} setErrores={setErrores} label="Teléfono" campo="telefono" value={formMX.telefono} onChange={v => updMX("telefono", v)} placeholder="+521..." required />
+              <TextField errores={errores} setErrores={setErrores} label="Email" campo="email" type="email" value={formMX.email} onChange={v => updMX("email", v)} placeholder="correo@..." />
+            </div>
+            <div className="two-col">
+              <SelectField errores={errores} setErrores={setErrores} label="Localidad (SVC)" campo="localidad" opciones={ESTADOS_MEXICO}
+                value={formMX.localidad} onChange={v => updMX("localidad", v)} />
+              <TextField errores={errores} setErrores={setErrores} label="Colonia" campo="colonia" value={formMX.colonia} onChange={v => updMX("colonia", v)} placeholder="Tu colonia" />
+            </div>
+
+            <div style={{ marginTop: 8, padding: "12px 14px", background: "#f8f9fa", borderRadius: 10, marginBottom: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", marginBottom: 10 }}>📎 Documentos requeridos</div>
+              <UploadField label="Adjuntar INE (ambos lados)" valor={formMX.url_ine}
+                uploading={uploading.ine}
+                onChange={e => handleUpload("ine", e.target.files[0], setFormMX, lead.id)} />
+              <UploadField label="Adjuntar CURP" valor={formMX.url_curp}
+                uploading={uploading.curp}
+                onChange={e => handleUpload("curp", e.target.files[0], setFormMX, lead.id)} />
+              <UploadField label="Adjuntar RFC" valor={formMX.url_rfc}
+                uploading={uploading.rfc}
+                onChange={e => handleUpload("rfc", e.target.files[0], setFormMX, lead.id)} />
+              {(formMX.puesto === "Driver" || formMX.puesto === "Propietario") && (
+                <UploadField label="Adjuntar Licencia de Conducir" valor={formMX.url_licencia}
+                  uploading={uploading.licencia}
+                  onChange={e => handleUpload("licencia", e.target.files[0], setFormMX, lead.id)} />
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ─── FORMULARIO CHILE ─── */}
+        {!esMexico && (
+          <div className="form-card">
+            {Object.values(errores).some(e => e) && (
+              <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 12, color: "#c0392b" }}>
+                ⚠ Completa los campos obligatorios marcados con *
+              </div>
+            )}
+
+            <SelectField errores={errores} setErrores={setErrores} label="Tipo de Certificación" campo="tipo_certificacion"
+              opciones={["Apoyo", "Planta", "Por Temporada"]}
+              value={formCL.tipo_certificacion} onChange={v => updCL("tipo_certificacion", v)} required />
+
+            <SelectField errores={errores} setErrores={setErrores} label="¿Posee Inicio de Actividades?" campo="posee_inicio_actividades"
+              opciones={["Si", "No"]}
+              value={formCL.posee_inicio_actividades} onChange={v => updCL("posee_inicio_actividades", v)} required />
+
+            {formCL.posee_inicio_actividades === "Si" && (
+              <>
+                <SelectField errores={errores} setErrores={setErrores} label="¿Persona Natural o Empresa?" campo="tipo_persona"
+                  opciones={["Persona Natural", "Empresa"]}
+                  value={formCL.tipo_persona} onChange={v => updCL("tipo_persona", v)} required />
+                <div className="two-col">
+                  <TextField errores={errores} setErrores={setErrores} label="Razón Social" campo="razon_social" value={formCL.razon_social} onChange={v => updCL("razon_social", v)} placeholder="Razón social" />
+                  <TextField errores={errores} setErrores={setErrores} label="RUT Empresa" campo="rut_empresa" value={formCL.rut_empresa} onChange={v => updCL("rut_empresa", v)} placeholder="RUT empresa" />
+                </div>
+                <TextField errores={errores} setErrores={setErrores} label="Dirección Empresa" campo="direccion_empresa" value={formCL.direccion_empresa} onChange={v => updCL("direccion_empresa", v)} placeholder="Dirección" />
+              </>
+            )}
+
+            <div className="form-title" style={{ marginTop: 16 }}>Datos del Representante Legal</div>
+            <div className="two-col">
+              <TextField errores={errores} setErrores={setErrores} label="Nombre Completo" campo="nombre_representante" value={formCL.nombre_representante}
+                onChange={v => updCL("nombre_representante", v)} placeholder="Nombre completo" required />
+              <TextField errores={errores} setErrores={setErrores} label="RUT Representante Legal" campo="rut_representante" value={formCL.rut_representante}
+                onChange={v => updCL("rut_representante", v)} placeholder="12345678k" required />
+            </div>
+            <div className="two-col">
+              <TextField errores={errores} setErrores={setErrores} label="Correo de Contacto" campo="correo" type="email" value={formCL.correo}
+                onChange={v => updCL("correo", v)} placeholder="correo@..." />
+              <TextField errores={errores} setErrores={setErrores} label="Teléfono de Contacto" campo="telefono" value={formCL.telefono}
+                onChange={v => updCL("telefono", v)} placeholder="+569..." required />
+            </div>
+
+            <div style={{ padding: "12px 14px", background: "#f8f9fa", borderRadius: 10, marginBottom: 8, marginTop: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", marginBottom: 10 }}>📎 Documentos</div>
+              <UploadField label="Adjuntar Cédula de Identidad (ambas caras)" valor={formCL.url_carnet}
+                uploading={uploading.carnet}
+                onChange={e => handleUpload("carnet", e.target.files[0], setFormCL, lead.id)} />
+            </div>
+
+            <div className="form-title" style={{ marginTop: 16 }}>Datos Bancarios</div>
+            <div className="two-col">
+              <TextField errores={errores} setErrores={setErrores} label="Banco" campo="banco" value={formCL.banco} onChange={v => updCL("banco", v)} placeholder="Nombre del banco" />
+              <SelectField errores={errores} setErrores={setErrores} label="Formato de Cuenta" campo="formato_cuenta"
+                opciones={["Persona Natural", "Empresa"]}
+                value={formCL.formato_cuenta} onChange={v => updCL("formato_cuenta", v)} />
+            </div>
+            <div className="two-col">
+              <SelectField errores={errores} setErrores={setErrores} label="Tipo de Cuenta" campo="tipo_cuenta"
+                opciones={["Cuenta Corriente", "Cuenta Vista", "Cuenta de Ahorro", "Chequera Electronica"]}
+                value={formCL.tipo_cuenta} onChange={v => updCL("tipo_cuenta", v)} />
+              <TextField errores={errores} setErrores={setErrores} label="Nombre del Titular" campo="nombre_titular" value={formCL.nombre_titular}
+                onChange={v => updCL("nombre_titular", v)} placeholder="Nombre titular" />
+            </div>
+            <TextField errores={errores} setErrores={setErrores} label="RUT del Titular" campo="rut_titular" value={formCL.rut_titular}
+              onChange={v => updCL("rut_titular", v)} placeholder="RUT titular" />
+
+            <div className="form-title" style={{ marginTop: 16 }}>Operación</div>
+            <SelectField errores={errores} setErrores={setErrores} label="Operación donde prestará servicios" campo="operacion"
+              opciones={OPERACIONES_CL}
+              value={formCL.operacion} onChange={v => updCL("operacion", v)} required />
+            <TextField errores={errores} setErrores={setErrores} label="Nombre del Supervisor a Cargo" campo="supervisor" value={formCL.supervisor}
+              onChange={v => updCL("supervisor", v)} placeholder="Nombre del supervisor" />
+          </div>
+        )}
+
+        {/* Política de privacidad */}
+        <div className="form-card">
+          {errores.acepta_privacidad && (
+            <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 12, fontSize: 12, color: "#c0392b" }}>
+              ⚠ {errores.acepta_privacidad}
+            </div>
+          )}
+          <label style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", borderRadius: 10,
+            border: `1.5px solid ${errores.acepta_privacidad ? "#EF4444" : (esMexico ? formMX.acepta_privacidad : formCL.acepta_privacidad) ? "#1a3a6b" : "#e4e7ec"}`,
+            background: (esMexico ? formMX.acepta_privacidad : formCL.acepta_privacidad) ? "#eef2ff" : "#fff", cursor: "pointer" }}>
+            <input type="checkbox"
+              checked={esMexico ? formMX.acepta_privacidad : formCL.acepta_privacidad}
+              onChange={e => {
+                if (esMexico) updMX("acepta_privacidad", e.target.checked);
+                else updCL("acepta_privacidad", e.target.checked);
+                setErrores(p => ({ ...p, acepta_privacidad: "" }));
+              }}
+              style={{ width: "auto", margin: "2px 0 0", accentColor: "#1a3a6b", flexShrink: 0 }} />
+            <span style={{ fontSize: 13, color: "#555", lineHeight: 1.5 }}>
+              Acepto las <button onClick={e => { e.preventDefault(); setShowPrivacidad(true); }}
+                style={{ background: "none", border: "none", color: "#1a3a6b", fontWeight: 700, cursor: "pointer", fontSize: 13, padding: 0, textDecoration: "underline" }}>
+                Políticas de Privacidad</button> de BigTicket
+            </span>
+          </label>
+
+          <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+            <button style={{ flex: 1, background: "#f0f2f5", color: "#475569", border: "none", borderRadius: 8, padding: "10px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+              onClick={onVolver}>← Volver</button>
+            <button className="btn-orange" style={{ flex: 2, marginTop: 0 }} onClick={enviar} disabled={guardando}>
+              {guardando ? "Enviando..." : "✅ Enviar formulario"}
+            </button>
+          </div>
+        </div>
+
+        {/* Modal políticas */}
+        {showPrivacidad && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 500 }}>
+            <div style={{ background: "#fff", borderRadius: 14, width: 560, maxHeight: "80vh", display: "flex", flexDirection: "column" }}>
+              <div style={{ padding: "16px 20px", borderBottom: "1px solid #e4e7ec", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ fontSize: 15, fontWeight: 700 }}>Políticas de Privacidad — BigTicket</div>
+                <button onClick={() => setShowPrivacidad(false)} style={{ background: "#f0f2f5", border: "none", borderRadius: 6, width: 28, height: 28, cursor: "pointer", fontSize: 16 }}>×</button>
+              </div>
+              <div style={{ padding: "16px 20px", overflow: "auto", fontSize: 13, color: "#555", lineHeight: 1.7 }}>
+                <p style={{ marginBottom: 12 }}>Conforme a lo dispuesto en el artículo 19 N° 4 de la Constitución Política de la República y a las normas pertinentes de la Ley N° 19.628 sobre protección de la vida privada, el tratamiento de datos personales que se realiza en BigTicket se rige por las siguientes reglas:</p>
+                <ul style={{ paddingLeft: 20, marginBottom: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                  <li>BigTicket asegura la confidencialidad de los datos personales de los usuarios.</li>
+                  <li>Los datos serán utilizados para el cumplimiento de los fines indicados en el formulario.</li>
+                  <li>El usuario podrá ejercer los derechos otorgados por la Ley N° 19.628 en cualquier momento.</li>
+                </ul>
+              </div>
+              <div style={{ padding: "12px 20px", borderTop: "1px solid #e4e7ec" }}>
+                <button className="btn-orange" style={{ maxWidth: 200, margin: "0 auto" }} onClick={() => setShowPrivacidad(false)}>Cerrar</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ViewPropuesta() {
+  const [lead,setLead]=useState(null);
+  const [campana,setCampana]=useState(null);
   const [loading,setLoading]=useState(true);
+  const [enviando,setEnviando]=useState(false);
+  const [respuesta,setRespuesta]=useState(null);
+  const [enviado,setEnviado]=useState(false);
 
   useEffect(()=>{
+    const params=new URLSearchParams(window.location.search);
+    const leadId=params.get("lead");
+    if(!leadId){setLoading(false);return;}
     const fetch=async()=>{
-      const data=await sb.from("lead_historial").select("*",{filter:`lead_id=eq.${lead.id}`,order:"created_at.asc"});
-      if(Array.isArray(data)) setHistorial(data);
+      const {data:l}=await sb.from("leads").select("*").eq("id",leadId).single();
+      if(!l){setLoading(false);return;}
+      setLead(l);
+      if(l.respuesta_propuesta) setRespuesta(l.respuesta_propuesta);
+      if(l.campana_id){
+        const {data:c}=await sb.from("campanas").select("*").eq("id",l.campana_id).single();
+        setCampana(c);
+      }
       setLoading(false);
     };
     fetch();
-  },[lead.id]);
+  },[]);
 
-  const eventos=[
-    {icon:"🎯",label:`Captado vía ${lead.fuente_contacto||lead.canal||"desconocido"}`,fecha:lead.created_at,color:"#3B82F6"},
-    lead.score>0&&{icon:"⭐",label:`Score calculado: ${lead.score} pts → ${lead.clasificacion||""}`,fecha:lead.created_at,color:getScoreColor(lead.score)},
-    ...historial.map(h=>({
-      icon:ETAPA_CFG[h.etapa_nueva]?.icon||"📊",
-      label:`Cambio de etapa: ${h.etapa_anterior} → ${h.etapa_nueva}`,
-      fecha:h.created_at,
-      color:ETAPA_CFG[h.etapa_nueva]?.color||"#64748b"
-    }))
-  ].filter(Boolean).sort((a,b)=>new Date(a.fecha)-new Date(b.fecha));
+  const responder=async(decision)=>{
+    if(!lead) return;
+    setEnviando(true);
+    const nuevaEtapa=decision==="si"?"Propuesta Aceptada":"Propuesta Rechazada";
+    await sb.from("leads").update({etapa:nuevaEtapa,respuesta_propuesta:decision}).eq("id",lead.id);
+    await sb.from("lead_historial").insert({lead_id:lead.id,etapa_anterior:lead.etapa,etapa_nueva:nuevaEtapa});
+    // Si acepta → notificar a N8N para enviar WhatsApp con link de onboarding
+    if(decision==="si"){
+      try{
+        await fetch("https://bigticket2026.app.n8n.cloud/webhook/invitacion-onboarding",{
+          method:"POST", mode:"no-cors",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            lead_id: lead.id,
+            nombre: lead.nombre,
+            telefono: lead.telefono,
+            codigo_postulacion: lead.codigo_postulacion,
+            campana_nombre: campana?.nombre||"",
+            link_onboarding: "https://bigticket-portal.vercel.app?onboarding=1",
+          }),
+        });
+      }catch(e){console.log("N8N onboarding error:",e);}
+    }
+    setRespuesta(decision);
+    setEnviado(true);
+    setEnviando(false);
+  };
+
+  if(loading) return <div style={{padding:40,textAlign:"center",color:"#888"}}>Cargando propuesta...</div>;
+  if(!lead) return <div style={{padding:40,textAlign:"center",color:"#888"}}>Propuesta no encontrada.</div>;
 
   return(
-    <div style={{display:"flex",flexDirection:"column",gap:0}}>
-      <div style={{fontSize:10,fontWeight:800,color:"#555555",letterSpacing:1,marginBottom:12,textTransform:"uppercase"}}>Historia del lead</div>
-      {loading?<div style={{color:"#aaaaaa",fontSize:12}}>Cargando historial...</div>:(
-        <div style={{position:"relative"}}>
-          <div style={{position:"absolute",left:15,top:0,bottom:0,width:2,background:"#e4e7ec"}}/>
-          {eventos.map((ev,i)=>(
-            <div key={i} style={{display:"flex",gap:14,paddingBottom:16,position:"relative"}}>
-              <div style={{width:32,height:32,borderRadius:"50%",background:ev.color+"22",border:`2px solid ${ev.color}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0,zIndex:1,background:"#ffffff"}}>
-                {ev.icon}
-              </div>
-              <div style={{flex:1,paddingTop:4}}>
-                <div style={{fontSize:12,fontWeight:700,color:"#1a1a1a",lineHeight:1.4}}>{ev.label}</div>
-                <div style={{fontSize:10,color:"#888888",marginTop:3}}>{formatFecha(ev.fecha)}</div>
-              </div>
-            </div>
-          ))}
-          {eventos.length===0&&<div style={{color:"#aaaaaa",fontSize:12,paddingLeft:46}}>Sin movimientos aún</div>}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ─── PANEL DETALLE ────────────────────────────────────────────────────────────
-const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
-  const [tab,setTab]=useState("info");
-  const [etapa,setEtapa]=useState(lead.etapa||"Nuevo Lead");
-  const [saving,setSaving]=useState(false);
-  const [saved,setSaved]=useState(false);
-
-  useEffect(()=>{ setEtapa(lead.etapa||"Nuevo Lead"); },[lead.etapa]);
-  const handleEtapaChange=async(newEtapa)=>{
-    const etapaActual=etapa;
-    if(etapaActual===newEtapa) return;
-    onEtapaChangeRequest&&onEtapaChangeRequest(lead,newEtapa);
-  };
-  const etapaCfg=ETAPA_CFG[etapa]||{color:"#888888"};
-  const scoreColor=getScoreColor(lead.score||0);
-  return (
-    <div style={{position:"fixed",top:0,right:0,width:480,height:"100vh",background:"#1a3a6b",borderLeft:"1px solid #e4e7ec",display:"flex",flexDirection:"column",zIndex:100,boxShadow:"-30px 0 80px rgba(0,0,0,.7)"}}>
-      <div style={{padding:"18px 20px",background:"linear-gradient(135deg,#0f1f3d,#1a3a6b)",borderBottom:"1px solid #e4e7ec",flexShrink:0}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-          <div style={{flex:1}}>
-            <div style={{fontSize:18,fontWeight:800,color:"#1a1a1a"}}>{lead.nombre||"Sin nombre"}</div>
-            <div style={{fontSize:12,color:"#888888",marginTop:2}}>{lead.cargo?`${lead.cargo} · `:""}{lead.empresa||"Sin empresa"}</div>
-            <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
-              <CanalTag canal={lead.fuente_contacto||lead.canal}/>
-              {lead.pais&&<div style={{display:"flex",alignItems:"center",gap:4,background:"#f0f2f5",borderRadius:20,padding:"2px 8px"}}><PaisFlag pais={lead.pais}/><span style={{fontSize:10,fontWeight:700,color:"#555"}}>{lead.pais}</span></div>}
-              {lead.clasificacion&&<Tag label={`${lead.emoji||""} ${lead.clasificacion}`} color={lead.clasificacion?.includes("Caliente")?"#EF4444":lead.clasificacion?.includes("Candidato")?"#F59E0B":"#F97316"}/>}
-            </div>
-          </div>
-          <div style={{display:"flex",gap:8,alignItems:"center"}}>
-            <ScoreDot score={lead.score}/>
-            <button onClick={onClose} style={{background:"#eef2ff",border:"1px solid #dbeafe",color:"#666666",borderRadius:8,width:32,height:32,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
-          </div>
-        </div>
-        <div style={{marginTop:12,display:"flex",gap:8,alignItems:"center"}}>
-          <select value={etapa} onChange={e=>handleEtapaChange(e.target.value)}
-            style={{flex:1,background:"#ffffff",color:etapaCfg.color,border:`1px solid ${etapaCfg.color}44`,borderRadius:8,padding:"7px 12px",fontSize:12,cursor:"pointer",fontWeight:600}}>
-            {ETAPAS_TODAS.map(e=><option key={e}>{e}</option>)}
-          </select>
-          {saving&&<span style={{fontSize:10,color:"#3B82F6"}}>Guardando...</span>}
-          {saved&&<span style={{fontSize:10,color:"#10B981"}}>✓ Guardado</span>}
-        </div>
+    <div>
+      <div className="topbar">
+        <span className="logo">Big<span>ticket</span></span>
+        <span style={{fontSize:13,color:"#888"}}>Propuesta económica</span>
       </div>
-      <div style={{display:"flex",background:"#1a3a6b",borderBottom:"1px solid #e4e7ec",flexShrink:0}}>
-        {[["info","📋 Datos"],["score","⭐ Score"],["timeline","🕐 Historial"]].map(([id,label])=>(
-          <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:tab===id?"2px solid #3B82F6":"2px solid transparent",color:tab===id?"#3B82F6":"#475569",fontSize:11,fontWeight:700,cursor:"pointer",letterSpacing:.5}}>{label}</button>
-        ))}
-      </div>
-      <div style={{flex:1,overflow:"auto",padding:16}}>
-        {tab==="info"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:12}}>
-            <div style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:10,padding:14}}>
-              <div style={{fontSize:10,fontWeight:800,color:"#555555",letterSpacing:1,marginBottom:10,textTransform:"uppercase"}}>Datos de contacto</div>
-              {lead.codigo_postulacion&&(
-                <div style={{background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:8,padding:"10px 14px",marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div>
-                    <div style={{fontSize:9,color:"#0369a1",fontWeight:800,letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>Código postulación</div>
-                    <div style={{fontSize:16,fontWeight:900,color:"#0369a1",letterSpacing:2,fontFamily:"monospace"}}>{lead.codigo_postulacion}</div>
-                  </div>
-                  <button onClick={()=>navigator.clipboard?.writeText(lead.codigo_postulacion)}
-                    style={{background:"#e0f2fe",color:"#0369a1",border:"none",borderRadius:6,padding:"5px 10px",fontSize:11,cursor:"pointer",fontWeight:700}}>
-                    Copiar
-                  </button>
-                </div>
-              )}
-              {[["📞","Teléfono",lead.telefono],["📧","Email",lead.email],["📍","Zona",lead.zona],["📦","Volumen",lead.volumen],["🔗","Canal",lead.fuente_contacto||lead.canal],["📅","Captado",formatFecha(lead.created_at)],["🔄","Actualizado",formatFecha(lead.updated_at)]].filter(([,,v])=>v).map(([icon,k,v])=>(
-                <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #f4f5f7"}}>
-                  <span style={{fontSize:12,color:"#555555"}}>{icon} {k}</span>
-                  <span style={{fontSize:12,color:"#1a1a1a",fontWeight:600}}>{v}</span>
-                </div>
-              ))}
-              {lead.pais&&(
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #f4f5f7"}}>
-                  <span style={{fontSize:12,color:"#555555"}}>🌎 País</span>
-                  <div style={{display:"flex",alignItems:"center",gap:6}}>
-                    <PaisFlag pais={lead.pais}/>
-                    <span style={{fontSize:12,color:"#1a1a1a",fontWeight:600}}>{lead.pais}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-            {lead.notas&&<div style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:10,padding:14}}><div style={{fontSize:10,fontWeight:800,color:"#555555",letterSpacing:1,marginBottom:8,textTransform:"uppercase"}}>Notas</div><div style={{fontSize:12,color:"#666666",lineHeight:1.6}}>{lead.notas}</div></div>}
-          </div>
-        )}
-        {tab==="score"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:12}}>
-            <div style={{background:"#ffffff",border:`1px solid ${scoreColor}33`,borderRadius:10,padding:16,textAlign:"center"}}>
-              <div style={{fontSize:52,fontWeight:900,color:scoreColor,fontFamily:"monospace"}}>{lead.score||0}</div>
-              <div style={{fontSize:12,color:"#888888",marginTop:4}}>Score total / 100</div>
-              {lead.clasificacion&&<div style={{marginTop:8}}><Tag label={`${lead.emoji||""} ${lead.clasificacion}`} color={lead.clasificacion?.includes("Caliente")?"#EF4444":lead.clasificacion?.includes("Candidato")?"#F59E0B":"#F97316"}/></div>}
-            </div>
-            {lead.razones_score&&<div style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:10,padding:14}}>
-              <div style={{fontSize:10,fontWeight:800,color:"#555555",letterSpacing:1,marginBottom:10,textTransform:"uppercase"}}>Detalle del score</div>
-              {lead.razones_score.split(" | ").map((r,i)=>(
-                <div key={i} style={{display:"flex",alignItems:"flex-start",gap:8,padding:"6px 0",borderBottom:"1px solid #f4f5f7"}}>
-                  <span style={{color:"#10B981"}}>✓</span><span style={{fontSize:12,color:"#666666"}}>{r}</span>
-                </div>
-              ))}
-            </div>}
-          </div>
-        )}
-        {tab==="timeline"&&<TimelineView lead={lead}/>}
-      </div>
-    </div>
-  );
-};
-
-// ─── KPIs POR CAMPAÑA ─────────────────────────────────────────────────────────
-const KPIsCampanaView = ({ leads }) => {
-  const [campanaFiltro,setCampanaFiltro]=useState("todas");
-  const [descargando,setDescargando]=useState(false);
-  const reporteRef=useRef(null);
-  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
-
-  const descargarPDF=async()=>{
-    if(!reporteRef.current) return;
-    setDescargando(true);
-    try {
-      const script=document.createElement("script");
-      script.src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
-      document.head.appendChild(script);
-      await new Promise(r=>script.onload=r);
-      const script2=document.createElement("script");
-      script2.src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
-      document.head.appendChild(script2);
-      await new Promise(r=>script2.onload=r);
-      const canvas=await window.html2canvas(reporteRef.current,{scale:2,backgroundColor:"#f0f2f5",useCORS:true});
-      const imgData=canvas.toDataURL("image/png");
-      const {jsPDF}=window.jspdf;
-      const pdf=new jsPDF({orientation:"portrait",unit:"mm",format:"a4"});
-      const pdfW=pdf.internal.pageSize.getWidth();
-      const pdfH=(canvas.height*pdfW)/canvas.width;
-      pdf.addImage(imgData,"PNG",0,0,pdfW,pdfH);
-      const nombre=campanaFiltro==="todas"?"KPIs_Todas_Campanas":campanaFiltro.replace(/\s+/g,"_");
-      pdf.save(`BigTicket_${nombre}_${new Date().toLocaleDateString("es-CL").replace(/\//g,"-")}.pdf`);
-    } catch(e){alert("Error generando PDF: "+e.message);}
-    finally{setDescargando(false);}
-  };
-  const campanas=[...new Set(leads.filter(l=>l.campana_id&&l.origen).map(l=>l.origen.replace("Campaña: ","")))].filter(Boolean).sort();
-
-  const leadsFiltered=campanaFiltro==="todas"
-    ? leads.filter(l=>l.campana_id)
-    : leads.filter(l=>(l.origen||"").includes(campanaFiltro));
-
-  const total=leadsFiltered.length;
-  if(total===0) return(
-    <div style={{display:"flex",flexDirection:"column",gap:16}}>
-      <select value={campanaFiltro} onChange={e=>setCampanaFiltro(e.target.value)}
-        style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:8,padding:"9px 12px",fontSize:13,maxWidth:400}}>
-        <option value="todas">Todas las campañas</option>
-        {campanas.map(c=><option key={c} value={c}>{c}</option>)}
-      </select>
-      <div style={{background:"#ffffff",borderRadius:12,border:"1px solid #e4e7ec",padding:40,textAlign:"center",color:"#aaaaaa"}}>No hay leads de campaña para mostrar</div>
-    </div>
-  );
-
-  const pct=(n)=>total>0?Math.round((n/total)*100):0;
-  const propAceptadas=leadsFiltered.filter(l=>["Propuesta Aceptada","Entrevistas y Validaciones","Postulante Aprobado","Postulante No Calificado"].includes(norm(l.etapa))).length;
-  const propRechazadas=leadsFiltered.filter(l=>norm(l.etapa)==="Propuesta Rechazada").length;
-  const contratosFirmados=leadsFiltered.filter(l=>norm(l.etapa)==="Postulante Aprobado").length;
-  const contratosNoFirmados=leadsFiltered.filter(l=>norm(l.etapa)==="Postulante No Calificado").length;
-  const enProceso=leadsFiltered.filter(l=>!["Postulante Aprobado","Postulante No Calificado","Propuesta Rechazada","Base Datos Leads"].includes(norm(l.etapa))).length;
-
-  // Canal con más ingresos
-  const canalesMap={};
-  leadsFiltered.forEach(l=>{const c=(l.fuente_contacto||l.canal||"Desconocido");canalesMap[c]=(canalesMap[c]||0)+1;});
-  const canalTop=Object.entries(canalesMap).sort((a,b)=>b[1]-a[1]);
-
-  // Tiempo promedio de cierre
-  const tiempos=leadsFiltered.filter(l=>norm(l.etapa)==="Postulante Aprobado").map(l=>diasEntre(l.created_at,l.updated_at)).filter(d=>d!==null);
-  const tiempoPromedio=tiempos.length?Math.round(tiempos.reduce((a,b)=>a+b,0)/tiempos.length):null;
-
-  // Score promedio
-  const scorePromedio=leadsFiltered.length?Math.round(leadsFiltered.reduce((a,l)=>a+(l.score||0),0)/leadsFiltered.length):0;
-
-  // Leads calientes
-  const calientes=leadsFiltered.filter(l=>(l.clasificacion||"").toLowerCase().includes("caliente")).length;
-
-  const METRICAS=[
-    ["📋","Total postulaciones",total,"#3B82F6","leads en esta campaña"],
-    ["✅","Propuestas aceptadas",`${pct(propAceptadas)}%`,"#10B981",`${propAceptadas} de ${total}`],
-    ["❌","Propuestas rechazadas",`${pct(propRechazadas)}%`,"#EF4444",`${propRechazadas} de ${total}`],
-    ["📝","Postulantes Aprobados",`${pct(contratosFirmados)}%`,"#059669",`${contratosFirmados} de ${total}`],
-    ["🚫","Postulantes No Calificados",`${pct(contratosNoFirmados)}%`,"#DC2626",`${contratosNoFirmados} de ${total}`],
-    ["⏳","En proceso",enProceso,"#F59E0B","leads activos en pipeline"],
-    ["⭐","Score promedio",scorePromedio,"#F59E0B","puntos promedio"],
-    ["🔴","Leads calientes",`${pct(calientes)}%`,"#EF4444",`${calientes} calientes`],
-    ["⏱","Tiempo prom. cierre",tiempoPromedio!==null?`${tiempoPromedio}d`:"—","#8B5CF6","días lead→contrato firmado"],
-  ];
-
-  return(
-    <div style={{display:"flex",flexDirection:"column",gap:16}} ref={reporteRef}>
-      {/* Filtro campaña */}
-      <div style={{display:"flex",gap:12,alignItems:"center"}}>
-        <select value={campanaFiltro} onChange={e=>setCampanaFiltro(e.target.value)}
-          style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:8,padding:"9px 14px",fontSize:13,flex:1,maxWidth:400,cursor:"pointer"}}>
-          <option value="todas">📊 Todas las campañas</option>
-          {campanas.map(c=><option key={c} value={c}>{c}</option>)}
-        </select>
-        <div style={{fontSize:12,color:"#888888"}}>{total} leads {campanaFiltro!=="todas"?`en "${campanaFiltro}"`:"en total"}</div>
-        <button onClick={descargarPDF} disabled={descargando}
-          style={{background:"#1a3a6b",color:"white",border:"none",borderRadius:8,padding:"9px 18px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif",opacity:descargando?0.6:1,flexShrink:0}}>
-          {descargando?"Generando...":"⬇ Descargar PDF"}
-        </button>
-      </div>
-
-      {/* Métricas principales */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
-        {METRICAS.map(([icon,label,val,color,sub])=>(
-          <div key={label} style={{background:"#ffffff",border:`1px solid ${color}22`,borderRadius:12,padding:16}}>
-            <div style={{fontSize:20}}>{icon}</div>
-            <div style={{fontSize:26,fontWeight:900,color,fontFamily:"monospace",marginTop:6}}>{val}</div>
-            <div style={{fontSize:11,color:"#555555",fontWeight:700,marginTop:2}}>{label}</div>
-            <div style={{fontSize:10,color:"#aaaaaa",marginTop:2}}>{sub}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Canal con más ingresos */}
-      <div style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:12,padding:16}}>
-        <div style={{fontSize:10,fontWeight:800,color:"#555555",letterSpacing:2,marginBottom:14,textTransform:"uppercase"}}>Origen de leads</div>
-        {canalTop.map(([canal,count])=>{const cfg=getCanalCfg(canal.toLowerCase());return(
-          <div key={canal} style={{marginBottom:10}}>
-            <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-              <span style={{fontSize:12,color:"#666666"}}>{cfg.icon} {cfg.label||canal}</span>
-              <div style={{display:"flex",gap:12}}>
-                <span style={{fontSize:10,color:"#555555"}}>{count} leads</span>
-                <span style={{fontSize:12,fontWeight:800,color:cfg.color}}>{pct(count)}%</span>
-              </div>
-            </div>
-            <div style={{height:6,background:"#f4f5f7",borderRadius:4}}>
-              <div style={{height:"100%",width:`${pct(count)}%`,background:cfg.color,borderRadius:4,transition:"width .8s ease"}}/>
-            </div>
-          </div>
-        );})}
-      </div>
-
-      {/* Comparativa de campañas si se muestra "todas" */}
-      {campanaFiltro==="todas"&&campanas.length>1&&(
-        <div style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:12,padding:16}}>
-          <div style={{fontSize:10,fontWeight:800,color:"#555555",letterSpacing:2,marginBottom:14,textTransform:"uppercase"}}>Comparativa de campañas</div>
-          {campanas.map(c=>{
-            const ls=leads.filter(l=>(l.origen||"").includes(c));
-            const tot=ls.length;
-            const firm=ls.filter(l=>norm(l.etapa)==="Postulante Aprobado").length;
-            const tasa=tot>0?Math.round((firm/tot)*100):0;
-            return(
-              <div key={c} style={{marginBottom:12}}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                  <span style={{fontSize:12,color:"#1a1a1a",fontWeight:600}}>{c}</span>
-                  <div style={{display:"flex",gap:16}}>
-                    <span style={{fontSize:10,color:"#555555"}}>{tot} postulaciones · {firm} firmados</span>
-                    <span style={{fontSize:12,fontWeight:800,color:tasa>=50?"#10B981":tasa>=25?"#F59E0B":"#EF4444"}}>{tasa}%</span>
-                  </div>
-                </div>
-                <div style={{height:6,background:"#f4f5f7",borderRadius:4}}>
-                  <div style={{height:"100%",width:`${tasa}%`,background:tasa>=50?"#10B981":tasa>=25?"#F59E0B":"#EF4444",borderRadius:4,transition:"width .8s ease"}}/>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ─── EMBUDO DE CONVERSIÓN ─────────────────────────────────────────────────────
-const EmbudoView = ({ leads }) => {
-  const [campanaFiltro, setCampanaFiltro] = useState("todas");
-  const [descargando, setDescargando] = useState(false);
-  const reporteRef = useRef(null);
-
-  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
-
-  const campanas = [...new Set(leads.filter(l=>l.campana_id&&l.origen).map(l=>l.origen.replace("Campaña: ","")))].filter(Boolean).sort();
-
-  const leadsFiltered = campanaFiltro === "todas"
-    ? leads.filter(l => l.campana_id)
-    : leads.filter(l => (l.origen||"").includes(campanaFiltro));
-
-  // ── Cálculo de etapas del embudo ──
-  const total        = leadsFiltered.length;
-  const preCalif     = leadsFiltered.filter(l => {
-    const e = norm(l.etapa);
-    return (l.clasificacion||"").toLowerCase().includes("caliente") ||
-      ["Propuesta Enviada","Propuesta Aceptada","Propuesta Rechazada","Postulante Aprobado","Postulante No Calificado"].includes(e);
-  }).length;
-  const potenciales  = leadsFiltered.filter(l => {
-    const e = norm(l.etapa);
-    return ["Propuesta Aceptada","Postulante Aprobado","Postulante No Calificado"].includes(e);
-  }).length;
-  const validacion   = leadsFiltered.filter(l => {
-    const e = norm(l.etapa);
-    return ["Postulante Aprobado","Postulante No Calificado","Entrevistas y Validaciones","Onboarding Pendiente"].includes(e) ||
-      (l.onboarding_completado === true);
-  }).length;
-  const aprobados    = leadsFiltered.filter(l => norm(l.etapa) === "Postulante Aprobado").length;
-
-  const pct = (n, base) => base > 0 ? Math.round((n / base) * 100) : 0;
-
-  const ETAPAS = [
-    { label: "Prospectos",            sub: "Total postulaciones",                    n: total,       color: "#3B82F6", icon: "👥", base: total },
-    { label: "Pre-Calificados",       sub: "Leads calientes o propuesta enviada",    n: preCalif,    color: "#8B5CF6", icon: "⭐", base: total },
-    { label: "Clientes Potenciales",  sub: "Aceptaron la propuesta económica",       n: potenciales, color: "#F59E0B", icon: "✅", base: total },
-    { label: "Validación",            sub: "Completaron formulario de onboarding",   n: validacion,  color: "#10B981", icon: "📋", base: total },
-    { label: "Aprobados",             sub: "Contrato firmado — activos",             n: aprobados,   color: "#059669", icon: "🏆", base: total },
-  ];
-
-  const maxN = total || 1;
-
-  const descargarPDF = async () => {
-    if (!reporteRef.current) return;
-    setDescargando(true);
-    try {
-      if (!window.html2canvas) { const s=document.createElement("script"); s.src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"; document.head.appendChild(s); await new Promise(r=>s.onload=r); }
-      if (!window.jspdf)       { const s=document.createElement("script"); s.src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";    document.head.appendChild(s); await new Promise(r=>s.onload=r); }
-      const canvas   = await window.html2canvas(reporteRef.current, { scale: 2, backgroundColor: "#f0f2f5", useCORS: true });
-      const imgData  = canvas.toDataURL("image/png");
-      const { jsPDF } = window.jspdf;
-      const pdf      = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const pdfW     = pdf.internal.pageSize.getWidth();
-      const pdfH     = (canvas.height * pdfW) / canvas.width;
-      if (pdfH > pdf.internal.pageSize.getHeight()) {
-        const ratio  = pdf.internal.pageSize.getHeight() / pdfH;
-        pdf.addImage(imgData, "PNG", 0, 0, pdfW * ratio, pdf.internal.pageSize.getHeight());
-      } else {
-        pdf.addImage(imgData, "PNG", 0, 0, pdfW, pdfH);
-      }
-      const nombre = campanaFiltro === "todas" ? "Embudo_Todas" : campanaFiltro.replace(/\s+/g,"_");
-      pdf.save(`BigTicket_Embudo_${nombre}_${new Date().toLocaleDateString("es-CL").replace(/\//g,"-")}.pdf`);
-    } catch(e) { alert("Error generando PDF: "+e.message); }
-    finally { setDescargando(false); }
-  };
-
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:16}}>
-      {/* Filtros y acciones */}
-      <div style={{display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
-        <select value={campanaFiltro} onChange={e=>setCampanaFiltro(e.target.value)}
-          style={{background:"#fff",border:"1px solid #e4e7ec",borderRadius:8,padding:"9px 14px",fontSize:13,flex:1,maxWidth:400,cursor:"pointer"}}>
-          <option value="todas">📊 Todas las campañas</option>
-          {campanas.map(c=><option key={c} value={c}>{c}</option>)}
-        </select>
-        <div style={{fontSize:12,color:"#888"}}>{total} leads {campanaFiltro!=="todas"?`en "${campanaFiltro}"`:"en total"}</div>
-        <button onClick={descargarPDF} disabled={descargando}
-          style={{background:"#1a3a6b",color:"#fff",border:"none",borderRadius:8,padding:"9px 18px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif",opacity:descargando?0.6:1,flexShrink:0}}>
-          {descargando?"Generando...":"⬇ Descargar PDF"}
-        </button>
-      </div>
-
-      {/* Reporte embudo */}
-      <div ref={reporteRef} style={{background:"#f0f2f5",padding:24,borderRadius:16}}>
-
-        {/* Header reporte */}
-        <div style={{background:"#1a3a6b",borderRadius:12,padding:"20px 24px",marginBottom:24,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div>
-            <div style={{fontSize:20,fontWeight:900,color:"#fff",fontFamily:"'Outfit',sans-serif"}}>📊 Embudo de Conversión</div>
-            <div style={{fontSize:12,color:"#ffffff88",marginTop:4}}>
-              {campanaFiltro==="todas"?"Todas las campañas":`Campaña: ${campanaFiltro}`} · {new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"long",year:"numeric"})}
-            </div>
-          </div>
-          <div style={{textAlign:"right"}}>
-            <div style={{fontSize:32,fontWeight:900,color:"#3B82F6",fontFamily:"monospace"}}>{total}</div>
-            <div style={{fontSize:10,color:"#ffffff88",fontWeight:700,letterSpacing:1}}>TOTAL PROSPECTOS</div>
-          </div>
+      <div style={{maxWidth:700,margin:"0 auto",padding:"20px 16px"}}>
+        <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",padding:"16px 20px",marginBottom:16}}>
+          <div style={{fontSize:13,color:"#888",marginBottom:2}}>Hola, <strong style={{color:"#1a1a1a"}}>{lead.nombre}</strong></div>
+          <div style={{fontSize:13,color:"#555"}}>A continuación encontrarás la propuesta económica para la campaña <strong>{campana?.nombre||"BigTicket"}</strong>. Por favor revísala y responde al final.</div>
         </div>
 
-        {/* Embudo visual */}
-        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:24}}>
-          {ETAPAS.map((et, i) => {
-            const w = maxN > 0 ? Math.max(30, Math.round((et.n / maxN) * 100)) : 30;
-            const convPrev = i > 0 ? pct(et.n, ETAPAS[i-1].n) : 100;
-            return (
-              <div key={et.label}>
-                {/* Flecha de conversión entre etapas */}
-                {i > 0 && (
-                  <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:8,padding:"4px 0",marginBottom:4}}>
-                    <div style={{height:1,flex:1,background:"#e4e7ec"}}/>
-                    <div style={{fontSize:11,fontWeight:700,color: convPrev >= 50 ? "#10B981" : convPrev >= 25 ? "#F59E0B" : "#EF4444",
-                      background:"#fff",border:`1px solid ${convPrev >= 50 ? "#10B98133" : convPrev >= 25 ? "#F59E0B33" : "#EF444433"}`,
-                      borderRadius:20,padding:"2px 10px"}}>
-                      ↓ {convPrev}% conversión
-                    </div>
-                    <div style={{height:1,flex:1,background:"#e4e7ec"}}/>
-                  </div>
-                )}
-                {/* Barra del embudo */}
-                <div style={{display:"flex",alignItems:"center",gap:12}}>
-                  <div style={{width:32,textAlign:"center",fontSize:18,flexShrink:0}}>{et.icon}</div>
-                  <div style={{flex:1}}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:5,alignItems:"center"}}>
-                      <div>
-                        <span style={{fontSize:13,fontWeight:800,color:"#1a1a1a",fontFamily:"'Outfit',sans-serif"}}>{et.label}</span>
-                        <span style={{fontSize:11,color:"#888",marginLeft:8}}>{et.sub}</span>
-                      </div>
-                      <div style={{display:"flex",gap:16,alignItems:"center",flexShrink:0}}>
-                        <span style={{fontSize:22,fontWeight:900,color:et.color,fontFamily:"monospace"}}>{et.n}</span>
-                        <span style={{fontSize:13,fontWeight:700,color:"#555",minWidth:40,textAlign:"right"}}>{pct(et.n, total)}%</span>
-                      </div>
-                    </div>
-                    <div style={{height:28,background:"#e4e7ec",borderRadius:6,overflow:"hidden"}}>
-                      <div style={{height:"100%",width:`${w}%`,background:`linear-gradient(90deg, ${et.color}, ${et.color}cc)`,
-                        borderRadius:6,transition:"width 1s ease",display:"flex",alignItems:"center",justifyContent:"flex-end",paddingRight:8}}>
-                        {et.n > 0 && <span style={{fontSize:10,fontWeight:800,color:"#fff"}}>{et.n}</span>}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Métricas clave */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:24}}>
-          {[
-            ["Tasa Pre-Calif.",    `${pct(preCalif,total)}%`,    "#8B5CF6", `${preCalif} de ${total}`],
-            ["Tasa Potenciales",   `${pct(potenciales,total)}%`, "#F59E0B", `${potenciales} de ${preCalif} pre-calif.`],
-            ["Tasa Onboarding",    `${pct(validacion,total)}%`,  "#10B981", `${validacion} de ${potenciales} potenciales`],
-            ["Tasa Aprobación",    `${pct(aprobados,total)}%`,   "#059669", `${aprobados} de ${total} totales`],
-          ].map(([label,val,color,sub])=>(
-            <div key={label} style={{background:"#fff",borderRadius:10,padding:14,border:`1px solid ${color}33`}}>
-              <div style={{fontSize:24,fontWeight:900,color,fontFamily:"monospace"}}>{val}</div>
-              <div style={{fontSize:11,fontWeight:700,color:"#555",marginTop:4}}>{label}</div>
-              <div style={{fontSize:10,color:"#aaa",marginTop:2}}>{sub}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Comparativa por campaña si es "todas" */}
-        {campanaFiltro==="todas" && campanas.length > 1 && (
-          <div style={{background:"#fff",borderRadius:12,padding:16,border:"1px solid #e4e7ec"}}>
-            <div style={{fontSize:10,fontWeight:800,color:"#555",letterSpacing:2,marginBottom:14,textTransform:"uppercase"}}>Comparativa por campaña</div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
-              {campanas.map(c => {
-                const ls = leads.filter(l=>(l.origen||"").includes(c));
-                const tot = ls.length;
-                const aprov = ls.filter(l=>norm(l.etapa)==="Postulante Aprobado").length;
-                const tasa = pct(aprov, tot);
-                return (
-                  <div key={c} style={{background:"#f8f9fa",borderRadius:8,padding:12,border:"1px solid #e4e7ec"}}>
-                    <div style={{fontSize:12,fontWeight:700,color:"#1a1a1a",marginBottom:6,lineHeight:1.3}}>{c}</div>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                      <span style={{fontSize:10,color:"#888"}}>{tot} leads</span>
-                      <span style={{fontSize:13,fontWeight:900,color:tasa>=50?"#059669":tasa>=25?"#F59E0B":"#EF4444"}}>{tasa}%</span>
-                    </div>
-                    <div style={{height:5,background:"#e4e7ec",borderRadius:3}}>
-                      <div style={{height:"100%",width:`${tasa}%`,background:tasa>=50?"#059669":tasa>=25?"#F59E0B":"#EF4444",borderRadius:3}}/>
-                    </div>
-                    <div style={{fontSize:9,color:"#aaa",marginTop:4}}>{aprov} aprobados</div>
-                  </div>
-                );
-              })}
-            </div>
+        {campana?.propuesta_url?(
+          <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",overflow:"hidden",marginBottom:16}}>
+            <iframe src={campana.propuesta_url} style={{width:"100%",height:600,border:"none"}} title="Propuesta económica"/>
+          </div>
+        ):(
+          <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",padding:40,textAlign:"center",marginBottom:16,color:"#888"}}>
+            La propuesta aún no ha sido cargada. Contacta al equipo BigTicket.
           </div>
         )}
 
-        {/* Footer */}
-        <div style={{marginTop:16,textAlign:"center",fontSize:10,color:"#aaa"}}>
-          Generado por BIGPRO FLOTA CRM · {new Date().toLocaleString("es-CL")}
-        </div>
+        {enviado?(
+          <div style={{background:respuesta==="si"?"#dcfce7":"#fee2e2",border:`1px solid ${respuesta==="si"?"#86efac":"#fca5a5"}`,borderRadius:16,padding:"20px 24px",textAlign:"center"}}>
+            <div style={{fontSize:20,marginBottom:8}}>{respuesta==="si"?"✅":"❌"}</div>
+            <div style={{fontSize:15,fontWeight:700,color:respuesta==="si"?"#166534":"#c0392b"}}>
+              {respuesta==="si"?"¡Propuesta aceptada!":"Propuesta rechazada"}
+            </div>
+            <div style={{fontSize:13,color:"#555",marginTop:6}}>
+              {respuesta==="si"?"Nuestro equipo se pondrá en contacto contigo para coordinar los siguientes pasos.":"Gracias por tu tiempo. Puedes postular a otras campañas disponibles."}
+            </div>
+          </div>
+        ):respuesta?(
+          <div style={{background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:16,padding:"20px 24px",textAlign:"center"}}>
+            <div style={{fontSize:13,color:"#0369a1",fontWeight:600}}>Ya respondiste esta propuesta anteriormente: {respuesta==="si"?"Aceptada ✅":"Rechazada ❌"}</div>
+          </div>
+        ):(
+          <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",padding:"20px 24px"}}>
+            <div style={{fontSize:14,fontWeight:700,color:"#1a1a1a",marginBottom:6}}>¿Aceptas esta propuesta económica?</div>
+            <div style={{fontSize:12,color:"#888",marginBottom:16}}>Tu respuesta actualizará automáticamente el estado de tu postulación.</div>
+            <div style={{display:"flex",gap:12}}>
+              <button onClick={()=>responder("si")} disabled={enviando}
+                style={{flex:1,background:"#10B981",color:"#fff",border:"none",borderRadius:10,padding:"14px",fontSize:14,fontWeight:700,cursor:"pointer",opacity:enviando?0.6:1}}>
+                ✅ Sí, acepto la propuesta
+              </button>
+              <button onClick={()=>responder("no")} disabled={enviando}
+                style={{flex:1,background:"#EF4444",color:"#fff",border:"none",borderRadius:10,padding:"14px",fontSize:14,fontWeight:700,cursor:"pointer",opacity:enviando?0.6:1}}>
+                ❌ No acepto
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
-};
-
-// ─── DASHBOARD ────────────────────────────────────────────────────────────────
-const DashboardMetrics = ({ leads }) => {
-  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
-  const hoy=new Date();hoy.setHours(0,0,0,0);
-  const nuevosHoy=leads.filter(l=>l.created_at&&new Date(l.created_at)>=hoy).length;
-  const scorePromedio=leads.length?Math.round(leads.reduce((a,l)=>a+(l.score||0),0)/leads.length):0;
-  const ganados=leads.filter(l=>norm(l.etapa)==="Postulante Aprobado").length;
-  const cerrados=ganados+leads.filter(l=>norm(l.etapa)==="Postulante No Calificado").length;
-  const tasaCierre=cerrados>0?Math.round((ganados/cerrados)*100):0;
-  const canalData=Object.entries(leads.reduce((a,l)=>{const c=(l.fuente_contacto||l.canal)?.toLowerCase()||"otro";a[c]=(a[c]||0)+1;return a},{})).sort((a,b)=>b[1]-a[1]);
-  const etapaData=ETAPAS_TODAS.map(e=>({etapa:e,count:leads.filter(l=>norm(l.etapa)===e).length}));
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:16}}>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
-        {[["👥","Total Leads",leads.length,"#3B82F6"],["🆕","Nuevos hoy",nuevosHoy,"#10B981"],["⭐","Score promedio",scorePromedio,"#F59E0B"],["✅","Tasa de cierre",`${tasaCierre}%`,"#10B981"]].map(([icon,label,val,color])=>(
-          <div key={label} style={{background:"#ffffff",border:`1px solid ${color}22`,borderRadius:12,padding:16}}>
-            <div style={{fontSize:24}}>{icon}</div>
-            <div style={{fontSize:30,fontWeight:900,color,fontFamily:"monospace",marginTop:6}}>{val}</div>
-            <div style={{fontSize:11,color:"#555555",fontWeight:700,marginTop:2}}>{label}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-        <div style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:12,padding:16}}>
-          <div style={{fontSize:10,fontWeight:800,color:"#555555",letterSpacing:2,marginBottom:14,textTransform:"uppercase"}}>Leads por canal</div>
-          {canalData.map(([canal,count])=>{const cfg=getCanalCfg(canal);return(
-            <div key={canal} style={{marginBottom:10}}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
-                <span style={{fontSize:12,color:"#666666"}}>{cfg.icon} {cfg.label}</span>
-                <span style={{fontSize:12,fontWeight:800,color:cfg.color}}>{count}</span>
-              </div>
-              <div style={{height:5,background:"#f4f5f7",borderRadius:4}}><div style={{height:"100%",width:`${(count/leads.length)*100}%`,background:cfg.color,borderRadius:4,transition:"width .8s ease"}}/></div>
-            </div>
-          );})}
-        </div>
-        <div style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:12,padding:16}}>
-          <div style={{fontSize:10,fontWeight:800,color:"#555555",letterSpacing:2,marginBottom:14,textTransform:"uppercase"}}>Pipeline por etapa</div>
-          {etapaData.map(({etapa,count})=>{const cfg=ETAPA_CFG[etapa]||{color:"#888888"};return(
-            <div key={etapa} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid #f4f5f7"}}>
-              <span style={{fontSize:11,color:"#888888"}}>{cfg.icon} {etapa}</span>
-              <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                <div style={{height:4,width:`${Math.max(count*10,4)}px`,maxWidth:60,background:cfg.color,borderRadius:4}}/>
-                <span style={{fontSize:12,fontWeight:800,color:cfg.color,fontFamily:"monospace",minWidth:20,textAlign:"right"}}>{count}</span>
-              </div>
-            </div>
-          );})}
-        </div>
-      </div>
-      <div style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:12,padding:16}}>
-        <div style={{fontSize:10,fontWeight:800,color:"#555555",letterSpacing:2,marginBottom:12,textTransform:"uppercase"}}>Leads recientes</div>
-        {leads.slice(0,5).map(lead=>(
-          <div key={lead.id} style={{display:"flex",alignItems:"center",gap:12,padding:"9px 0",borderBottom:"1px solid #ffffff"}}>
-            <div style={{width:34,height:34,borderRadius:"50%",background:"#eef2ff",border:"1px solid #dbeafe",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"#888888",fontWeight:700,flexShrink:0}}>{(lead.nombre||"?")[0].toUpperCase()}</div>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:12,fontWeight:700,color:"#1a1a1a",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{lead.nombre} · {lead.empresa}</div>
-              <div style={{fontSize:10,color:"#555555"}}>{lead.etapa||"Nuevo Lead"} · {formatFecha(lead.created_at)}</div>
-            </div>
-            <CanalTag canal={lead.canal}/><ScoreDot score={lead.score}/>
-          </div>
-        ))}
-        {leads.length===0&&<div style={{color:"#aaaaaa",fontSize:12}}>No hay leads aún</div>}
-      </div>
-    </div>
-  );
-};
-
-// ─── TABLA ────────────────────────────────────────────────────────────────────
-const TablaLeads = ({ leads, onSelect }) => (
-  <div style={{background:"#ffffff",borderRadius:12,border:"1px solid #e4e7ec",overflow:"hidden"}}>
-    <table style={{width:"100%",borderCollapse:"collapse"}}>
-      <thead><tr style={{background:"#f0f2f5"}}>{["Prospecto","Empresa","Canal","País","Etapa","Score","Clasificación","Actualizado",""].map(h=><th key={h} style={{padding:"10px 14px",textAlign:"left",fontSize:9,fontWeight:800,color:"#aaaaaa",textTransform:"uppercase",letterSpacing:1}}>{h}</th>)}</tr></thead>
-      <tbody>{leads.map((lead,i)=>{const cfg=ETAPA_CFG[lead.etapa]||{color:"#888888",icon:"•"};return(
-        <tr key={lead.id} style={{borderTop:"1px solid #f0f2f5",background:i%2===0?"#ffffff":"#f8f9fa",cursor:"pointer"}}
-          onClick={()=>onSelect(lead)} onMouseEnter={e=>e.currentTarget.style.background="#eef2ff"} onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"#ffffff":"#f8f9fa"}>
-          <td style={{padding:"10px 14px"}}><div style={{fontSize:12,fontWeight:700,color:"#1a1a1a"}}>{lead.nombre||"—"}</div><div style={{fontSize:10,color:"#aaaaaa"}}>{lead.email||"—"}</div></td>
-          <td style={{padding:"10px 14px",fontSize:12,color:"#888888"}}>{lead.empresa||"—"}</td>
-          <td style={{padding:"10px 14px"}}><CanalTag canal={lead.fuente_contacto||lead.canal}/></td>
-          <td style={{padding:"10px 14px"}}><div style={{display:"flex",alignItems:"center",gap:6}}><PaisFlag pais={lead.pais}/><span style={{fontSize:12,color:"#888"}}>{lead.pais||"—"}</span></div></td>
-          <td style={{padding:"10px 14px"}}><Tag label={`${cfg.icon} ${lead.etapa||"Nuevo Lead"}`} color={cfg.color}/></td>
-          <td style={{padding:"10px 14px"}}><ScoreDot score={lead.score}/></td>
-          <td style={{padding:"10px 14px"}}>{lead.clasificacion?<Tag label={`${lead.emoji||""} ${lead.clasificacion}`} color={lead.clasificacion?.includes("Caliente")?"#EF4444":lead.clasificacion?.includes("Candidato")?"#F59E0B":"#F97316"}/>:<span style={{color:"#aaaaaa",fontSize:11}}>—</span>}</td>
-          <td style={{padding:"10px 14px",fontSize:11,color:"#aaaaaa"}}>{formatFecha(lead.updated_at)}</td>
-          <td style={{padding:"10px 14px"}}><button onClick={e=>{e.stopPropagation();onSelect(lead);}} style={{background:"#eef2ff",color:"#1a3a6b",border:"none",borderRadius:6,padding:"5px 10px",fontSize:11,cursor:"pointer",fontWeight:700}}>Ver →</button></td>
-        </tr>
-      );})}</tbody>
-    </table>
-  </div>
-);
-
-// ─── APP ──────────────────────────────────────────────────────────────────────
-const ETAPAS_MONITOR=["Nuevo Lead","Propuesta Enviada","Propuesta Aceptada","Propuesta Rechazada"];
-const HORAS_OLVIDADO=24;
-const HORAS_ESTANCADO=48;
-
-const calcAlertas=(leads)=>{
-  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
-  const ahora=Date.now();
-  const olvidados=[];
-  const estancados=[];
-  leads.forEach(l=>{
-    if(!ETAPAS_MONITOR.includes(norm(l.etapa))) return;
-    const hsSinTocar=(ahora-new Date(l.updated_at||l.created_at))/3600000;
-    const hsEnEtapa =(ahora-new Date(l.created_at))/3600000;
-    if(hsSinTocar>=HORAS_OLVIDADO)  olvidados.push({...l,horas:Math.floor(hsSinTocar)});
-    else if(hsEnEtapa>=HORAS_ESTANCADO) estancados.push({...l,horas:Math.floor(hsEnEtapa)});
-  });
-  return{olvidados,estancados};
-};
-
-const AlertasPopup=({leads,onClose,onVerLead})=>{
-  const {olvidados,estancados}=calcAlertas(leads);
-  const total=olvidados.length+estancados.length;
-  if(total===0) return null;
-  return(
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300}}>
-      <div style={{background:"#ffffff",borderRadius:16,width:560,maxHeight:"80vh",display:"flex",flexDirection:"column",boxShadow:"0 20px 60px rgba(0,0,0,.3)"}}>
-        {/* Header */}
-        <div style={{padding:"20px 24px",borderBottom:"1px solid #f0f2f5",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
-          <div>
-            <div style={{fontSize:18,fontWeight:900,color:"#1a1a1a",fontFamily:"'Outfit',sans-serif"}}>
-              🔔 Alertas del CRM
-            </div>
-            <div style={{fontSize:12,color:"#888888",marginTop:2}}>
-              {total} lead{total!==1?"s":""} requiere{total===1?"":"n"} atención
-            </div>
-          </div>
-          <button onClick={onClose} style={{background:"#f0f2f5",border:"none",borderRadius:8,width:34,height:34,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",color:"#666666"}}>×</button>
-        </div>
-        {/* Contenido */}
-        <div style={{overflow:"auto",padding:"16px 24px",display:"flex",flexDirection:"column",gap:16}}>
-          {olvidados.length>0&&(
-            <div>
-              <div style={{fontSize:10,fontWeight:800,color:"#EF4444",letterSpacing:1.5,textTransform:"uppercase",marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
-                <div style={{width:8,height:8,borderRadius:"50%",background:"#EF4444"}}/>
-                Leads olvidados — sin tocar hace más de {HORAS_OLVIDADO}h ({olvidados.length})
-              </div>
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {olvidados.map(l=>(
-                  <div key={l.id} onClick={()=>{onVerLead(l);onClose();}}
-                    style={{background:"#fff5f5",border:"1px solid #fca5a5",borderRadius:10,padding:"10px 14px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",transition:"all .15s"}}
-                    onMouseOver={e=>e.currentTarget.style.background="#fee2e2"}
-                    onMouseOut={e=>e.currentTarget.style.background="#fff5f5"}>
-                    <div>
-                      <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a"}}>{l.nombre||"Sin nombre"}</div>
-                      <div style={{fontSize:11,color:"#888888",marginTop:2}}>{l.empresa||"Sin empresa"} · {ETAPA_CFG[l.etapa||"Nuevo Lead"]?.icon} {l.etapa||"Nuevo Lead"}</div>
-                    </div>
-                    <div style={{textAlign:"right",flexShrink:0}}>
-                      <div style={{fontSize:13,fontWeight:800,color:"#EF4444"}}>{l.horas}h</div>
-                      <div style={{fontSize:10,color:"#888888"}}>sin gestión</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {estancados.length>0&&(
-            <div>
-              <div style={{fontSize:10,fontWeight:800,color:"#F59E0B",letterSpacing:1.5,textTransform:"uppercase",marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
-                <div style={{width:8,height:8,borderRadius:"50%",background:"#F59E0B"}}/>
-                Leads estancados — más de {HORAS_ESTANCADO}h en la misma etapa ({estancados.length})
-              </div>
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {estancados.map(l=>(
-                  <div key={l.id} onClick={()=>{onVerLead(l);onClose();}}
-                    style={{background:"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:"10px 14px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",transition:"all .15s"}}
-                    onMouseOver={e=>e.currentTarget.style.background="#fef3c7"}
-                    onMouseOut={e=>e.currentTarget.style.background="#fffbeb"}>
-                    <div>
-                      <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a"}}>{l.nombre||"Sin nombre"}</div>
-                      <div style={{fontSize:11,color:"#888888",marginTop:2}}>{l.empresa||"Sin empresa"} · {ETAPA_CFG[l.etapa||"Nuevo Lead"]?.icon} {l.etapa||"Nuevo Lead"}</div>
-                    </div>
-                    <div style={{textAlign:"right",flexShrink:0}}>
-                      <div style={{fontSize:13,fontWeight:800,color:"#F59E0B"}}>{l.horas}h</div>
-                      <div style={{fontSize:10,color:"#888888"}}>en esta etapa</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-        {/* Footer */}
-        <div style={{padding:"14px 24px",borderTop:"1px solid #f0f2f5",flexShrink:0,display:"flex",justifyContent:"flex-end"}}>
-          <button onClick={onClose}
-            style={{background:"#1a3a6b",color:"white",border:"none",borderRadius:8,padding:"9px 20px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>
-            Entendido, cerrar
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
+}
 
 export default function App() {
-  const [leads,setLeads]=useState([]);
+  // Detectar URL de propuesta
+  const params=new URLSearchParams(window.location.search);
+  if(params.get("lead")&&params.get("propuesta")==="1"){
+    return <><style>{css}</style><ViewPropuesta/></>;
+  }
+  // Detectar URL de onboarding
+  if(params.get("onboarding")==="1"){
+    return <><style>{css}</style><OnboardingApp/></>;
+  }
+
+  const [view,setView]=useState("country");
+  const [op,setOp]=useState(null);
+  const [canal]=useState(getCanal);
+  const [campaigns,setCampaigns]=useState([]);
   const [loading,setLoading]=useState(true);
-  const [error,setError]=useState(null);
-  const [seccion,setSeccion]=useState("campana");
-  const [selectedLead,setSelectedLead]=useState(null);
-  const [busqueda,setBusqueda]=useState("");
-  const [vista,setVista]=useState("pipeline");
-  const [lastUpdate,setLastUpdate]=useState(null);
-  const [showAlertas,setShowAlertas]=useState(false);
-  const refreshInterval=useRef(null);
-  const alertasMostradas=useRef(false);
+  const [selectedCamp,setSelectedCamp]=useState(null);
+  const [formCamp,setFormCamp]=useState(null);
+  const [showAdmin,setShowAdmin]=useState(false);
+  const [adminAuth,setAdminAuth]=useState(!!sessionStorage.getItem("admin_auth"));
+  const [successCodigo,setSuccessCodigo]=useState(null);
+  const [busquedaCodigo,setBusquedaCodigo]=useState("");
+  const [resultadoBusqueda,setResultadoBusqueda]=useState(null);
+  const [buscando,setBuscando]=useState(false);
+  const [errorBusqueda,setErrorBusqueda]=useState("");
 
-  const fetchLeads=async()=>{
-    const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
-    try{const data=await sb.from("leads").select("*",{order:"created_at.desc"});
-      if(Array.isArray(data)){
-        const normalized=data.map(l=>({...l,etapa:norm(l.etapa)}));
-        setLeads(normalized);setLastUpdate(new Date());setError(null);
-        if(!alertasMostradas.current){
-          const {olvidados,estancados}=calcAlertas(normalized);
-          if(olvidados.length+estancados.length>0){setShowAlertas(true);}
-          alertasMostradas.current=true;
-        }
-      }
-      else setError("Error al cargar leads");
-    }catch{setError("Sin conexión a Supabase");}
-    finally{setLoading(false);}
-  };
+  useEffect(()=>{loadCampaigns();},[]);
 
-  useEffect(()=>{fetchLeads();refreshInterval.current=setInterval(fetchLeads,30000);return()=>clearInterval(refreshInterval.current);},[]);
+  async function loadCampaigns() {
+    setLoading(true);
+    const {data}=await sb.from("campanas").select("*").order("created_at",{ascending:false});
+    setCampaigns(data||[]);setLoading(false);
+  }
 
-  const NORM=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
+  async function buscarPostulacion() {
+    const codigo=busquedaCodigo.trim().toUpperCase();
+    if(!codigo){setErrorBusqueda("Ingresa tu código de postulación.");return;}
+    setBuscando(true);setErrorBusqueda("");setResultadoBusqueda(null);
+    const {data,error}=await sb.from("leads").select("*").eq("codigo_postulacion",codigo).single();
+    if(error||!data){setErrorBusqueda("No encontramos una postulación con ese código.");setBuscando(false);return;}
+    const {data:hist}=await sb.from("lead_historial").select("*").eq("lead_id",data.id).order("created_at",{ascending:true});
+    setResultadoBusqueda({lead:data,historial:hist||[]});
+    setBuscando(false);
+  }
 
-  const [confirmModal,setConfirmModal]=useState(null); // {lead, nuevaEtapa}
-
-  const handleEtapaChange=(lead,nuevaEtapa)=>{
-    const etapaActual=NORM(lead.etapa);
-    if(etapaActual===nuevaEtapa) return;
-    setConfirmModal({lead,nuevaEtapa,etapaActual});
-  };
-
-  const confirmarCambioEtapa=async()=>{
-    if(!confirmModal) return;
-    const {lead,nuevaEtapa,etapaActual}=confirmModal;
-    setConfirmModal(null);
-    try{
-      await sb.from("leads").update({etapa:nuevaEtapa},`id=eq.${lead.id}`);
-      await sb.from("lead_historial").insert({lead_id:lead.id,etapa_anterior:etapaActual,etapa_nueva:nuevaEtapa});
-      setLeads(prev=>prev.map(l=>l.id===lead.id?{...l,etapa:nuevaEtapa}:l));
-      if(selectedLead?.id===lead.id)setSelectedLead(p=>({...p,etapa:nuevaEtapa}));
-    }catch(e){console.error(e);}
-  };
-
-  const handleLeadUpdate=(updated)=>{
-    setLeads(prev=>prev.map(l=>l.id===updated.id?updated:l));
-    if(selectedLead?.id===updated.id)setSelectedLead(updated);
-  };
-
-  const esCaliente=(l)=>(l.clasificacion||"").toLowerCase().includes("caliente");
-  const esBaseDatos=(l)=>{
-    const e=NORM(l.etapa);
-    return e==="Base Datos Leads"||(!esCaliente(l)&&e==="Nuevo Lead"&&l.tipo_postulacion==="libre");
-  };
-
-  const scoreOrden=(l)=>{
-    const c=(l.clasificacion||"").toLowerCase();
-    if(c.includes("caliente")) return 0;
-    if(c.includes("tibio"))    return 1;
-    return 2;
-  };
-
-  const busquedaFilter=(l)=>(l.nombre||"").toLowerCase().includes(busqueda.toLowerCase())||(l.empresa||"").toLowerCase().includes(busqueda.toLowerCase())||(l.email||"").toLowerCase().includes(busqueda.toLowerCase());
-
-  const leadsCampana=[...leads]
-    .filter(l=>l.tipo_postulacion==="campaña"||(l.campana_id&&!l.tipo_postulacion))
-    .filter(l=>NORM(l.etapa)!=="Base Datos Leads")
-    .filter(busquedaFilter)
-    .sort((a,b)=>{const d=new Date(b.created_at)-new Date(a.created_at);return d!==0?d:scoreOrden(a)-scoreOrden(b);});
-
-  const leadsLibre=[...leads]
-    .filter(l=>l.tipo_postulacion==="libre"||(!l.campana_id&&!l.tipo_postulacion))
-    .filter(l=>NORM(l.etapa)!=="Base Datos Leads")
-    .filter(busquedaFilter)
-    .sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
-
-  const leadsBaseDatos=[...leads]
-    .filter(l=>NORM(l.etapa)==="Base Datos Leads"||
-      NORM(l.etapa)==="Propuesta Rechazada"||
-      NORM(l.etapa)==="Postulante No Calificado"||
-      (!esCaliente(l)&&["Contactado","Reunión Agendada","Negociación"].includes(l.etapa)))
-    .filter(busquedaFilter)
-    .sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
-
-  const NAV=[
-    {id:"dashboard",   icon:"◈", label:"Dashboard"},
-    {id:"campana",     icon:"🎯",label:"Leads Campaña",      count:leadsCampana.length},
-    {id:"libre",       icon:"📋",label:"Leads Libre",         count:leadsLibre.length},
-    {id:"basedatos",   icon:"🗄️",label:"Base Datos Leads",   count:leadsBaseDatos.length},
-    {id:"kpis",        icon:"📊",label:"KPIs Generales"},
-    {id:"kpiscampana", icon:"🎯",label:"KPIs por Campaña"},
-    {id:"embudo",      icon:"🔻",label:"Embudo Conversión"},
-  ];
+  if(showAdmin&&!adminAuth) return <><style>{css}</style><AdminLogin onSuccess={()=>setAdminAuth(true)} onClose={()=>setShowAdmin(false)}/></>;
+  if(showAdmin&&adminAuth) return <><style>{css}</style><AdminPanel onClose={()=>setShowAdmin(false)} campaigns={campaigns} setCampaigns={setCampaigns}/></>;
+  if(resultadoBusqueda) return <><style>{css}</style><ViewPostulacion data={resultadoBusqueda} onVolver={()=>setResultadoBusqueda(null)}/><BiggiBubble/></>;
 
   return (
-    <div style={{display:"flex",height:"100vh",background:"#f0f2f5",color:"#1a1a1a",overflow:"hidden",fontFamily:"'DM Mono','Fira Code',monospace"}}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Outfit:wght@400;600;700;800;900&display=swap');
-        *{box-sizing:border-box;margin:0;padding:0;}
-        ::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:#f0f2f5}::-webkit-scrollbar-thumb{background:#d0d5dd;border-radius:4px}
-        input,textarea,select{outline:none;font-family:inherit;}
-        @keyframes spin{to{transform:rotate(360deg)}}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-      `}</style>
+    <><style>{css}</ style>
+      {view==="country"&&<ViewCountry onSelect={c=>{setOp(c);setView("portal");}} busquedaCodigo={busquedaCodigo} setBusquedaCodigo={setBusquedaCodigo} buscarPostulacion={buscarPostulacion} buscando={buscando} errorBusqueda={errorBusqueda} onAdmin={()=>setShowAdmin(true)}/>}
+      {view==="portal"&&op&&<ViewPortal op={op} canal={canal} campaigns={campaigns} loading={loading} onChangePais={()=>setView("country")} onDetail={c=>{setSelectedCamp(c);setView("detail");}} onLibre={()=>{setFormCamp(null);setView("form");}}/>}
+      {view==="detail"&&selectedCamp&&<ViewDetail camp={selectedCamp} canal={canal} onBack={()=>setView("portal")} onPostular={()=>{setFormCamp(selectedCamp);setView("form");}}/>}
+      {view==="form"&&<ViewForm camp={formCamp} canal={canal} op={op} onBack={()=>setView(formCamp?"detail":"portal")} onSuccess={(codigo)=>{setSuccessCodigo(codigo);setView("success");}}/>}
+      {view==="success"&&<ViewSuccess codigo={successCodigo} onVolver={()=>{setView("portal");loadCampaigns();}}/>}
+      <BiggiBubble paginaPrincipal={view==="country"}/>
+    </>
+  );
+}
 
-      {/* SIDEBAR */}
-      <div style={{width:200,background:"#1a3a6b",borderRight:"1px solid #ffffff20",display:"flex",flexDirection:"column",flexShrink:0}}>
-        <div style={{padding:"20px 16px",borderBottom:"1px solid #ffffff20"}}>
-          <div style={{fontSize:20,fontWeight:900,letterSpacing:-1,fontFamily:"'Outfit',sans-serif"}}>
-            <span style={{color:"#FF6B00"}}>BIGPRO</span><span style={{color:"#ffffff"}}> FLOTA</span>
-          </div>
-          <div style={{fontSize:9,color:"#ffffff88",fontWeight:700,letterSpacing:2,marginTop:3}}>BIGPRO · CRM LIVE</div>
-        </div>
-        <nav style={{flex:1,padding:"10px 10px"}}>
-          {NAV.map(item=>(
-            <button key={item.id} onClick={()=>setSeccion(item.id)}
-              style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:8,
-                background:seccion===item.id?"#1a3a6b":"none",border:seccion===item.id?"1px solid #e4e7ec":"1px solid transparent",
-                color:seccion===item.id?"#f1f5f9":"#475569",cursor:"pointer",fontSize:12,
-                fontWeight:seccion===item.id?700:500,marginBottom:3,transition:"all .2s",textAlign:"left",fontFamily:"'Outfit',sans-serif"}}>
-              <span style={{fontSize:14,color:seccion===item.id?"#ffffff":"#aac3e8"}}>{item.icon}</span>
-              {item.label}
-              {item.count!==undefined&&<span style={{marginLeft:"auto",background:"#3B82F622",color:"#3B82F6",fontSize:9,fontWeight:800,padding:"1px 6px",borderRadius:20}}>{item.count}</span>}
-            </button>
-          ))}
-        </nav>
-        <div style={{padding:12,borderBottom:"1px solid #ffffff20"}}>
-          <button onClick={fetchLeads} style={{width:"100%",background:"#1a3a6b",border:"1px solid #e4e7ec",color:"#888888",borderRadius:8,padding:"7px",fontSize:11,cursor:"pointer",fontWeight:600,fontFamily:"'Outfit',sans-serif"}}>🔄 Actualizar</button>
-          {lastUpdate&&<div style={{fontSize:9,color:"#aaaaaa",textAlign:"center",marginTop:4}}>{lastUpdate.toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})}</div>}
-        </div>
-        <div style={{padding:12}}>
-          <div style={{background:"#1a3a6b",border:"1px solid #e4e7ec",borderRadius:8,padding:"8px 10px"}}>
-            <div style={{fontSize:9,color:"#aaaaaa",fontWeight:700,letterSpacing:1}}>ESTADO DB</div>
-            <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4}}>
-              <div style={{width:6,height:6,borderRadius:"50%",background:error?"#EF4444":"#10B981",animation:error?"none":"pulse 2s infinite"}}/>
-              <span style={{fontSize:10,color:error?"#EF4444":"#10B981",fontWeight:700}}>{error?"Error":"Conectado"}</span>
-            </div>
-          </div>
+// App separado para onboarding (acceso por URL ?onboarding=1)
+function OnboardingApp() {
+  const [lead,setLead]=useState(null);
+  const [listo,setListo]=useState(false);
+  useEffect(()=>{ setTimeout(()=>setListo(true),0); },[]);
+  if(!listo) return(
+    <><style>{css}</style>
+      <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#f8f9fa"}}>
+        <div style={{textAlign:"center"}}>
+          <div style={{fontSize:32,marginBottom:12}}>🚛</div>
+          <div style={{fontSize:14,color:"#888",fontFamily:"'DM Sans',sans-serif"}}>Cargando...</div>
         </div>
       </div>
-
-      {/* MAIN */}
-      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        <div style={{height:56,background:"#1a3a6b",borderBottom:"1px solid #ffffff20",display:"flex",alignItems:"center",padding:"0 20px",gap:12,flexShrink:0}}>
-          <div style={{flex:1,display:"flex",gap:10,alignItems:"center"}}>
-            {(seccion==="campana"||seccion==="libre")&&(
-              <>
-                <input value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="🔍 Buscar leads..."
-                  style={{background:"#ffffff",color:"#1a1a1a",border:"1px solid #e4e7ec",borderRadius:7,padding:"6px 12px",fontSize:12,width:220}}/>
-                <div style={{display:"flex",background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:7,overflow:"hidden"}}>
-                  {[["pipeline","⬛ Kanban"],["lista","☰ Lista"]].map(([v,label])=>(
-                    <button key={v} onClick={()=>setVista(v)} style={{padding:"6px 12px",background:vista===v?"#F47B20":"none",border:"none",color:vista===v?"#ffffff":"#ffffffaa",cursor:"pointer",fontSize:11,fontWeight:vista===v?700:400}}>{label}</button>
-                  ))}
-                </div>
-              </>
-            )}
-            {seccion==="basedatos"&&(
-              <input value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="🔍 Buscar leads..."
-                style={{background:"#ffffff",color:"#1a1a1a",border:"1px solid #e4e7ec",borderRadius:7,padding:"6px 12px",fontSize:12,width:220}}/>
-            )}
-            <div style={{fontSize:11,color:"#888888"}}>
-              {seccion==="dashboard"  &&"📊 Resumen en tiempo real"}
-              {seccion==="campana"    &&`🎯 ${leadsCampana.length} leads de campaña · ordenados por fecha y puntaje`}
-              {seccion==="libre"      &&`📋 ${leadsLibre.length} leads postulación libre · ordenados por fecha`}
-              {seccion==="basedatos"  &&`🗄️ ${leadsBaseDatos.length} leads · tibios, fríos, rechazados y no calificados`}
-              {seccion==="kpis"       &&"📊 KPIs Generales"}
-              {seccion==="kpiscampana"&&"🎯 KPIs por Campaña"}
-            </div>
-          </div>
-          <div style={{background:"#dcfce7",border:"1px solid #86efac",borderRadius:7,padding:"5px 10px",fontSize:10,color:"#166534",fontWeight:700}}>⚡ N8N Activo</div>
-          {(()=>{const {olvidados,estancados}=calcAlertas(leads);const total=olvidados.length+estancados.length;return total>0?(
-            <button onClick={()=>setShowAlertas(true)} style={{position:"relative",background:"#EF444422",border:"1px solid #EF444466",borderRadius:7,padding:"5px 10px",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
-              🔔
-              <span style={{position:"absolute",top:-5,right:-5,background:"#EF4444",color:"white",borderRadius:"50%",width:16,height:16,fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center"}}>{total}</span>
-            </button>
-          ):null;})()}
-        </div>
-
-        <div style={{flex:1,overflow:"auto",padding:20,display:"flex",flexDirection:"column"}}>
-          {loading?<Spinner/>:error?(
-            <div style={{background:"#fff5f5",border:"1px solid #fca5a5",borderRadius:12,padding:24,textAlign:"center"}}>
-              <div style={{fontSize:24,marginBottom:8}}>⚠️</div>
-              <div style={{fontSize:14,color:"#EF4444",fontWeight:700}}>{error}</div>
-              <button onClick={fetchLeads} style={{marginTop:12,background:"#f4f5f7",color:"#666666",border:"1px solid #aaaaaa",borderRadius:8,padding:"8px 16px",fontSize:12,cursor:"pointer"}}>Reintentar</button>
-            </div>
-          ):(
-            <div style={{flex:1,display:"flex",flexDirection:"column",minHeight:0}}>
-              {seccion==="dashboard"  &&<DashboardMetrics leads={leads}/>}
-              {seccion==="campana"    &&(vista==="pipeline"?<Pipeline leads={leadsCampana} onSelect={setSelectedLead} onEtapaChange={handleEtapaChange}/>:<TablaLeads leads={leadsCampana} onSelect={setSelectedLead}/>)}
-              {seccion==="libre"      &&(vista==="pipeline"?<Pipeline leads={leadsLibre}   onSelect={setSelectedLead} onEtapaChange={handleEtapaChange}/>:<TablaLeads leads={leadsLibre}   onSelect={setSelectedLead}/>)}
-              {seccion==="basedatos"  &&<TablaLeads leads={leadsBaseDatos} onSelect={setSelectedLead}/>}
-              {seccion==="kpis"       &&<KPIsView leads={leads}/>}
-              {seccion==="kpiscampana"&&<KPIsCampanaView leads={leads}/>}
-              {seccion==="embudo"     &&<EmbudoView leads={leads}/>}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {selectedLead&&<LeadPanel lead={selectedLead} onClose={()=>setSelectedLead(null)} onUpdate={handleLeadUpdate} onEtapaChangeRequest={handleEtapaChange}/>}
-      {showAlertas&&<AlertasPopup leads={leads} onClose={()=>setShowAlertas(false)} onVerLead={(lead)=>{setSelectedLead(lead);setSeccion(lead.tipo_postulacion==="libre"?"libre":"campana");}}/>}
-      {confirmModal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:400}}>
-          <div style={{background:"#ffffff",borderRadius:14,padding:28,width:400,boxShadow:"0 20px 60px rgba(0,0,0,.3)"}}>
-            <div style={{fontSize:16,fontWeight:900,color:"#1a1a1a",fontFamily:"'Outfit',sans-serif",marginBottom:6}}>¿Confirmar cambio de etapa?</div>
-            <div style={{fontSize:12,color:"#555555",marginBottom:20}}>Lead: <strong>{confirmModal.lead.nombre||"Sin nombre"}</strong></div>
-            <div style={{display:"flex",alignItems:"center",gap:12,background:"#f0f2f5",borderRadius:10,padding:"14px 16px",marginBottom:20}}>
-              <div style={{flex:1,textAlign:"center"}}>
-                <div style={{fontSize:10,color:"#888888",marginBottom:4}}>ETAPA ACTUAL</div>
-                <div style={{fontSize:13,fontWeight:800,color:ETAPA_CFG[confirmModal.etapaActual]?.color||"#888888"}}>{ETAPA_CFG[confirmModal.etapaActual]?.icon} {confirmModal.etapaActual}</div>
-              </div>
-              <div style={{fontSize:20,color:"#aaaaaa"}}>→</div>
-              <div style={{flex:1,textAlign:"center"}}>
-                <div style={{fontSize:10,color:"#888888",marginBottom:4}}>NUEVA ETAPA</div>
-                <div style={{fontSize:13,fontWeight:800,color:ETAPA_CFG[confirmModal.nuevaEtapa]?.color||"#888888"}}>{ETAPA_CFG[confirmModal.nuevaEtapa]?.icon} {confirmModal.nuevaEtapa}</div>
-              </div>
-            </div>
-            <div style={{display:"flex",gap:10}}>
-              <button onClick={()=>setConfirmModal(null)} style={{flex:1,background:"#f0f2f5",color:"#475569",border:"none",borderRadius:8,padding:"10px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>Cancelar</button>
-              <button onClick={confirmarCambioEtapa} style={{flex:1,background:"#1a3a6b",color:"white",border:"none",borderRadius:8,padding:"10px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>✓ Confirmar cambio</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </>
+  );
+  return(
+    <><style>{css}</style>
+      {!lead
+        ?<OnboardingLogin onIngresar={setLead} onVolver={()=>window.location.href="https://bigticket-portal.vercel.app"}/>
+        :<ViewOnboarding lead={lead} onVolver={()=>setLead(null)}/>
+      }
+      <BiggiBubble/>
+    </>
   );
 }
