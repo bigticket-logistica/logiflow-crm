@@ -1559,7 +1559,7 @@ function OnboardingLogin({ onIngresar, onVolver }) {
       .eq("codigo_postulacion",codigo.trim().toUpperCase())
       .single();
     if(e||!data){setError("Código no encontrado. Verifica tus datos.");setCargando(false);return;}
-    if(!["Propuesta Aceptada","Contrato Firmado","Contrato No Firmado","Onboarding Pendiente"].includes(data.etapa)){
+    if(!["Propuesta Aceptada","Contrato Firmado","Contrato No Firmado","Onboarding Pendiente","Entrevistas y Validaciones","Postulante Aprobado","Postulante No Calificado"].includes(data.etapa)){
       setError(`Tu postulación está en etapa "${data.etapa}". El formulario de incorporación se habilitará cuando el equipo BigTicket te lo indique.`);setCargando(false);return;}
     setLeadParcial(data);
     setPaso(2);
