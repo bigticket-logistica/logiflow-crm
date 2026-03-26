@@ -1951,10 +1951,10 @@ function ViewOnboarding({ lead, onVolver }) {
       const dbPayload = { ...payload, updated_at: new Date().toISOString() };
       if (existe) { await sb.from("onboarding_terceros").update(dbPayload).eq("lead_id", lead.id); }
       else { await sb.from("onboarding_terceros").insert(dbPayload); }
-      await sb.from("leads").update({ etapa: "Contrato Firmado" }).eq("id", lead.id);
+      await sb.from("leads").update({ etapa: "Entrevistas y Validaciones" }).eq("id", lead.id);
       // Notificar N8N
       try {
-        await fetch("https://bigticket2026.app.n8n.cloud/webhook/nboarding-completado-v2", {
+        await fetch("https://bigticket2026.app.n8n.cloud/webhook/onboarding-completado", {
           method: "POST", mode: "no-cors",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...payload, campana_nombre: lead.origen || "", pais: pais }),
