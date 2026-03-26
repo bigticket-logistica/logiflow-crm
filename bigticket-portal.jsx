@@ -331,7 +331,7 @@ function ViewCountry({ onSelect, busquedaCodigo, setBusquedaCodigo, buscarPostul
         <div style={{background:"#eef2ff",border:"1px solid #c7d7f9",borderRadius:14,padding:"20px 20px"}}>
           <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:4}}>📋 Formulario de incorporación</div>
           <div style={{fontSize:12,color:"#555",marginBottom:14}}>¿Tu propuesta fue aceptada? Completa tu formulario de incorporación a BigTicket</div>
-          <button onClick={()=>window.location.href="?onboarding=1"}
+          <button onClick={e=>{e.currentTarget.textContent="Cargando...";e.currentTarget.disabled=true;window.location.href="?onboarding=1";}}
             style={{background:"#1a3a6b",color:"#fff",border:"none",borderRadius:8,padding:"10px 18px",fontSize:13,fontWeight:700,cursor:"pointer",width:"100%"}}>
             Completar formulario →
           </button>
@@ -518,7 +518,8 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
       // 1. Guardar en Supabase
       const {data:lead,error:le}=await sb.from("leads").insert({
         nombre:form.nombre,empresa:form.empresa||null,telefono:form.telefono,email:form.email||null,
-        rut:form.rut||null,
+        rut: (form.pais_form||op)==='México' ? null : (form.rut||null),
+        curp: (form.pais_form||op)==='México' ? (form.rut||null) : null,
         canal,pais:form.pais_form||op,score,clasificacion,etapa:clasificacion==="Caliente"?"Propuesta Enviada":"Base Datos Leads",
         origen:isLibre?"Postulación libre":`Campaña: ${camp?.nombre||""}`,
         campana_id:camp?.id||null,fuente_contacto:form.fuente_contacto||null,
@@ -546,7 +547,8 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
             fuente_contacto: form.fuente_contacto||null,
             codigo_postulacion: codigo,
             fecha_postulacion: new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"}),
-            rut: form.rut||null,
+            rut: (op||form.pais_form)==='México' ? null : (form.rut||null),
+            curp: (op||form.pais_form)==='México' ? (form.rut||null) : null,
             empresa: form.empresa||null,
             region_estado: form.region_estado||null,
           }),
@@ -1736,8 +1738,8 @@ function ViewOnboarding({ lead, onVolver }) {
     tipo_vehiculo: "",
     nombre: lead.nombre || "",
     apellidos: "",
-    ine: lead.rut || "",
-    curp: "",
+    ine: "",
+    curp: lead.curp || "",
     rfc: "",
     licencia: "",
     telefono: lead.telefono || "",
@@ -1952,7 +1954,7 @@ function ViewOnboarding({ lead, onVolver }) {
       await sb.from("leads").update({ etapa: "Contrato Firmado" }).eq("id", lead.id);
       // Notificar N8N
       try {
-        await fetch("https://bigticket2026.app.n8n.cloud/webhook/onboarding-completado", {
+        await fetch("https://bigticket2026.app.n8n.cloud/webhook/nboarding-completado-v2", {
           method: "POST", mode: "no-cors",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...payload, campana_nombre: lead.origen || "", pais: pais }),
