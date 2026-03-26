@@ -1178,6 +1178,206 @@ const KPIsCampanaView = ({ leads }) => {
   );
 };
 
+// ─── EMBUDO DE CONVERSIÓN ─────────────────────────────────────────────────────
+const EmbudoView = ({ leads }) => {
+  const [campanaFiltro, setCampanaFiltro] = useState("todas");
+  const [descargando, setDescargando] = useState(false);
+  const reporteRef = useRef(null);
+
+  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Contrato Firmado","contrato no firmado":"Contrato No Firmado","ganado":"Contrato Firmado","perdido":"Contrato No Firmado","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
+
+  const campanas = [...new Set(leads.filter(l=>l.campana_id&&l.origen).map(l=>l.origen.replace("Campaña: ","")))].filter(Boolean).sort();
+
+  const leadsFiltered = campanaFiltro === "todas"
+    ? leads.filter(l => l.campana_id)
+    : leads.filter(l => (l.origen||"").includes(campanaFiltro));
+
+  // ── Cálculo de etapas del embudo ──
+  const total        = leadsFiltered.length;
+  const preCalif     = leadsFiltered.filter(l => {
+    const e = norm(l.etapa);
+    return (l.clasificacion||"").toLowerCase().includes("caliente") ||
+      ["Propuesta Enviada","Propuesta Aceptada","Propuesta Rechazada","Contrato Firmado","Contrato No Firmado"].includes(e);
+  }).length;
+  const potenciales  = leadsFiltered.filter(l => {
+    const e = norm(l.etapa);
+    return ["Propuesta Aceptada","Contrato Firmado","Contrato No Firmado"].includes(e);
+  }).length;
+  const validacion   = leadsFiltered.filter(l => {
+    const e = norm(l.etapa);
+    return ["Contrato Firmado","Contrato No Firmado","Onboarding Pendiente"].includes(e) ||
+      (l.onboarding_completado === true);
+  }).length;
+  const aprobados    = leadsFiltered.filter(l => norm(l.etapa) === "Contrato Firmado").length;
+
+  const pct = (n, base) => base > 0 ? Math.round((n / base) * 100) : 0;
+
+  const ETAPAS = [
+    { label: "Prospectos",            sub: "Total postulaciones",                    n: total,       color: "#3B82F6", icon: "👥", base: total },
+    { label: "Pre-Calificados",       sub: "Leads calientes o propuesta enviada",    n: preCalif,    color: "#8B5CF6", icon: "⭐", base: total },
+    { label: "Clientes Potenciales",  sub: "Aceptaron la propuesta económica",       n: potenciales, color: "#F59E0B", icon: "✅", base: total },
+    { label: "Validación",            sub: "Completaron formulario de onboarding",   n: validacion,  color: "#10B981", icon: "📋", base: total },
+    { label: "Aprobados",             sub: "Contrato firmado — activos",             n: aprobados,   color: "#059669", icon: "🏆", base: total },
+  ];
+
+  const maxN = total || 1;
+
+  const descargarPDF = async () => {
+    if (!reporteRef.current) return;
+    setDescargando(true);
+    try {
+      if (!window.html2canvas) { const s=document.createElement("script"); s.src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"; document.head.appendChild(s); await new Promise(r=>s.onload=r); }
+      if (!window.jspdf)       { const s=document.createElement("script"); s.src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";    document.head.appendChild(s); await new Promise(r=>s.onload=r); }
+      const canvas   = await window.html2canvas(reporteRef.current, { scale: 2, backgroundColor: "#f0f2f5", useCORS: true });
+      const imgData  = canvas.toDataURL("image/png");
+      const { jsPDF } = window.jspdf;
+      const pdf      = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pdfW     = pdf.internal.pageSize.getWidth();
+      const pdfH     = (canvas.height * pdfW) / canvas.width;
+      if (pdfH > pdf.internal.pageSize.getHeight()) {
+        const ratio  = pdf.internal.pageSize.getHeight() / pdfH;
+        pdf.addImage(imgData, "PNG", 0, 0, pdfW * ratio, pdf.internal.pageSize.getHeight());
+      } else {
+        pdf.addImage(imgData, "PNG", 0, 0, pdfW, pdfH);
+      }
+      const nombre = campanaFiltro === "todas" ? "Embudo_Todas" : campanaFiltro.replace(/\s+/g,"_");
+      pdf.save(`BigTicket_Embudo_${nombre}_${new Date().toLocaleDateString("es-CL").replace(/\//g,"-")}.pdf`);
+    } catch(e) { alert("Error generando PDF: "+e.message); }
+    finally { setDescargando(false); }
+  };
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      {/* Filtros y acciones */}
+      <div style={{display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
+        <select value={campanaFiltro} onChange={e=>setCampanaFiltro(e.target.value)}
+          style={{background:"#fff",border:"1px solid #e4e7ec",borderRadius:8,padding:"9px 14px",fontSize:13,flex:1,maxWidth:400,cursor:"pointer"}}>
+          <option value="todas">📊 Todas las campañas</option>
+          {campanas.map(c=><option key={c} value={c}>{c}</option>)}
+        </select>
+        <div style={{fontSize:12,color:"#888"}}>{total} leads {campanaFiltro!=="todas"?`en "${campanaFiltro}"`:"en total"}</div>
+        <button onClick={descargarPDF} disabled={descargando}
+          style={{background:"#1a3a6b",color:"#fff",border:"none",borderRadius:8,padding:"9px 18px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif",opacity:descargando?0.6:1,flexShrink:0}}>
+          {descargando?"Generando...":"⬇ Descargar PDF"}
+        </button>
+      </div>
+
+      {/* Reporte embudo */}
+      <div ref={reporteRef} style={{background:"#f0f2f5",padding:24,borderRadius:16}}>
+
+        {/* Header reporte */}
+        <div style={{background:"#1a3a6b",borderRadius:12,padding:"20px 24px",marginBottom:24,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div>
+            <div style={{fontSize:20,fontWeight:900,color:"#fff",fontFamily:"'Outfit',sans-serif"}}>📊 Embudo de Conversión</div>
+            <div style={{fontSize:12,color:"#ffffff88",marginTop:4}}>
+              {campanaFiltro==="todas"?"Todas las campañas":`Campaña: ${campanaFiltro}`} · {new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"long",year:"numeric"})}
+            </div>
+          </div>
+          <div style={{textAlign:"right"}}>
+            <div style={{fontSize:32,fontWeight:900,color:"#3B82F6",fontFamily:"monospace"}}>{total}</div>
+            <div style={{fontSize:10,color:"#ffffff88",fontWeight:700,letterSpacing:1}}>TOTAL PROSPECTOS</div>
+          </div>
+        </div>
+
+        {/* Embudo visual */}
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:24}}>
+          {ETAPAS.map((et, i) => {
+            const w = maxN > 0 ? Math.max(30, Math.round((et.n / maxN) * 100)) : 30;
+            const convPrev = i > 0 ? pct(et.n, ETAPAS[i-1].n) : 100;
+            return (
+              <div key={et.label}>
+                {/* Flecha de conversión entre etapas */}
+                {i > 0 && (
+                  <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:8,padding:"4px 0",marginBottom:4}}>
+                    <div style={{height:1,flex:1,background:"#e4e7ec"}}/>
+                    <div style={{fontSize:11,fontWeight:700,color: convPrev >= 50 ? "#10B981" : convPrev >= 25 ? "#F59E0B" : "#EF4444",
+                      background:"#fff",border:`1px solid ${convPrev >= 50 ? "#10B98133" : convPrev >= 25 ? "#F59E0B33" : "#EF444433"}`,
+                      borderRadius:20,padding:"2px 10px"}}>
+                      ↓ {convPrev}% conversión
+                    </div>
+                    <div style={{height:1,flex:1,background:"#e4e7ec"}}/>
+                  </div>
+                )}
+                {/* Barra del embudo */}
+                <div style={{display:"flex",alignItems:"center",gap:12}}>
+                  <div style={{width:32,textAlign:"center",fontSize:18,flexShrink:0}}>{et.icon}</div>
+                  <div style={{flex:1}}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:5,alignItems:"center"}}>
+                      <div>
+                        <span style={{fontSize:13,fontWeight:800,color:"#1a1a1a",fontFamily:"'Outfit',sans-serif"}}>{et.label}</span>
+                        <span style={{fontSize:11,color:"#888",marginLeft:8}}>{et.sub}</span>
+                      </div>
+                      <div style={{display:"flex",gap:16,alignItems:"center",flexShrink:0}}>
+                        <span style={{fontSize:22,fontWeight:900,color:et.color,fontFamily:"monospace"}}>{et.n}</span>
+                        <span style={{fontSize:13,fontWeight:700,color:"#555",minWidth:40,textAlign:"right"}}>{pct(et.n, total)}%</span>
+                      </div>
+                    </div>
+                    <div style={{height:28,background:"#e4e7ec",borderRadius:6,overflow:"hidden"}}>
+                      <div style={{height:"100%",width:`${w}%`,background:`linear-gradient(90deg, ${et.color}, ${et.color}cc)`,
+                        borderRadius:6,transition:"width 1s ease",display:"flex",alignItems:"center",justifyContent:"flex-end",paddingRight:8}}>
+                        {et.n > 0 && <span style={{fontSize:10,fontWeight:800,color:"#fff"}}>{et.n}</span>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Métricas clave */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:24}}>
+          {[
+            ["Tasa Pre-Calif.",    `${pct(preCalif,total)}%`,    "#8B5CF6", `${preCalif} de ${total}`],
+            ["Tasa Potenciales",   `${pct(potenciales,total)}%`, "#F59E0B", `${potenciales} de ${preCalif} pre-calif.`],
+            ["Tasa Onboarding",    `${pct(validacion,total)}%`,  "#10B981", `${validacion} de ${potenciales} potenciales`],
+            ["Tasa Aprobación",    `${pct(aprobados,total)}%`,   "#059669", `${aprobados} de ${total} totales`],
+          ].map(([label,val,color,sub])=>(
+            <div key={label} style={{background:"#fff",borderRadius:10,padding:14,border:`1px solid ${color}33`}}>
+              <div style={{fontSize:24,fontWeight:900,color,fontFamily:"monospace"}}>{val}</div>
+              <div style={{fontSize:11,fontWeight:700,color:"#555",marginTop:4}}>{label}</div>
+              <div style={{fontSize:10,color:"#aaa",marginTop:2}}>{sub}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Comparativa por campaña si es "todas" */}
+        {campanaFiltro==="todas" && campanas.length > 1 && (
+          <div style={{background:"#fff",borderRadius:12,padding:16,border:"1px solid #e4e7ec"}}>
+            <div style={{fontSize:10,fontWeight:800,color:"#555",letterSpacing:2,marginBottom:14,textTransform:"uppercase"}}>Comparativa por campaña</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
+              {campanas.map(c => {
+                const ls = leads.filter(l=>(l.origen||"").includes(c));
+                const tot = ls.length;
+                const aprov = ls.filter(l=>norm(l.etapa)==="Contrato Firmado").length;
+                const tasa = pct(aprov, tot);
+                return (
+                  <div key={c} style={{background:"#f8f9fa",borderRadius:8,padding:12,border:"1px solid #e4e7ec"}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#1a1a1a",marginBottom:6,lineHeight:1.3}}>{c}</div>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                      <span style={{fontSize:10,color:"#888"}}>{tot} leads</span>
+                      <span style={{fontSize:13,fontWeight:900,color:tasa>=50?"#059669":tasa>=25?"#F59E0B":"#EF4444"}}>{tasa}%</span>
+                    </div>
+                    <div style={{height:5,background:"#e4e7ec",borderRadius:3}}>
+                      <div style={{height:"100%",width:`${tasa}%`,background:tasa>=50?"#059669":tasa>=25?"#F59E0B":"#EF4444",borderRadius:3}}/>
+                    </div>
+                    <div style={{fontSize:9,color:"#aaa",marginTop:4}}>{aprov} aprobados</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div style={{marginTop:16,textAlign:"center",fontSize:10,color:"#aaa"}}>
+          Generado por BigTicket CRM · {new Date().toLocaleString("es-CL")}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 const DashboardMetrics = ({ leads }) => {
   const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Contrato Firmado","contrato no firmado":"Contrato No Firmado","ganado":"Contrato Firmado","perdido":"Contrato No Firmado","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
@@ -1472,6 +1672,7 @@ export default function App() {
     {id:"basedatos",   icon:"🗄️",label:"Base Datos Leads",   count:leadsBaseDatos.length},
     {id:"kpis",        icon:"📊",label:"KPIs Generales"},
     {id:"kpiscampana", icon:"🎯",label:"KPIs por Campaña"},
+    {id:"embudo",      icon:"🔻",label:"Embudo Conversión"},
   ];
 
   return (
@@ -1572,6 +1773,7 @@ export default function App() {
               {seccion==="basedatos"  &&<TablaLeads leads={leadsBaseDatos} onSelect={setSelectedLead}/>}
               {seccion==="kpis"       &&<KPIsView leads={leads}/>}
               {seccion==="kpiscampana"&&<KPIsCampanaView leads={leads}/>}
+              {seccion==="embudo"     &&<EmbudoView leads={leads}/>}
             </div>
           )}
         </div>
