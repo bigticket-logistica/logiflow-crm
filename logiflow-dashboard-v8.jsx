@@ -1183,7 +1183,43 @@ const KPIsCampanaView = ({ leads }) => {
 const EmbudoView = ({ leads }) => {
   const [campanaFiltro, setCampanaFiltro] = useState("todas");
   const [descargando, setDescargando] = useState(false);
+  const [descargandoXLS, setDescargandoXLS] = useState(false);
   const reporteRef = useRef(null);
+
+  const descargarExcel = async (ETAPAS, campanaFiltro, campanas, leads, norm, pct, total) => {
+    setDescargandoXLS(true);
+    try {
+      if (!window.XLSX) {
+        const s = document.createElement("script");
+        s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+        document.head.appendChild(s);
+        await new Promise(r => s.onload = r);
+      }
+      const wb = window.XLSX.utils.book_new();
+      // Hoja 1: Resumen embudo
+      const embудоData = [
+        ["Etapa", "Cantidad", "% del Total"],
+        ...ETAPAS.map(et => [et.label, et.n, `${pct(et.n, total)}%`])
+      ];
+      const ws1 = window.XLSX.utils.aoa_to_sheet(embудоData);
+      window.XLSX.utils.book_append_sheet(wb, ws1, "Embudo");
+      // Hoja 2: Por campaña
+      if (campanas.length > 0) {
+        const campData = [["Campaña", "Total", "Aprobados", "% Aprobación"]];
+        campanas.forEach(c => {
+          const ls = leads.filter(l => (l.origen||"").includes(c));
+          const tot = ls.length;
+          const aprov = ls.filter(l => norm(l.etapa) === "Postulante Aprobado").length;
+          campData.push([c, tot, aprov, `${pct(aprov, tot)}%`]);
+        });
+        const ws2 = window.XLSX.utils.aoa_to_sheet(campData);
+        window.XLSX.utils.book_append_sheet(wb, ws2, "Por Campaña");
+      }
+      const nombre = campanaFiltro === "todas" ? "Embudo_Todas" : campanaFiltro.replace(/\s+/g,"_");
+      window.XLSX.writeFile(wb, `BigTicket_Embudo_${nombre}_${new Date().toLocaleDateString("es-CL").replace(/\//g,"-")}.xlsx`);
+    } catch(e) { alert("Error generando Excel: " + e.message); }
+    finally { setDescargandoXLS(false); }
+  };
 
   const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
 
@@ -1218,7 +1254,7 @@ const EmbudoView = ({ leads }) => {
     { label: "Pre-Calificados",       sub: "Leads calientes o propuesta enviada",    n: preCalif,    color: "#8B5CF6", icon: "⭐", base: total },
     { label: "Clientes Potenciales",  sub: "Aceptaron la propuesta económica",       n: potenciales, color: "#F59E0B", icon: "✅", base: total },
     { label: "Validación",            sub: "Completaron formulario de onboarding",   n: validacion,  color: "#10B981", icon: "📋", base: total },
-    { label: "Aprobados",             sub: "Contrato firmado — activos",             n: aprobados,   color: "#059669", icon: "🏆", base: total },
+    { label: "Aprobados",             sub: "Postulante Aprobado — activos",          n: aprobados,   color: "#059669", icon: "🏆", base: total },
   ];
 
   const maxN = total || 1;
@@ -1260,6 +1296,10 @@ const EmbudoView = ({ leads }) => {
         <button onClick={descargarPDF} disabled={descargando}
           style={{background:"#1a3a6b",color:"#fff",border:"none",borderRadius:8,padding:"9px 18px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif",opacity:descargando?0.6:1,flexShrink:0}}>
           {descargando?"Generando...":"⬇ Descargar PDF"}
+        </button>
+        <button onClick={()=>descargarExcel(ETAPAS,campanaFiltro,campanas,leads,norm,pct,total)} disabled={descargandoXLS}
+          style={{background:"#059669",color:"#fff",border:"none",borderRadius:8,padding:"9px 18px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif",opacity:descargandoXLS?0.6:1,flexShrink:0}}>
+          {descargandoXLS?"Generando...":"⬇ Descargar Excel"}
         </button>
       </div>
 
