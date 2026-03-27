@@ -712,7 +712,7 @@ const LeadCard = ({ lead, onSelect, onDragStart }) => {
 const KanbanCol = ({ etapa, leads, onSelect, onDragStart, onDrop, isDragOver, setDragOver }) => {
   const cfg=ETAPA_CFG[etapa]||{color:"#888888",icon:"•"};
   return (
-    <div style={{width:ETAPAS_CIERRE.includes(etapa)?220:245,flexShrink:0,display:"flex",flexDirection:"column",height:"100%"}}
+    <div style={{width:ETAPAS_CIERRE.includes(etapa)?280:etapa==="Nuevo Lead"?160:245,flexShrink:0,display:"flex",flexDirection:"column",height:"100%"}}
       onDragOver={e=>{e.preventDefault();setDragOver(etapa);}}
       onDragLeave={()=>setDragOver(null)}
       onDrop={e=>{onDrop(e,etapa);setDragOver(null);}}>
