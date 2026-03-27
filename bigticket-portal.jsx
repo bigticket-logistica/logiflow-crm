@@ -1784,7 +1784,8 @@ function ViewOnboarding({ lead, onVolver }) {
         url_carnet: formCL.url_carnet, acepta_privacidad: formCL.acepta_privacidad,
         completado: false, updated_at: new Date().toISOString(),
       };
-      const { data: existe } = await sb.from("onboarding_terceros").select("id").eq("lead_id", lead.id).single();
+      let existe = null;
+      try { const { data } = await sb.from("onboarding_terceros").select("id").eq("lead_id", lead.id).single(); existe = data; } catch(_) { existe = null; }
       if (existe) { await sb.from("onboarding_terceros").update(payload).eq("lead_id", lead.id); }
       else { await sb.from("onboarding_terceros").insert(payload); }
       setGuardadoAvance(true);
@@ -1921,6 +1922,12 @@ function ViewOnboarding({ lead, onVolver }) {
       if (!formMX.url_ine) nuevosErrores.url_ine = "Debes adjuntar tu INE";
       if (!formMX.url_curp) nuevosErrores.url_curp = "Debes adjuntar tu CURP";
       if (!formMX.url_rfc) nuevosErrores.url_rfc = "Debes adjuntar tu RFC";
+      if (!formMX.email?.trim()) nuevosErrores.email = "Campo obligatorio";
+      if (!formMX.colonia?.trim()) nuevosErrores.colonia = "Campo obligatorio";
+      if (formMX.puesto !== 'Ayudante') {
+        if (!formMX.licencia?.trim()) nuevosErrores.licencia = "Campo obligatorio";
+        if (!formMX.url_licencia) nuevosErrores.url_licencia = "Debes adjuntar tu licencia";
+      }
     } else {
       if (!formCL.tipo_certificacion) nuevosErrores.tipo_certificacion = "Campo obligatorio";
       if (!formCL.posee_inicio_actividades) nuevosErrores.posee_inicio_actividades = "Campo obligatorio";
@@ -1935,6 +1942,7 @@ function ViewOnboarding({ lead, onVolver }) {
       if (!formCL.rut_titular?.trim()) nuevosErrores.rut_titular = "Campo obligatorio";
       if (!formCL.operacion) nuevosErrores.operacion = "Campo obligatorio";
       if (!formCL.url_carnet) nuevosErrores.url_carnet = "Debes adjuntar tu cédula de identidad";
+      if (!formCL.supervisor?.trim()) nuevosErrores.supervisor = "Campo obligatorio";
     }
     if (Object.keys(nuevosErrores).length > 0) {
       setErrores(nuevosErrores);
@@ -1960,7 +1968,7 @@ function ViewOnboarding({ lead, onVolver }) {
         await fetch("https://bigticket2026.app.n8n.cloud/webhook/onboarding-completado", {
           method: "POST", mode: "no-cors",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...payload, campana_nombre: lead.origen || "", pais: pais }),
+          body: JSON.stringify({ ...payload, campana_nombre: lead.origen || "", pais: pais, lead_id: lead.id }),
         });
       } catch (e) { console.log("N8N error:", e); }
       setCompletado(true);
@@ -2028,16 +2036,16 @@ function ViewOnboarding({ lead, onVolver }) {
 
             <div className="two-col">
               <TextField errores={errores} setErrores={setErrores} label="Nombres" campo="nombre" value={formMX.nombre} onChange={v => updMX("nombre", v)} placeholder="Tu nombre" required />
-              <TextField errores={errores} setErrores={setErrores} label="Apellidos" campo="apellidos" value={formMX.apellidos} onChange={v => updMX("apellidos", v)} placeholder="Tus apellidos" />
+              <TextField errores={errores} setErrores={setErrores} label="Apellidos" campo="apellidos" value={formMX.apellidos} onChange={v => updMX("apellidos", v)} placeholder="Tus apellidos" required />
             </div>
             <div className="two-col">
               <TextField errores={errores} setErrores={setErrores} label="INE" campo="ine" value={formMX.ine} onChange={v => updMX("ine", v)} placeholder="Número de INE" required />
-              <TextField errores={errores} setErrores={setErrores} label="CURP" campo="curp" value={formMX.curp} onChange={v => updMX("curp", v)} placeholder="CURP" />
+              <TextField errores={errores} setErrores={setErrores} label="CURP" campo="curp" value={formMX.curp} onChange={v => updMX("curp", v)} placeholder="CURP" required />
             </div>
             <div className="two-col">
-              <TextField errores={errores} setErrores={setErrores} label="RFC" campo="rfc" value={formMX.rfc} onChange={v => updMX("rfc", v)} placeholder="RFC" />
+              <TextField errores={errores} setErrores={setErrores} label="RFC" campo="rfc" value={formMX.rfc} onChange={v => updMX("rfc", v)} placeholder="RFC" required />
               {(formMX.puesto === "Driver" || formMX.puesto === "Propietario") && (
-                <TextField errores={errores} setErrores={setErrores} label="Licencia de Conducir" campo="licencia" value={formMX.licencia} onChange={v => updMX("licencia", v)} placeholder="Número de licencia" />
+                <TextField errores={errores} setErrores={setErrores} label="Licencia de Conducir" campo="licencia" value={formMX.licencia} onChange={v => updMX("licencia", v)} placeholder="Número de licencia" required />
               )}
             </div>
             <div className="two-col">
@@ -2047,7 +2055,7 @@ function ViewOnboarding({ lead, onVolver }) {
             <div className="two-col">
               <SelectField errores={errores} setErrores={setErrores} label="Localidad (SVC)" campo="localidad" opciones={ESTADOS_MEXICO}
                 value={formMX.localidad} onChange={v => updMX("localidad", v)} />
-              <TextField errores={errores} setErrores={setErrores} label="Colonia" campo="colonia" value={formMX.colonia} onChange={v => updMX("colonia", v)} placeholder="Tu colonia" />
+              <TextField errores={errores} setErrores={setErrores} label="Colonia" campo="colonia" value={formMX.colonia} onChange={v => updMX("colonia", v)} placeholder="Tu colonia" required />
             </div>
 
             <div style={{ marginTop: 8, padding: "12px 14px", background: "#f8f9fa", borderRadius: 10, marginBottom: 8 }}>
@@ -2093,10 +2101,10 @@ function ViewOnboarding({ lead, onVolver }) {
                   opciones={["Persona Natural", "Empresa"]}
                   value={formCL.tipo_persona} onChange={v => updCL("tipo_persona", v)} required />
                 <div className="two-col">
-                  <TextField errores={errores} setErrores={setErrores} label="Razón Social" campo="razon_social" value={formCL.razon_social} onChange={v => updCL("razon_social", v)} placeholder="Razón social" />
-                  <TextField errores={errores} setErrores={setErrores} label="RUT Empresa" campo="rut_empresa" value={formCL.rut_empresa} onChange={v => updCL("rut_empresa", v)} placeholder="RUT empresa" />
+                  <TextField errores={errores} setErrores={setErrores} label="Razón Social" campo="razon_social" value={formCL.razon_social} onChange={v => updCL("razon_social", v)} placeholder="Razón social" required />
+                  <TextField errores={errores} setErrores={setErrores} label="RUT Empresa" campo="rut_empresa" value={formCL.rut_empresa} onChange={v => updCL("rut_empresa", v)} placeholder="RUT empresa" required />
                 </div>
-                <TextField errores={errores} setErrores={setErrores} label="Dirección Empresa" campo="direccion_empresa" value={formCL.direccion_empresa} onChange={v => updCL("direccion_empresa", v)} placeholder="Dirección" />
+                <TextField errores={errores} setErrores={setErrores} label="Dirección Empresa" campo="direccion_empresa" value={formCL.direccion_empresa} onChange={v => updCL("direccion_empresa", v)} placeholder="Dirección" required />
               </>
             )}
 
@@ -2123,7 +2131,7 @@ function ViewOnboarding({ lead, onVolver }) {
 
             <div className="form-title" style={{ marginTop: 16 }}>Datos Bancarios</div>
             <div className="two-col">
-              <TextField errores={errores} setErrores={setErrores} label="Banco" campo="banco" value={formCL.banco} onChange={v => updCL("banco", v)} placeholder="Nombre del banco" />
+              <TextField errores={errores} setErrores={setErrores} label="Banco" campo="banco" value={formCL.banco} onChange={v => updCL("banco", v)} placeholder="Nombre del banco" required />
               <SelectField errores={errores} setErrores={setErrores} label="Formato de Cuenta" campo="formato_cuenta"
                 opciones={["Persona Natural", "Empresa"]}
                 value={formCL.formato_cuenta} onChange={v => updCL("formato_cuenta", v)} />
@@ -2132,17 +2140,17 @@ function ViewOnboarding({ lead, onVolver }) {
               <SelectField errores={errores} setErrores={setErrores} label="Tipo de Cuenta" campo="tipo_cuenta"
                 opciones={["Cuenta Corriente", "Cuenta Vista", "Cuenta de Ahorro", "Chequera Electronica"]}
                 value={formCL.tipo_cuenta} onChange={v => updCL("tipo_cuenta", v)} />
-              <TextField errores={errores} setErrores={setErrores} label="Nombre del Titular" campo="nombre_titular" value={formCL.nombre_titular}
+              <TextField errores={errores} setErrores={setErrores} label="Nombre del Titular" campo="nombre_titular" value={formCL.nombre_titular} required
                 onChange={v => updCL("nombre_titular", v)} placeholder="Nombre titular" />
             </div>
-            <TextField errores={errores} setErrores={setErrores} label="RUT del Titular" campo="rut_titular" value={formCL.rut_titular}
+            <TextField errores={errores} setErrores={setErrores} label="RUT del Titular" campo="rut_titular" value={formCL.rut_titular} required
               onChange={v => updCL("rut_titular", v)} placeholder="RUT titular" />
 
             <div className="form-title" style={{ marginTop: 16 }}>Operación</div>
             <SelectField errores={errores} setErrores={setErrores} label="Operación donde prestará servicios" campo="operacion"
               opciones={OPERACIONES_CL}
               value={formCL.operacion} onChange={v => updCL("operacion", v)} required />
-            <TextField errores={errores} setErrores={setErrores} label="Nombre del Supervisor a Cargo" campo="supervisor" value={formCL.supervisor}
+            <TextField errores={errores} setErrores={setErrores} label="Nombre del Supervisor a Cargo" campo="supervisor" value={formCL.supervisor} required
               onChange={v => updCL("supervisor", v)} placeholder="Nombre del supervisor" />
           </div>
         )}
