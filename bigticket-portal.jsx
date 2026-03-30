@@ -1989,6 +1989,12 @@ function ViewOnboarding({ lead, onVolver }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...payload, campana_nombre: lead.origen || "", pais: pais, lead_id: lead.id }),
         });
+        // Flujo 10 — marca onboarding_completado = true en leads
+        await fetch("https://bigticket2026.app.n8n.cloud/webhook/nboarding-completado-v2", {
+          method: "POST", mode: "no-cors",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lead_id: lead.id, nombre: lead.nombre, telefono: lead.telefono, pais: pais, url_vehiculo: formMX.url_vehiculo || "" }),
+        });
       } catch (e) { console.log("N8N error:", e); }
       setCompletado(true);
     } catch (e) { alert("Error al enviar: " + e.message); }
