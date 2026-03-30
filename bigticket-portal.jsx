@@ -1640,6 +1640,20 @@ const OPERACIONES_CL = [
 ];
 
 const TIPOS_VEHICULO_MX = ["Small Van","Large Van","Small + Large Van","Extra Van"];
+
+const IMAGENES_VEHICULO_MX = {
+  "Small Van":         "https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/2019_Renault_Kangoo_Maxi_ZE_facelift%2C_front_8.4.19.jpg/320px-2019_Renault_Kangoo_Maxi_ZE_facelift%2C_front_8.4.19.jpg",
+  "Large Van":         "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Mercedes-Benz_Sprinter_W907_front_20190822.jpg/320px-Mercedes-Benz_Sprinter_W907_front_20190822.jpg",
+  "Small + Large Van": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Ford_Transit_Custom_facelift%2C_front_8.4.19.jpg/320px-Ford_Transit_Custom_facelift%2C_front_8.4.19.jpg",
+  "Extra Van":         "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e2/Iveco_Daily_35S13_front.jpg/320px-Iveco_Daily_35S13_front.jpg",
+};
+
+const DESC_VEHICULO_MX = {
+  "Small Van":         "Furgoneta pequeña tipo Kangoo, NV200 o similar. Carga hasta 800 kg.",
+  "Large Van":         "Furgoneta grande tipo Sprinter, Transit o similar. Carga hasta 1,500 kg.",
+  "Small + Large Van": "Disponibilidad tanto en Small Van como Large Van.",
+  "Extra Van":         "Vehículo de carga extra tipo Iveco Daily o camión ligero.",
+};
 const PUESTOS_MX = ["Driver","Ayudante","Propietario"];
 
 async function subirDocumento(file, leadId, nombre) {
@@ -1735,6 +1749,7 @@ function ViewOnboarding({ lead, onVolver }) {
   const [formMX, setFormMX] = useState({
     puesto: "",
     tipo_vehiculo: "",
+    url_vehiculo: "",
     nombre: lead.nombre || "",
     apellidos: "",
     ine: lead.rut || "",
@@ -1769,6 +1784,7 @@ function ViewOnboarding({ lead, onVolver }) {
         telefono: formMX.telefono, email: formMX.email, localidad: formMX.localidad,
         colonia: formMX.colonia, url_ine: formMX.url_ine, url_curp: formMX.url_curp,
         url_rfc: formMX.url_rfc, url_licencia: formMX.url_licencia,
+        url_vehiculo: formMX.url_vehiculo,
         acepta_privacidad: formMX.acepta_privacidad, completado: false,
         updated_at: new Date().toISOString(),
       } : {
@@ -1817,6 +1833,7 @@ function ViewOnboarding({ lead, onVolver }) {
           url_curp: saved.url_curp || "",
           url_rfc: saved.url_rfc || "",
           url_licencia: saved.url_licencia || "",
+          url_vehiculo: saved.url_vehiculo || "",
           acepta_privacidad: saved.acepta_privacidad || false,
         }));
       } else {
@@ -1875,6 +1892,7 @@ function ViewOnboarding({ lead, onVolver }) {
       url_curp: formMX.url_curp,
       url_rfc: formMX.url_rfc,
       url_licencia: formMX.url_licencia,
+      url_vehiculo: formMX.url_vehiculo,
       acepta_privacidad: formMX.acepta_privacidad,
       completado: true,
       completado_at: new Date().toISOString(),
@@ -1922,6 +1940,7 @@ function ViewOnboarding({ lead, onVolver }) {
       if (!formMX.url_ine) nuevosErrores.url_ine = "Debes adjuntar tu INE";
       if (!formMX.url_curp) nuevosErrores.url_curp = "Debes adjuntar tu CURP";
       if (!formMX.url_rfc) nuevosErrores.url_rfc = "Debes adjuntar tu RFC";
+      if (!formMX.url_vehiculo) nuevosErrores.url_vehiculo = "Debes adjuntar una foto de tu vehículo";
       if (!formMX.email?.trim()) nuevosErrores.email = "Campo obligatorio";
       if (!formMX.colonia?.trim()) nuevosErrores.colonia = "Campo obligatorio";
       if (formMX.puesto !== 'Ayudante') {
@@ -2034,6 +2053,20 @@ function ViewOnboarding({ lead, onVolver }) {
             <SelectField errores={errores} setErrores={setErrores} label="Tipo de Vehículo" campo="tipo_vehiculo" opciones={TIPOS_VEHICULO_MX}
               value={formMX.tipo_vehiculo} onChange={v => updMX("tipo_vehiculo", v)} required />
 
+            {/* Imagen de referencia del vehículo */}
+            {formMX.tipo_vehiculo && IMAGENES_VEHICULO_MX[formMX.tipo_vehiculo] && (
+              <div style={{background:"#f0f7ff",border:"1px solid #bfdbfe",borderRadius:10,padding:12,marginBottom:12,display:"flex",gap:12,alignItems:"center"}}>
+                <img src={IMAGENES_VEHICULO_MX[formMX.tipo_vehiculo]} alt={formMX.tipo_vehiculo}
+                  style={{width:120,height:80,objectFit:"cover",borderRadius:8,flexShrink:0}}
+                  onError={e=>e.target.style.display="none"}/>
+                <div>
+                  <div style={{fontSize:13,fontWeight:700,color:"#1a3a6b",marginBottom:4}}>📸 Referencia: {formMX.tipo_vehiculo}</div>
+                  <div style={{fontSize:12,color:"#555"}}>{DESC_VEHICULO_MX[formMX.tipo_vehiculo]}</div>
+                  <div style={{fontSize:11,color:"#F47B20",marginTop:4,fontWeight:600}}>Tu vehículo debe ser similar al de la imagen</div>
+                </div>
+              </div>
+            )}
+
             <div className="two-col">
               <TextField errores={errores} setErrores={setErrores} label="Nombres" campo="nombre" value={formMX.nombre} onChange={v => updMX("nombre", v)} placeholder="Tu nombre" required />
               <TextField errores={errores} setErrores={setErrores} label="Apellidos" campo="apellidos" value={formMX.apellidos} onChange={v => updMX("apellidos", v)} placeholder="Tus apellidos" required />
@@ -2060,6 +2093,9 @@ function ViewOnboarding({ lead, onVolver }) {
 
             <div style={{ marginTop: 8, padding: "12px 14px", background: "#f8f9fa", borderRadius: 10, marginBottom: 8 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", marginBottom: 10 }}>📎 Documentos requeridos</div>
+              <UploadField label="📷 Foto de tu vehículo (frente con placas visibles) *" valor={formMX.url_vehiculo}
+                uploading={uploading.vehiculo}
+                onChange={e => handleUpload("vehiculo", e.target.files[0], setFormMX, lead.id)} />
               <UploadField label="Adjuntar INE (ambos lados)" valor={formMX.url_ine}
                 uploading={uploading.ine}
                 onChange={e => handleUpload("ine", e.target.files[0], setFormMX, lead.id)} />
