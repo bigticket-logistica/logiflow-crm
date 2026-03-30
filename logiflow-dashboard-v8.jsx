@@ -914,6 +914,14 @@ const TimelineView = ({ lead }) => {
 };
 
 // ─── PANEL DETALLE ────────────────────────────────────────────────────────────
+const IMAGENES_VEHICULO_CRM = {
+  "Small Van":         "https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/2019_Renault_Kangoo_Maxi_ZE_facelift%2C_front_8.4.19.jpg/320px-2019_Renault_Kangoo_Maxi_ZE_facelift%2C_front_8.4.19.jpg",
+  "Large Van":         "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Mercedes-Benz_Sprinter_W907_front_20190822.jpg/320px-Mercedes-Benz_Sprinter_W907_front_20190822.jpg",
+  "Small + Large Van": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Ford_Transit_Custom_facelift%2C_front_8.4.19.jpg/320px-Ford_Transit_Custom_facelift%2C_front_8.4.19.jpg",
+  "Extra Van":         "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e2/Iveco_Daily_35S13_front.jpg/320px-Iveco_Daily_35S13_front.jpg",
+  "Furgón":            "https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/2019_Renault_Kangoo_Maxi_ZE_facelift%2C_front_8.4.19.jpg/320px-2019_Renault_Kangoo_Maxi_ZE_facelift%2C_front_8.4.19.jpg",
+};
+
 const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
   const [tab,setTab]=useState("info");
   const [etapa,setEtapa]=useState(lead.etapa||"Nuevo Lead");
@@ -994,6 +1002,40 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
               )}
             </div>
             {lead.notas&&<div style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:10,padding:14}}><div style={{fontSize:10,fontWeight:800,color:"#555555",letterSpacing:1,marginBottom:8,textTransform:"uppercase"}}>Notas</div><div style={{fontSize:12,color:"#666666",lineHeight:1.6}}>{lead.notas}</div></div>}
+
+            {/* Sección vehículo */}
+            {(lead.tipo_vehiculo||lead.onboarding_completado) && (
+              <div style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:10,padding:14}}>
+                <div style={{fontSize:10,fontWeight:800,color:"#555555",letterSpacing:1,marginBottom:10,textTransform:"uppercase"}}>🚛 Vehículo declarado</div>
+                {lead.tipo_vehiculo && (
+                  <div style={{display:"flex",gap:12,alignItems:"center",marginBottom:10}}>
+                    {IMAGENES_VEHICULO_CRM[lead.tipo_vehiculo] && (
+                      <img src={IMAGENES_VEHICULO_CRM[lead.tipo_vehiculo]} alt={lead.tipo_vehiculo}
+                        style={{width:100,height:66,objectFit:"cover",borderRadius:8,flexShrink:0,border:"1px solid #e4e7ec"}}
+                        onError={e=>e.target.style.display="none"}/>
+                    )}
+                    <div>
+                      <div style={{fontSize:13,fontWeight:800,color:"#1a3a6b"}}>{lead.tipo_vehiculo}</div>
+                      {lead.pipefy_card_id&&<div style={{fontSize:10,color:"#888",marginTop:2}}>Tarjeta Pipefy: {lead.pipefy_card_id}</div>}
+                    </div>
+                  </div>
+                )}
+                {lead.url_vehiculo && (
+                  <div>
+                    <div style={{fontSize:10,fontWeight:700,color:"#555",marginBottom:6}}>📷 Foto del vehículo subida</div>
+                    <a href={lead.url_vehiculo} target="_blank" rel="noreferrer">
+                      <img src={lead.url_vehiculo} alt="Foto vehículo"
+                        style={{width:"100%",maxHeight:160,objectFit:"cover",borderRadius:8,border:"1px solid #e4e7ec",cursor:"pointer"}}
+                        onError={e=>e.target.style.display="none"}/>
+                    </a>
+                    <div style={{fontSize:10,color:"#3B82F6",marginTop:4}}>← Clic para ver en tamaño completo</div>
+                  </div>
+                )}
+                {lead.onboarding_completado && !lead.url_vehiculo && (
+                  <div style={{fontSize:11,color:"#888",fontStyle:"italic"}}>Onboarding completado — foto de vehículo no disponible</div>
+                )}
+              </div>
+            )}
           </div>
         )}
         {tab==="score"&&(
