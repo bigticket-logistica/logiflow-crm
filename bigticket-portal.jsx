@@ -1928,53 +1928,57 @@ function ViewOnboarding({ lead, onVolver }) {
         if (leadData?.onboarding_completado) { setYaCompletado(true); setCargandoInicial(false); return; }
 
         // Buscar avance guardado en onboarding_terceros
-        const { data: saved } = await sb.from("onboarding_terceros").select("*").eq("lead_id", lead.id).single();
-        if (saved?.completado) { setYaCompletado(true); setCargandoInicial(false); return; }
-        // Cargar avance guardado
-        if (esMexico) {
-          setFormMX(f => ({...f,
-            puesto: saved.puesto || f.puesto,
-            tipo_vehiculo: Array.isArray(saved.tipos_vehiculo) ? saved.tipos_vehiculo[0] : (saved.tipos_vehiculo || f.tipo_vehiculo),
-            nombre: saved.nombre || f.nombre,
-            apellidos: saved.apellidos || f.apellidos,
-            ine: saved.rut || f.ine,
-            curp: saved.curp || f.curp,
-            rfc: saved.rfc || f.rfc,
-            licencia: saved.licencia || f.licencia,
-            telefono: saved.telefono || f.telefono,
-            email: saved.email || f.email,
-            localidad: saved.localidad || f.localidad,
-            colonia: saved.colonia || f.colonia,
-            url_ine: saved.url_ine || "",
-            url_curp: saved.url_curp || "",
-            url_rfc: saved.url_rfc || "",
-            url_licencia: saved.url_licencia || "",
-            url_vehiculo: saved.url_vehiculo || "",
-            acepta_privacidad: saved.acepta_privacidad || false,
-          }));
-        } else {
-          setFormCL(f => ({...f,
-            tipo_certificacion: saved.tipo_certificacion || f.tipo_certificacion,
-            posee_inicio_actividades: saved.posee_inicio_actividades || f.posee_inicio_actividades,
-            tipo_persona: saved.tipo_persona || f.tipo_persona,
-            razon_social: saved.razon_social || f.razon_social,
-            rut_empresa: saved.rut_empresa || f.rut_empresa,
-            direccion_empresa: saved.direccion_empresa || f.direccion_empresa,
-            nombre_representante: saved.nombre || f.nombre_representante,
-            rut_representante: saved.rut || f.rut_representante,
-            correo: saved.correo || f.correo,
-            telefono: saved.telefono || f.telefono,
-            banco: saved.banco || f.banco,
-            formato_cuenta: saved.formato_cuenta || f.formato_cuenta,
-            tipo_cuenta: saved.tipo_cuenta || f.tipo_cuenta,
-            nombre_titular: saved.nombre_titular || f.nombre_titular,
-            rut_titular: saved.rut_titular || f.rut_titular,
-            operacion: saved.operacion || f.operacion,
-            supervisor: saved.supervisor || f.supervisor,
-            url_carnet: saved.url_carnet || "",
-            acepta_privacidad: saved.acepta_privacidad || false,
-          }));
-        }
+        try {
+          const { data: saved } = await sb.from("onboarding_terceros").select("*").eq("lead_id", lead.id).single();
+          if (saved?.completado) { setYaCompletado(true); setCargandoInicial(false); return; }
+          if (saved) {
+            // Cargar avance guardado
+            if (esMexico) {
+              setFormMX(f => ({...f,
+                puesto: saved.puesto || f.puesto,
+                tipo_vehiculo: Array.isArray(saved.tipos_vehiculo) ? saved.tipos_vehiculo[0] : (saved.tipos_vehiculo || f.tipo_vehiculo),
+                nombre: saved.nombre || f.nombre,
+                apellidos: saved.apellidos || f.apellidos,
+                ine: saved.rut || f.ine,
+                curp: saved.curp || f.curp,
+                rfc: saved.rfc || f.rfc,
+                licencia: saved.licencia || f.licencia,
+                telefono: saved.telefono || f.telefono,
+                email: saved.email || f.email,
+                localidad: saved.localidad || f.localidad,
+                colonia: saved.colonia || f.colonia,
+                url_ine: saved.url_ine || "",
+                url_curp: saved.url_curp || "",
+                url_rfc: saved.url_rfc || "",
+                url_licencia: saved.url_licencia || "",
+                url_vehiculo: saved.url_vehiculo || "",
+                acepta_privacidad: saved.acepta_privacidad || false,
+              }));
+            } else {
+              setFormCL(f => ({...f,
+                tipo_certificacion: saved.tipo_certificacion || f.tipo_certificacion,
+                posee_inicio_actividades: saved.posee_inicio_actividades || f.posee_inicio_actividades,
+                tipo_persona: saved.tipo_persona || f.tipo_persona,
+                razon_social: saved.razon_social || f.razon_social,
+                rut_empresa: saved.rut_empresa || f.rut_empresa,
+                direccion_empresa: saved.direccion_empresa || f.direccion_empresa,
+                nombre_representante: saved.nombre || f.nombre_representante,
+                rut_representante: saved.rut || f.rut_representante,
+                correo: saved.correo || f.correo,
+                telefono: saved.telefono || f.telefono,
+                banco: saved.banco || f.banco,
+                formato_cuenta: saved.formato_cuenta || f.formato_cuenta,
+                tipo_cuenta: saved.tipo_cuenta || f.tipo_cuenta,
+                nombre_titular: saved.nombre_titular || f.nombre_titular,
+                rut_titular: saved.rut_titular || f.rut_titular,
+                operacion: saved.operacion || f.operacion,
+                supervisor: saved.supervisor || f.supervisor,
+                url_carnet: saved.url_carnet || "",
+                acepta_privacidad: saved.acepta_privacidad || false,
+              }));
+            }
+          }
+        } catch(_) {}
       } catch(_) {}
       finally { setCargandoInicial(false); }
     };
