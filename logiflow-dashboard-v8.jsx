@@ -1700,8 +1700,7 @@ export default function App() {
 
   const fetchLeads=async()=>{
     const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
-    try{const {data,error}=await sb.from("leads").select("*").order("created_at",{ascending:false});
-      if(error) throw error;
+    try{const data=await sb.from("leads").select("*",{order:"created_at.desc"});
       if(Array.isArray(data)){
         const normalized=data.map(l=>({...l,etapa:norm(l.etapa)}));
         setLeads(normalized);setLastUpdate(new Date());setError(null);
