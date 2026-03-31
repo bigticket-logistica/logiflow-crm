@@ -1827,6 +1827,7 @@ function ViewOnboarding({ lead, onVolver }) {
   const [guardando, setGuardando] = useState(false);
   const [completado, setCompletado] = useState(false);
   const [yaCompletado, setYaCompletado] = useState(false);
+  const [cargandoInicial, setCargandoInicial] = useState(true);
   const [uploading, setUploading] = useState({});
   const [showPrivacidad, setShowPrivacidad] = useState(false);
   const [errores, setErrores] = useState({});
@@ -1922,15 +1923,13 @@ function ViewOnboarding({ lead, onVolver }) {
   useEffect(() => {
     const cargar = async () => {
       try {
-        // Primero verificar en leads si onboarding_completado = true
+        // Verificar en leads si onboarding_completado = true
         const { data: leadData } = await sb.from("leads").select("onboarding_completado").eq("id", lead.id).single();
-        if (leadData?.onboarding_completado) { setYaCompletado(true); return; }
+        if (leadData?.onboarding_completado) { setYaCompletado(true); setCargandoInicial(false); return; }
 
-        // Luego buscar avance en onboarding_terceros
+        // Buscar avance guardado en onboarding_terceros
         const { data: saved } = await sb.from("onboarding_terceros").select("*").eq("lead_id", lead.id).single();
-        if (!saved) return;
-        // Si completado = true en onboarding_terceros también mostrar mensaje
-        if (saved.completado) { setYaCompletado(true); return; }
+        if (saved?.completado) { setYaCompletado(true); setCargandoInicial(false); return; }
         // Cargar avance guardado
         if (esMexico) {
           setFormMX(f => ({...f,
@@ -1977,6 +1976,7 @@ function ViewOnboarding({ lead, onVolver }) {
           }));
         }
       } catch(_) {}
+      finally { setCargandoInicial(false); }
     };
     cargar();
   }, [lead.id]);
@@ -2122,6 +2122,18 @@ function ViewOnboarding({ lead, onVolver }) {
     } catch (e) { alert("Error al enviar: " + e.message); }
     finally { setGuardando(false); }
   };
+
+  if (cargandoInicial) return (
+    <div>
+      <div className="topbar"><span className="logo">Big<span>ticket</span></span></div>
+      <div style={{minHeight:"60vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <div style={{textAlign:"center"}}>
+          <div style={{fontSize:32,marginBottom:12}}>🚛</div>
+          <div style={{fontSize:14,color:"#888",fontFamily:"'DM Sans',sans-serif"}}>Cargando...</div>
+        </div>
+      </div>
+    </div>
+  );
 
   if (yaCompletado) return (
     <div>
