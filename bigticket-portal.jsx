@@ -1168,7 +1168,7 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
         <button className="btn-gw" onClick={onClose}>Ver portal →</button>
       </div>
       <div className="admin-nav">
-        {[["camps","Campañas"],["nueva","Nueva campaña"],["postulaciones","Postulaciones"],["canales","Canales"],["centros_mx","Centros México"]].map(([k,l])=>(
+        {[["camps","Campañas"],["nueva","Nueva campaña"],["postulaciones","Postulaciones"],["vehiculos","🚗 Vehículos"],["canales","Canales"],["centros_mx","Centros México"]].map(([k,l])=>(
           <button key={k} className={`nav-btn ${tab===k?"active":""}`} onClick={()=>setTab(k)}>{l}</button>
         ))}
       </div>
@@ -1257,6 +1257,7 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
             }
           </div>
         )}
+        {tab==="vehiculos"&&<VehiculosVerificacion/>}
         {tab==="canales"&&<CanalesView postulaciones={postulaciones} onLoad={loadPost}/>}
         {tab==="centros_mx"&&<CentrosMxAdmin/>}
       </div>
@@ -1465,6 +1466,73 @@ function NuevaCampana({ campaigns, setCampaigns, onDone }) {
         </div>
       </div>
       <button className="btn-blue" onClick={save} disabled={saving} style={{width:"100%"}}>{saving?"Guardando...":"Crear y publicar campaña"}</button>
+    </div>
+  );
+}
+
+function VehiculosVerificacion() {
+  const [leads, setLeads] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const cargar = async () => {
+      setLoading(true);
+      const { data } = await sb.from("leads")
+        .select("id,nombre,telefono,codigo_postulacion,url_vehiculo,vehiculo_veredicto,vehiculo_score,vehiculo_comentario,created_at")
+        .not("url_vehiculo", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      setLeads(data || []);
+      setLoading(false);
+    };
+    cargar();
+  }, []);
+
+  const colorVeredicto = v => v === "Aprobado" ? "#166534" : v === "Revisar" ? "#92400e" : v === "Rechazado" ? "#c0392b" : "#888";
+  const bgVeredicto   = v => v === "Aprobado" ? "#dcfce7" : v === "Revisar" ? "#fef3c7" : v === "Rechazado" ? "#fee2e2" : "#f4f5f7";
+  const iconVeredicto = v => v === "Aprobado" ? "✅" : v === "Revisar" ? "⚠️" : v === "Rechazado" ? "❌" : "⏳";
+
+  return (
+    <div>
+      <div className="sec-title" style={{marginBottom:4}}>Verificación de Vehículos</div>
+      <div className="sec-sub">Resultados del análisis Claude Vision por cada lead con foto adjunta</div>
+      {loading ? <div className="loading">Cargando...</div> :
+        leads.length === 0 ? <div className="empty">No hay leads con foto de vehículo aún.</div> :
+        leads.map(l => (
+          <div key={l.id} style={{background:"#fff",border:"0.5px solid #e4e7ec",borderRadius:12,padding:"14px 16px",marginBottom:10,display:"flex",gap:14,alignItems:"flex-start"}}>
+            {/* Foto */}
+            <div style={{flexShrink:0}}>
+              {l.url_vehiculo ? (
+                <a href={l.url_vehiculo} target="_blank">
+                  <img src={l.url_vehiculo} alt="vehículo"
+                    style={{width:90,height:64,objectFit:"cover",borderRadius:8,border:"1px solid #e4e7ec",display:"block"}}
+                    onError={e=>{e.target.style.display="none";}}/>
+                </a>
+              ) : <div style={{width:90,height:64,background:"#f4f5f7",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>🚗</div>}
+            </div>
+            {/* Info */}
+            <div style={{flex:1}}>
+              <div style={{fontSize:14,fontWeight:700,color:"#1a1a1a"}}>{l.nombre}</div>
+              <div style={{fontSize:12,color:"#888",marginBottom:6}}>{l.codigo_postulacion} · {new Date(l.created_at).toLocaleDateString("es-CL")}</div>
+              {l.vehiculo_veredicto ? (
+                <div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center"}}>
+                  <span style={{fontSize:12,padding:"3px 10px",borderRadius:20,background:bgVeredicto(l.vehiculo_veredicto),color:colorVeredicto(l.vehiculo_veredicto),fontWeight:700}}>
+                    {iconVeredicto(l.vehiculo_veredicto)} {l.vehiculo_veredicto}
+                  </span>
+                  {l.vehiculo_score != null && (
+                    <span style={{fontSize:12,color:"#555",fontWeight:600}}>Score: {l.vehiculo_score}/100</span>
+                  )}
+                  {l.vehiculo_comentario && (
+                    <span style={{fontSize:12,color:"#666",fontStyle:"italic"}}>"{l.vehiculo_comentario}"</span>
+                  )}
+                </div>
+              ) : (
+                <span style={{fontSize:12,color:"#F47B20",fontWeight:600}}>⏳ Pendiente verificación</span>
+              )}
+            </div>
+          </div>
+        ))
+      }
     </div>
   );
 }
@@ -1681,20 +1749,20 @@ const OPERACIONES_CL = [
   "F_VIÑA","S_VIÑA","R_RM","R_VIÑA","BODEGA_VIÑA","BODEGA_RM",
 ];
 
-const TIPOS_VEHICULO_MX = ["Small Van","Large Van","Small + Large Van","Extra Van"];
+const TIPOS_VEHICULO_MX = ["Auto","Small Van","Large Van","Small + Large Van"];
 
 const IMAGENES_VEHICULO_MX = {
-  "Small Van":         "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=320&h=213&fit=crop&auto=format",
-  "Large Van":         "https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=320&h=213&fit=crop&auto=format",
-  "Small + Large Van": "https://images.unsplash.com/photo-1519003722824-194d4455a60c?w=320&h=213&fit=crop&auto=format",
-  "Extra Van":         "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=320&h=213&fit=crop&auto=format",
+  "Auto":              "https://psvdtgjvognbmxfvqbaa.supabase.co/storage/v1/object/public/assets/AUTO.jpeg",
+  "Small Van":         "https://psvdtgjvognbmxfvqbaa.supabase.co/storage/v1/object/public/assets/SMALL_VAN.jpeg",
+  "Large Van":         "https://psvdtgjvognbmxfvqbaa.supabase.co/storage/v1/object/public/assets/LARGE_VAN.jpeg",
+  "Small + Large Van": null,
 };
 
 const DESC_VEHICULO_MX = {
-  "Small Van":         "Furgoneta pequeña tipo Kangoo, NV200 o similar. Carga hasta 800 kg.",
-  "Large Van":         "Furgoneta grande tipo Sprinter, Transit o similar. Carga hasta 1,500 kg.",
-  "Small + Large Van": "Disponibilidad tanto en Small Van como Large Van.",
-  "Extra Van":         "Vehículo de carga extra tipo Iveco Daily o camión ligero.",
+  "Auto":              "Hasta 1,9 m³. Ejemplos: Sedan, SUV, Hatchback.",
+  "Small Van":         "De 2,0 m³ a 5,4 m³. Ejemplos: Peugeot Partner, Nissan NV200, Ford Transit Connect Carga, Chevrolet Express 1500, Volkswagen Transporter.",
+  "Large Van":         "De 5,5 m³ a 12,9 m³. Ejemplos: Nissan Urvan Panel, Ford Transit Custom, RAM ProMaster, Mercedes-Benz Sprinter, Peugeot Manager, Fiat Ducato.",
+  "Small + Large Van": "Tienes disponibilidad tanto en Small Van (2,0-5,4 m³) como en Large Van (5,5-12,9 m³).",
 };
 const PUESTOS_MX = ["Driver","Ayudante","Propietario"];
 
@@ -1760,6 +1828,7 @@ function ViewOnboarding({ lead, onVolver }) {
   const esMexico = pais === "México";
   const [guardando, setGuardando] = useState(false);
   const [completado, setCompletado] = useState(false);
+  const [yaCompletado, setYaCompletado] = useState(false);
   const [uploading, setUploading] = useState({});
   const [showPrivacidad, setShowPrivacidad] = useState(false);
   const [errores, setErrores] = useState({});
@@ -1855,52 +1924,57 @@ function ViewOnboarding({ lead, onVolver }) {
   // Cargar progreso guardado
   useEffect(() => {
     const cargar = async () => {
-      const { data: saved } = await sb.from("onboarding_terceros").select("*").eq("lead_id", lead.id).single();
-      if (!saved) return;
-      if (esMexico) {
-        setFormMX(f => ({...f,
-          puesto: saved.puesto || f.puesto,
-          tipo_vehiculo: Array.isArray(saved.tipos_vehiculo) ? saved.tipos_vehiculo[0] : f.tipo_vehiculo,
-          nombre: saved.nombre || f.nombre,
-          apellidos: saved.apellidos || f.apellidos,
-          ine: saved.rut || f.ine,
-          curp: saved.curp || f.curp,
-          rfc: saved.rfc || f.rfc,
-          licencia: saved.licencia || f.licencia,
-          telefono: saved.telefono || f.telefono,
-          email: saved.email || f.email,
-          localidad: saved.localidad || f.localidad,
-          colonia: saved.colonia || f.colonia,
-          url_ine: saved.url_ine || "",
-          url_curp: saved.url_curp || "",
-          url_rfc: saved.url_rfc || "",
-          url_licencia: saved.url_licencia || "",
-          url_vehiculo: saved.url_vehiculo || "",
-          acepta_privacidad: saved.acepta_privacidad || false,
-        }));
-      } else {
-        setFormCL(f => ({...f,
-          tipo_certificacion: saved.tipo_certificacion || f.tipo_certificacion,
-          posee_inicio_actividades: saved.posee_inicio_actividades || f.posee_inicio_actividades,
-          tipo_persona: saved.tipo_persona || f.tipo_persona,
-          razon_social: saved.razon_social || f.razon_social,
-          rut_empresa: saved.rut_empresa || f.rut_empresa,
-          direccion_empresa: saved.direccion_empresa || f.direccion_empresa,
-          nombre_representante: saved.nombre || f.nombre_representante,
-          rut_representante: saved.rut || f.rut_representante,
-          correo: saved.correo || f.correo,
-          telefono: saved.telefono || f.telefono,
-          banco: saved.banco || f.banco,
-          formato_cuenta: saved.formato_cuenta || f.formato_cuenta,
-          tipo_cuenta: saved.tipo_cuenta || f.tipo_cuenta,
-          nombre_titular: saved.nombre_titular || f.nombre_titular,
-          rut_titular: saved.rut_titular || f.rut_titular,
-          operacion: saved.operacion || f.operacion,
-          supervisor: saved.supervisor || f.supervisor,
-          url_carnet: saved.url_carnet || "",
-          acepta_privacidad: saved.acepta_privacidad || false,
-        }));
-      }
+      try {
+        const { data: saved } = await sb.from("onboarding_terceros").select("*").eq("lead_id", lead.id).single();
+        if (!saved) return;
+        // Si ya estaba completado, mostrar mensaje
+        if (saved.completado) { setYaCompletado(true); return; }
+        // Cargar avance guardado
+        if (esMexico) {
+          setFormMX(f => ({...f,
+            puesto: saved.puesto || f.puesto,
+            tipo_vehiculo: Array.isArray(saved.tipos_vehiculo) ? saved.tipos_vehiculo[0] : (saved.tipos_vehiculo || f.tipo_vehiculo),
+            nombre: saved.nombre || f.nombre,
+            apellidos: saved.apellidos || f.apellidos,
+            ine: saved.rut || f.ine,
+            curp: saved.curp || f.curp,
+            rfc: saved.rfc || f.rfc,
+            licencia: saved.licencia || f.licencia,
+            telefono: saved.telefono || f.telefono,
+            email: saved.email || f.email,
+            localidad: saved.localidad || f.localidad,
+            colonia: saved.colonia || f.colonia,
+            url_ine: saved.url_ine || "",
+            url_curp: saved.url_curp || "",
+            url_rfc: saved.url_rfc || "",
+            url_licencia: saved.url_licencia || "",
+            url_vehiculo: saved.url_vehiculo || "",
+            acepta_privacidad: saved.acepta_privacidad || false,
+          }));
+        } else {
+          setFormCL(f => ({...f,
+            tipo_certificacion: saved.tipo_certificacion || f.tipo_certificacion,
+            posee_inicio_actividades: saved.posee_inicio_actividades || f.posee_inicio_actividades,
+            tipo_persona: saved.tipo_persona || f.tipo_persona,
+            razon_social: saved.razon_social || f.razon_social,
+            rut_empresa: saved.rut_empresa || f.rut_empresa,
+            direccion_empresa: saved.direccion_empresa || f.direccion_empresa,
+            nombre_representante: saved.nombre || f.nombre_representante,
+            rut_representante: saved.rut || f.rut_representante,
+            correo: saved.correo || f.correo,
+            telefono: saved.telefono || f.telefono,
+            banco: saved.banco || f.banco,
+            formato_cuenta: saved.formato_cuenta || f.formato_cuenta,
+            tipo_cuenta: saved.tipo_cuenta || f.tipo_cuenta,
+            nombre_titular: saved.nombre_titular || f.nombre_titular,
+            rut_titular: saved.rut_titular || f.rut_titular,
+            operacion: saved.operacion || f.operacion,
+            supervisor: saved.supervisor || f.supervisor,
+            url_carnet: saved.url_carnet || "",
+            acepta_privacidad: saved.acepta_privacidad || false,
+          }));
+        }
+      } catch(_) {}
     };
     cargar();
   }, [lead.id]);
@@ -2051,6 +2125,30 @@ function ViewOnboarding({ lead, onVolver }) {
     finally { setGuardando(false); }
   };
 
+  if (yaCompletado) return (
+    <div>
+      <div className="topbar"><span className="logo">Big<span>ticket</span></span></div>
+      <div style={{ maxWidth: 480, margin: "60px auto", padding: "0 20px" }}>
+        <div style={{ background: "#fff", borderRadius: 16, border: "0.5px solid #e4e7ec", padding: "40px 32px", textAlign: "center" }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: "#1a3a6b", marginBottom: 8 }}>Formulario ya completado</div>
+          <div style={{ fontSize: 13, color: "#555", marginBottom: 8 }}>
+            Hola <strong>{lead.nombre}</strong>, ya enviaste tu formulario de incorporación anteriormente.
+          </div>
+          <div style={{ fontSize: 13, color: "#555", marginBottom: 24 }}>
+            Nuestro equipo está revisando tu información y te contactará pronto por WhatsApp 🚛
+          </div>
+          <div style={{ background: "#f0f9ff", borderRadius: 10, padding: "12px 16px", marginBottom: 24, display: "inline-block" }}>
+            <div style={{ fontSize: 11, color: "#0369a1", fontWeight: 700, marginBottom: 4 }}>Tu código de postulación</div>
+            <div style={{ fontSize: 20, fontWeight: 900, fontFamily: "monospace", color: "#0369a1", letterSpacing: 2 }}>{lead.codigo_postulacion}</div>
+          </div>
+          <br/>
+          <button className="btn-orange" onClick={onVolver}>Volver al portal</button>
+        </div>
+      </div>
+    </div>
+  );
+
   if (completado) return (
     <div>
       <div className="topbar"><span className="logo">Big<span>ticket</span></span></div>
@@ -2110,16 +2208,41 @@ function ViewOnboarding({ lead, onVolver }) {
               value={formMX.tipo_vehiculo} onChange={v => updMX("tipo_vehiculo", v)} required />
 
             {/* Imagen de referencia del vehículo */}
-            {formMX.tipo_vehiculo && IMAGENES_VEHICULO_MX[formMX.tipo_vehiculo] && (
-              <div style={{background:"#f0f7ff",border:"1px solid #bfdbfe",borderRadius:10,padding:12,marginBottom:12,display:"flex",gap:12,alignItems:"center"}}>
-                <img src={IMAGENES_VEHICULO_MX[formMX.tipo_vehiculo]} alt={formMX.tipo_vehiculo}
-                  style={{width:120,height:80,objectFit:"cover",borderRadius:8,flexShrink:0}}
-                  onError={e=>e.target.style.display="none"}/>
-                <div>
-                  <div style={{fontSize:13,fontWeight:700,color:"#1a3a6b",marginBottom:4}}>📸 Referencia: {formMX.tipo_vehiculo}</div>
-                  <div style={{fontSize:12,color:"#555"}}>{DESC_VEHICULO_MX[formMX.tipo_vehiculo]}</div>
-                  <div style={{fontSize:11,color:"#F47B20",marginTop:4,fontWeight:600}}>Tu vehículo debe ser similar al de la imagen</div>
-                </div>
+            {formMX.tipo_vehiculo && (
+              <div style={{background:"#f0f7ff",border:"1px solid #bfdbfe",borderRadius:10,padding:12,marginBottom:12}}>
+                {formMX.tipo_vehiculo === "Small + Large Van" ? (
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700,color:"#1a3a6b",marginBottom:8}}>📸 Referencia: Small Van + Large Van</div>
+                    <div style={{display:"flex",gap:10,marginBottom:8}}>
+                      <div style={{flex:1,textAlign:"center"}}>
+                        <img src={IMAGENES_VEHICULO_MX["Small Van"]} alt="Small Van"
+                          style={{width:"100%",height:90,objectFit:"contain",borderRadius:8,background:"#e8f5e9"}}
+                          onError={e=>e.target.style.display="none"}/>
+                        <div style={{fontSize:11,fontWeight:700,color:"#166534",marginTop:4}}>Small Van · 2,0–5,4 m³</div>
+                      </div>
+                      <div style={{flex:1,textAlign:"center"}}>
+                        <img src={IMAGENES_VEHICULO_MX["Large Van"]} alt="Large Van"
+                          style={{width:"100%",height:90,objectFit:"contain",borderRadius:8,background:"#dbeafe"}}
+                          onError={e=>e.target.style.display="none"}/>
+                        <div style={{fontSize:11,fontWeight:700,color:"#1e40af",marginTop:4}}>Large Van · 5,5–12,9 m³</div>
+                      </div>
+                    </div>
+                    <div style={{fontSize:12,color:"#555"}}>{DESC_VEHICULO_MX["Small + Large Van"]}</div>
+                  </div>
+                ) : (
+                  <div style={{display:"flex",gap:12,alignItems:"center"}}>
+                    {IMAGENES_VEHICULO_MX[formMX.tipo_vehiculo] && (
+                      <img src={IMAGENES_VEHICULO_MX[formMX.tipo_vehiculo]} alt={formMX.tipo_vehiculo}
+                        style={{width:130,height:90,objectFit:"contain",borderRadius:8,flexShrink:0,background:"#f0f0f0"}}
+                        onError={e=>e.target.style.display="none"}/>
+                    )}
+                    <div>
+                      <div style={{fontSize:13,fontWeight:700,color:"#1a3a6b",marginBottom:4}}>📸 Referencia: {formMX.tipo_vehiculo}</div>
+                      <div style={{fontSize:12,color:"#555"}}>{DESC_VEHICULO_MX[formMX.tipo_vehiculo]}</div>
+                      <div style={{fontSize:11,color:"#F47B20",marginTop:4,fontWeight:600}}>Tu vehículo debe ser similar al de la imagen</div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
