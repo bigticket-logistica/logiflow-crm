@@ -1911,7 +1911,7 @@ function ViewOnboarding({ lead, onVolver }) {
         completado: false, updated_at: new Date().toISOString(),
       };
       const { error } = await sb.from("onboarding_terceros")
-        .upsert(payload, { onConflict: "lead_id" });
+        .upsert(payload, { onConflict: "codigo_postulacion" });
       if (error) throw error;
       setGuardadoAvance(true);
       setTimeout(() => setGuardadoAvance(false), 3000);
@@ -1929,7 +1929,7 @@ function ViewOnboarding({ lead, onVolver }) {
 
         // Buscar avance guardado en onboarding_terceros
         try {
-          const { data: saved } = await sb.from("onboarding_terceros").select("*").eq("lead_id", lead.id).single();
+          const { data: saved } = await sb.from("onboarding_terceros").select("*").eq("codigo_postulacion", lead.codigo_postulacion).single();
           if (saved?.completado) { setYaCompletado(true); setCargandoInicial(false); return; }
           if (saved) {
             // Cargar avance guardado
@@ -2097,7 +2097,7 @@ function ViewOnboarding({ lead, onVolver }) {
       // Guardar en Supabase — manejamos el 406 por separado para no detener el flujo
       const dbPayload = { ...payload, updated_at: new Date().toISOString() };
       const { error: dbErr } = await sb.from("onboarding_terceros")
-        .upsert(dbPayload, { onConflict: "lead_id" });
+        .upsert(dbPayload, { onConflict: "codigo_postulacion" });
       if (dbErr) throw dbErr;
       await sb.from("leads").update({ etapa: "Entrevistas y Validaciones" }).eq("id", lead.id);
       // Notificar N8N
