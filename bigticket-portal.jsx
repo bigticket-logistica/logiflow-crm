@@ -1922,9 +1922,14 @@ function ViewOnboarding({ lead, onVolver }) {
   useEffect(() => {
     const cargar = async () => {
       try {
+        // Primero verificar en leads si onboarding_completado = true
+        const { data: leadData } = await sb.from("leads").select("onboarding_completado").eq("id", lead.id).single();
+        if (leadData?.onboarding_completado) { setYaCompletado(true); return; }
+
+        // Luego buscar avance en onboarding_terceros
         const { data: saved } = await sb.from("onboarding_terceros").select("*").eq("lead_id", lead.id).single();
         if (!saved) return;
-        // Si ya estaba completado, mostrar mensaje
+        // Si completado = true en onboarding_terceros también mostrar mensaje
         if (saved.completado) { setYaCompletado(true); return; }
         // Cargar avance guardado
         if (esMexico) {
