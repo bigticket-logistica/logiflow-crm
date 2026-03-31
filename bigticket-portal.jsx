@@ -807,18 +807,62 @@ MODALIDADES DE CONTRATO:
 - Apoyo: soporte puntual según demanda
 - Planta: contrato estable con ruta fija
 - Temporada: contrato por período específico
-- Cada modalidad tiene su propio flujo y forma de pago
+- Vigencia inicial de 12 meses, condicionada al cumplimiento de niveles de servicio
+- BIGTICKET MX puede rotar operadores entre zonas según habilidades y necesidades operativas
 
-PAGOS:
-- Por cantidad de envíos: ganas según cuánto entregues
-- Por ruta fija: valor fijo por ruta completada
-- La documentación para pagos se solicita periódicamente
+PAGOS CHILE:
+- Entre $8.000 y $15.000 CLP por ruta según vehículo y campaña
+- Frecuencia: semanal cada viernes
+- Se requiere factura electrónica (boleta o factura)
+
+PAGOS MÉXICO:
+- Large Van (LV): $2.056 MXN netos + IVA por jornada (tramo 0 a 100 km)
+- Small Van (SV): $1.856 MXN netos + IVA por jornada (tramo 0 a 100 km)
+- Auxiliar en entregas: $300 MXN por día (se puede solicitar)
+- Frecuencia: semanal cada viernes por semana inmediata anterior
+- Transferencia bancaria previa emisión de CFDI
+- Importante: realizar certificación Bigticket para no tener problemas con el pago
+- BIGTICKET MX puede retener pago si no se acredita cumplimiento de obligaciones laborales, fiscales y de seguridad social
+
+ENTREGAS ESTIMADAS MÉXICO:
+- Entre 80 y 100 entregas por unidad por jornada
+
+CEDIS SQR1 QUERÉTARO:
+- Dirección: Prol. Av. Zaragoza 61, La Capilla, 76170 Santiago de Querétaro, Qro.
+- Devoluciones de mercancía no entregada: en el mismo SVC hasta las 22:00 hrs.
+
+CASTIGOS POR BAJO DESEMPEÑO MÉXICO:
+- Menos del 99.5% de domicilios visitados → castigo del 3% sobre tarifa base
+- Nivel de servicio inferior al 95% → castigo del 3% sobre tarifa base
+
+DOCUMENTOS REQUERIDOS MÉXICO:
+- Carta de no antecedentes penales vigente
+- Historial de conductor
+- Licencia de conducir vigente
+- Permiso de paquetería (obligatorio)
+- GPS instalado (obligatorio, con cargo al prestador + renta mensual)
+
+DOCUMENTOS REQUERIDOS CHILE:
+- Licencia de conducir vigente
+- Cédula de identidad
+- RUT con inicio de actividades
+- Documentación del vehículo al día
+- Seguro de responsabilidad civil
+
+PROCESO DESPUÉS DE POSTULAR:
+1. Postulas en el portal
+2. El equipo revisa tu perfil (1-3 días hábiles)
+3. Recibes propuesta económica por WhatsApp
+4. Aceptas y completas formulario de incorporación
+5. Verificación de documentos (2-5 días)
+6. ¡Empiezas a recibir rutas!
 
 CONSULTAS FRECUENTES DE TERCEROS ACTIVOS:
 - Certificación de flotas: proceso de verificación del vehículo
 - Documentación para pagos: boletas, facturas, liquidaciones
 - Carga y descarga de documentos: se hace a través del sistema
 - Incidentes (choque/robo): reportar inmediatamente al coordinador
+- Seguro: BigTicket exige seguro de responsabilidad civil propio. Cubrimos las mercancías transportadas.
 
 PORTAL:
 - Los prospectos pueden postular en: https://bigticket-portal.vercel.app
