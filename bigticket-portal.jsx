@@ -1749,20 +1749,18 @@ const OPERACIONES_CL = [
   "F_VIÑA","S_VIÑA","R_RM","R_VIÑA","BODEGA_VIÑA","BODEGA_RM",
 ];
 
-const TIPOS_VEHICULO_MX = ["Auto","Small Van","Large Van","Small + Large Van"];
+const TIPOS_VEHICULO_MX = ["Small Van","Large Van","Small + Large Van"];
 
 const IMAGENES_VEHICULO_MX = {
-  "Auto":              "https://psvdtgjvognbmxfvqbaa.supabase.co/storage/v1/object/public/assets/AUTO.jpeg",
   "Small Van":         "https://psvdtgjvognbmxfvqbaa.supabase.co/storage/v1/object/public/assets/SMALL_VAN.jpeg",
   "Large Van":         "https://psvdtgjvognbmxfvqbaa.supabase.co/storage/v1/object/public/assets/LARGE_VAN.jpeg",
   "Small + Large Van": null,
 };
 
 const DESC_VEHICULO_MX = {
-  "Auto":              "Hasta 1,9 m³. Ejemplos: Sedan, SUV, Hatchback.",
   "Small Van":         "De 2,0 m³ a 5,4 m³. Ejemplos: Peugeot Partner, Nissan NV200, Ford Transit Connect Carga, Chevrolet Express 1500, Volkswagen Transporter.",
   "Large Van":         "De 5,5 m³ a 12,9 m³. Ejemplos: Nissan Urvan Panel, Ford Transit Custom, RAM ProMaster, Mercedes-Benz Sprinter, Peugeot Manager, Fiat Ducato.",
-  "Small + Large Van": "Tienes disponibilidad tanto en Small Van (2,0-5,4 m³) como en Large Van (5,5-12,9 m³).",
+  "Small + Large Van": "Tienes disponibilidad tanto en Small Van (2,0–5,4 m³) como en Large Van (5,5–12,9 m³).",
 };
 const PUESTOS_MX = ["Driver","Ayudante","Propietario"];
 
@@ -1911,10 +1909,9 @@ function ViewOnboarding({ lead, onVolver }) {
         url_carnet: formCL.url_carnet, acepta_privacidad: formCL.acepta_privacidad,
         completado: false, updated_at: new Date().toISOString(),
       };
-      let existe = null;
-      try { const { data } = await sb.from("onboarding_terceros").select("id").eq("lead_id", lead.id).single(); existe = data; } catch(_) { existe = null; }
-      if (existe) { await sb.from("onboarding_terceros").update(payload).eq("lead_id", lead.id); }
-      else { await sb.from("onboarding_terceros").insert(payload); }
+      const { error } = await sb.from("onboarding_terceros")
+        .upsert(payload, { onConflict: "lead_id" });
+      if (error) throw error;
       setGuardadoAvance(true);
       setTimeout(() => setGuardadoAvance(false), 3000);
     } catch(e) { alert("Error al guardar: " + e.message); }
@@ -2090,13 +2087,9 @@ function ViewOnboarding({ lead, onVolver }) {
     try {
       // Guardar en Supabase — manejamos el 406 por separado para no detener el flujo
       const dbPayload = { ...payload, updated_at: new Date().toISOString() };
-      let existe = null;
-      try {
-        const { data } = await sb.from("onboarding_terceros").select("id").eq("lead_id", lead.id).single();
-        existe = data;
-      } catch (_) { existe = null; }
-      if (existe) { await sb.from("onboarding_terceros").update(dbPayload).eq("lead_id", lead.id); }
-      else { await sb.from("onboarding_terceros").insert(dbPayload); }
+      const { error: dbErr } = await sb.from("onboarding_terceros")
+        .upsert(dbPayload, { onConflict: "lead_id" });
+      if (dbErr) throw dbErr;
       await sb.from("leads").update({ etapa: "Entrevistas y Validaciones" }).eq("id", lead.id);
       // Notificar N8N
       try {
@@ -2209,37 +2202,41 @@ function ViewOnboarding({ lead, onVolver }) {
 
             {/* Imagen de referencia del vehículo */}
             {formMX.tipo_vehiculo && (
-              <div style={{background:"#f0f7ff",border:"1px solid #bfdbfe",borderRadius:10,padding:12,marginBottom:12}}>
+              <div style={{background:"#f0f7ff",border:"1px solid #bfdbfe",borderRadius:12,marginBottom:14,overflow:"hidden"}}>
                 {formMX.tipo_vehiculo === "Small + Large Van" ? (
                   <div>
-                    <div style={{fontSize:13,fontWeight:700,color:"#1a3a6b",marginBottom:8}}>📸 Referencia: Small Van + Large Van</div>
-                    <div style={{display:"flex",gap:10,marginBottom:8}}>
-                      <div style={{flex:1,textAlign:"center"}}>
+                    <div style={{display:"flex",gap:0}}>
+                      <div style={{flex:1,textAlign:"center",background:"#e8f5e9",padding:12}}>
                         <img src={IMAGENES_VEHICULO_MX["Small Van"]} alt="Small Van"
-                          style={{width:"100%",height:90,objectFit:"contain",borderRadius:8,background:"#e8f5e9"}}
+                          style={{width:"100%",height:160,objectFit:"contain",borderRadius:8,display:"block",margin:"0 auto"}}
                           onError={e=>e.target.style.display="none"}/>
-                        <div style={{fontSize:11,fontWeight:700,color:"#166534",marginTop:4}}>Small Van · 2,0–5,4 m³</div>
+                        <div style={{fontSize:12,fontWeight:700,color:"#166534",marginTop:6}}>Small Van</div>
+                        <div style={{fontSize:11,color:"#166534"}}>2,0 – 5,4 m³</div>
                       </div>
-                      <div style={{flex:1,textAlign:"center"}}>
+                      <div style={{flex:1,textAlign:"center",background:"#dbeafe",padding:12}}>
                         <img src={IMAGENES_VEHICULO_MX["Large Van"]} alt="Large Van"
-                          style={{width:"100%",height:90,objectFit:"contain",borderRadius:8,background:"#dbeafe"}}
+                          style={{width:"100%",height:160,objectFit:"contain",borderRadius:8,display:"block",margin:"0 auto"}}
                           onError={e=>e.target.style.display="none"}/>
-                        <div style={{fontSize:11,fontWeight:700,color:"#1e40af",marginTop:4}}>Large Van · 5,5–12,9 m³</div>
+                        <div style={{fontSize:12,fontWeight:700,color:"#1e40af",marginTop:6}}>Large Van</div>
+                        <div style={{fontSize:11,color:"#1e40af"}}>5,5 – 12,9 m³</div>
                       </div>
                     </div>
-                    <div style={{fontSize:12,color:"#555"}}>{DESC_VEHICULO_MX["Small + Large Van"]}</div>
+                    <div style={{padding:"10px 14px",background:"#f0f7ff"}}>
+                      <div style={{fontSize:12,fontWeight:700,color:"#1a3a6b",marginBottom:2}}>📸 Referencia: Small Van + Large Van</div>
+                      <div style={{fontSize:12,color:"#555"}}>{DESC_VEHICULO_MX["Small + Large Van"]}</div>
+                    </div>
                   </div>
                 ) : (
-                  <div style={{display:"flex",gap:12,alignItems:"center"}}>
+                  <div>
                     {IMAGENES_VEHICULO_MX[formMX.tipo_vehiculo] && (
                       <img src={IMAGENES_VEHICULO_MX[formMX.tipo_vehiculo]} alt={formMX.tipo_vehiculo}
-                        style={{width:130,height:90,objectFit:"contain",borderRadius:8,flexShrink:0,background:"#f0f0f0"}}
+                        style={{width:"100%",height:200,objectFit:"contain",background:"#e8f0fb",display:"block"}}
                         onError={e=>e.target.style.display="none"}/>
                     )}
-                    <div>
+                    <div style={{padding:"10px 14px"}}>
                       <div style={{fontSize:13,fontWeight:700,color:"#1a3a6b",marginBottom:4}}>📸 Referencia: {formMX.tipo_vehiculo}</div>
-                      <div style={{fontSize:12,color:"#555"}}>{DESC_VEHICULO_MX[formMX.tipo_vehiculo]}</div>
-                      <div style={{fontSize:11,color:"#F47B20",marginTop:4,fontWeight:600}}>Tu vehículo debe ser similar al de la imagen</div>
+                      <div style={{fontSize:12,color:"#555",marginBottom:4}}>{DESC_VEHICULO_MX[formMX.tipo_vehiculo]}</div>
+                      <div style={{fontSize:11,color:"#F47B20",fontWeight:600}}>⚠ Tu vehículo debe ser similar al de la imagen</div>
                     </div>
                   </div>
                 )}
