@@ -67,7 +67,16 @@ const getCanalCfg = (canal) => {
   return CANAL_CFG[canal.toLowerCase()] || { color:"#888888", icon:"•", label:canal };
 };
 
-const getScoreColor = (s) => s>=80?"#10B981":s>=60?"#F59E0B":s>=40?"#F97316":"#EF4444";
+const getScoreColor = (s, clasificacion) => {
+  if (clasificacion) {
+    const c = clasificacion.toLowerCase();
+    if (c.includes("caliente")) return "#10B981";
+    if (c.includes("tibio") || c.includes("candidato")) return "#F59E0B";
+    return "#EF4444";
+  }
+  // fallback sin clasificacion: usa porcentaje sobre 100
+  return s>=70?"#10B981":s>=40?"#F59E0B":"#EF4444";
+};
 
 const formatFecha = (iso) => {
   if (!iso) return "—";
@@ -85,8 +94,13 @@ const formatFecha = (iso) => {
 const diasEntre = (a,b) => (!a||!b)?null:Math.round(Math.abs(new Date(b)-new Date(a))/86400000);
 
 // ─── COMPONENTES BASE ─────────────────────────────────────────────────────────
-const ScoreDot = ({ score }) => {
-  const c=getScoreColor(score||0), s=Math.min(score||0,100);
+const ScoreDot = ({ score, clasificacion }) => {
+  const c=getScoreColor(score||0, clasificacion);
+  const pct = clasificacion?.toLowerCase().includes("caliente") ? 100
+    : clasificacion?.toLowerCase().includes("tibio") || clasificacion?.toLowerCase().includes("candidato") ? 65
+    : clasificacion ? 25
+    : Math.min(score||0, 100);
+  const s = pct;
   return (
     <svg width={36} height={36} viewBox="0 0 36 36" style={{flexShrink:0}}>
       <circle cx={18} cy={18} r={15} fill="none" stroke="#f0f2f5" strokeWidth={3}/>
@@ -692,7 +706,7 @@ const LeadCard = ({ lead, onSelect, onDragStart }) => {
           <div style={{fontSize:10,color:"#555555",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{lead.empresa||"Sin empresa"}</div>
         </div>
         <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3}}>
-          <ScoreDot score={lead.score}/>
+          <ScoreDot score={lead.score} clasificacion={lead.clasificacion}/>
           {lead.pais&&<PaisFlag pais={lead.pais}/>}
         </div>
       </div>
@@ -935,7 +949,7 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
     onEtapaChangeRequest&&onEtapaChangeRequest(lead,newEtapa);
   };
   const etapaCfg=ETAPA_CFG[etapa]||{color:"#888888"};
-  const scoreColor=getScoreColor(lead.score||0);
+  const scoreColor=getScoreColor(lead.score||0, lead.clasificacion);
   return (
     <div style={{position:"fixed",top:0,right:0,width:480,height:"100vh",background:"#1a3a6b",borderLeft:"1px solid #e4e7ec",display:"flex",flexDirection:"column",zIndex:100,boxShadow:"-30px 0 80px rgba(0,0,0,.7)"}}>
       <div style={{padding:"18px 20px",background:"linear-gradient(135deg,#0f1f3d,#1a3a6b)",borderBottom:"1px solid #e4e7ec",flexShrink:0}}>
@@ -950,7 +964,7 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
             </div>
           </div>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
-            <ScoreDot score={lead.score}/>
+            <ScoreDot score={lead.score} clasificacion={lead.clasificacion}/>
             <button onClick={onClose} style={{background:"#eef2ff",border:"1px solid #dbeafe",color:"#666666",borderRadius:8,width:32,height:32,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
           </div>
         </div>
@@ -1549,7 +1563,7 @@ const DashboardMetrics = ({ leads }) => {
               <div style={{fontSize:12,fontWeight:700,color:"#1a1a1a",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{lead.nombre} · {lead.empresa}</div>
               <div style={{fontSize:10,color:"#555555"}}>{lead.etapa||"Nuevo Lead"} · {formatFecha(lead.created_at)}</div>
             </div>
-            <CanalTag canal={lead.canal}/><ScoreDot score={lead.score}/>
+            <CanalTag canal={lead.canal}/><ScoreDot score={lead.score} clasificacion={lead.clasificacion}/>
           </div>
         ))}
         {leads.length===0&&<div style={{color:"#aaaaaa",fontSize:12}}>No hay leads aún</div>}
@@ -1571,7 +1585,7 @@ const TablaLeads = ({ leads, onSelect }) => (
           <td style={{padding:"10px 14px"}}><CanalTag canal={lead.fuente_contacto||lead.canal}/></td>
           <td style={{padding:"10px 14px"}}><div style={{display:"flex",alignItems:"center",gap:6}}><PaisFlag pais={lead.pais}/><span style={{fontSize:12,color:"#888"}}>{lead.pais||"—"}</span></div></td>
           <td style={{padding:"10px 14px"}}><Tag label={`${cfg.icon} ${lead.etapa||"Nuevo Lead"}`} color={cfg.color}/></td>
-          <td style={{padding:"10px 14px"}}><ScoreDot score={lead.score}/></td>
+          <td style={{padding:"10px 14px"}}><ScoreDot score={lead.score} clasificacion={lead.clasificacion}/></td>
           <td style={{padding:"10px 14px"}}>{lead.clasificacion?<Tag label={`${lead.emoji||""} ${lead.clasificacion}`} color={lead.clasificacion?.includes("Caliente")?"#EF4444":lead.clasificacion?.includes("Candidato")?"#F59E0B":"#F97316"}/>:<span style={{color:"#aaaaaa",fontSize:11}}>—</span>}</td>
           <td style={{padding:"10px 14px",fontSize:11,color:"#aaaaaa"}}>{formatFecha(lead.updated_at)}</td>
           <td style={{padding:"10px 14px"}}><button onClick={e=>{e.stopPropagation();onSelect(lead);}} style={{background:"#eef2ff",color:"#1a3a6b",border:"none",borderRadius:6,padding:"5px 10px",fontSize:11,cursor:"pointer",fontWeight:700}}>Ver →</button></td>
