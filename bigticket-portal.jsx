@@ -450,12 +450,13 @@ const ESTADOS_MEXICO = [
   "SPV1 Puebla",
   "SVR1 Veracruz",
   "SVH1 Villahermosa",
+  "SQR1 Querétaro",
 ];
 
 const PREFIJOS = { "Chile": "+569", "México": "+521" };
 
 function ViewForm({ camp, canal, op, onBack, onSuccess }) {
-  const [form,setForm]=useState({nombre:"",empresa:"",rut:"",telefono:PREFIJOS[op]||"+569",email:"",fuente_contacto:"",pais_form:op||"Chile",region_estado:""});
+  const [form,setForm]=useState({nombre:"",empresa:"",rut:"",telefono:PREFIJOS[op]||"+569",email:"",fuente_contacto:"",pais_form:op||"Chile",region_estado:"",url_vehiculo:""});
   const [respuestas,setRespuestas]=useState({});
   const [vars,setVars]=useState([]);
   const [loading,setLoading]=useState(false);
@@ -526,6 +527,7 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
         tipo_postulacion:isLibre?"libre":"campaña",
         codigo_postulacion:codigo,
         region_estado:form.region_estado||null,
+        url_vehiculo:form.url_vehiculo||null,
       }).select().single();
       if(le) throw le;
       await sb.from("postulaciones").insert({
@@ -553,6 +555,17 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
           }),
         });
       } catch(fetchErr) { console.log("N8N WhatsApp error:", fetchErr); }
+
+      // 2c. Llamar al flujo 13 — verificación vehículo con Claude Vision
+      if(lead.id && form.url_vehiculo){
+        try {
+          await fetch("https://bigticket2026.app.n8n.cloud/webhook/verificacion-vehiculo", {
+            method:"POST", mode:"no-cors",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({ lead_id: lead.id, url_vehiculo: form.url_vehiculo }),
+          });
+        } catch(e){ console.log("N8N verificacion-vehiculo error:",e); }
+      }
 
       // 2b. Enviar correo de confirmación si tiene email
       if(form.email){
@@ -726,16 +739,23 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
             <div className="form-title">Tu vehículo y disponibilidad</div>
             <div className="two-col">
               <div className="field-row"><span className="field-label">Tipo de vehículo</span>
-                <select value={respuestas.vehiculo||""} onChange={e=>setRespuestas({...respuestas,vehiculo:e.target.value})}>
+                <select value={respuestas.vehiculo||""} onChange={e=>{
+                  const tv=e.target.value;
+                  const volAuto="1,9 m³"; const volSmall="2,3 - 5,4 m³"; const volLarge="5,5 - 12,9 m³";
+                  const volAuto_v="1,9"; const volSmall_v="2,3 - 5,4"; const volLarge_v="5,5 - 12,9";
+                  const autoVol=tv==="Auto"?volAuto_v:tv==="Small Van"?volSmall_v:tv==="Large Van"?volLarge_v:"";
+                  setRespuestas({...respuestas,vehiculo:tv,volumen:autoVol});
+                }}>
                   <option value="">-- Seleccionar --</option>
-                  {["Moto","Auto","Furgón","Camión"].map(v=><option key={v}>{v}</option>)}
+                  {["Auto","Small Van","Large Van"].map(v=><option key={v}>{v}</option>)}
                 </select>
               </div>
               <div className="field-row"><span className="field-label">Volumen (m³)</span>
-                <select value={respuestas.volumen||""} onChange={e=>setRespuestas({...respuestas,volumen:e.target.value})}>
-                  <option value="">-- Seleccionar --</option>
-                  {["1 m³","2 m³","3 m³","4 m³","6 m³","8 m³","9 m³","12 m³","16 m³","20 m³","24 m³","Más de 24 m³"].map(v=><option key={v}>{v}</option>)}
-                </select>
+                <input value={respuestas.volumen||""} onChange={e=>setRespuestas({...respuestas,volumen:e.target.value})}
+                  placeholder={respuestas.vehiculo==="Auto"?"1,9 m³":respuestas.vehiculo==="Small Van"?"2,3 - 5,4 m³":respuestas.vehiculo==="Large Van"?"5,5 - 12,9 m³":"Se autocompleta al elegir vehículo"}/>
+                <span style={{fontSize:11,color:"#888",marginTop:3,display:"block"}}>
+                  {respuestas.vehiculo==="Auto"?"Auto: 1,9 m³":respuestas.vehiculo==="Small Van"?"Small Van: 2,3 a 5,4 m³":respuestas.vehiculo==="Large Van"?"Large Van: 5,5 a 12,9 m³":""}
+                </span>
               </div>
             </div>
             <div className="two-col">
@@ -772,6 +792,21 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
             </div>
           </div>
         )}
+        <div className="form-card">
+          <div className="form-title">📷 Foto de tu vehículo</div>
+          <div style={{fontSize:12,color:"#666",marginBottom:12}}>Sube una foto de tu vehículo a Google Drive, Dropbox o similar y pega el enlace aquí. Lo usamos para verificar el estado del vehículo.</div>
+          <div className="field-row">
+            <span className="field-label">URL de la foto (opcional pero recomendado)</span>
+            <input value={form.url_vehiculo} onChange={e=>setForm({...form,url_vehiculo:e.target.value})} placeholder="https://drive.google.com/..."/>
+          </div>
+          {form.url_vehiculo&&(
+            <div style={{marginTop:8}}>
+              <img src={form.url_vehiculo} alt="Preview vehículo"
+                style={{width:"100%",maxHeight:200,objectFit:"cover",borderRadius:8,border:"1px solid #e4e7ec"}}
+                onError={e=>{e.target.style.display="none";}}/>
+            </div>
+          )}
+        </div>
         <button className="btn-orange" onClick={submit} disabled={loading}>{loading?"Enviando...":"Enviar postulación"}</button>
       </div>
     </div>
@@ -1250,7 +1285,7 @@ function CentrosMxAdmin() {
     "SMX6 Industrial Tlaxcoapan","SMX7 Cuajimalpa","SMX8 Los Héroes Tecámac / Ojo de agua",
     "SMX9  Granjas México, Iztacalco","SMX10  Vallejo","SMX11 Outlets Punta Norte",
     "SCQ1 Colima","STX1 Tlaxcala","SHP1 Pachuca","SCY1 Celaya","SLT1 Toluca",
-    "SPV1 Puebla","SVR1 Veracruz","SVH1 Villahermosa",
+    "SPV1 Puebla","SVR1 Veracruz","SVH1 Villahermosa","SQR1 Querétaro",
   ];
   const [centros,setCentros]=useState(()=>{
     try{const s=localStorage.getItem("centros_mx");return s?JSON.parse(s):CENTROS_DEFAULT;}
@@ -1307,7 +1342,7 @@ function newField() {
 }
 
 function NuevaCampana({ campaigns, setCampaigns, onDone }) {
-  const empty={nombre:"",pais:"Chile",vehiculo:"Furgón",volumen_m3:"",cantidad:"",zona:"",factura:"Sí requiere factura",modalidad_pago:"Semanal",disponibilidad:"Diurno",experiencia_anios:"0",ingreso_rango:"",descripcion:"",fecha_inicio:"",fecha_fin:""};
+  const empty={nombre:"",pais:"Chile",vehiculos:[],volumen_m3:"",cantidad:"",zona:"",factura:"Sí requiere factura",modalidad_pago:"Semanal",disponibilidad:"Diurno",experiencia_anios:"0",ingreso_rango:"",descripcion:"",fecha_inicio:"",fecha_fin:""};
   const [f,setF]=useState(empty);
   const [scoreFields,setScoreFields]=useState([newField()]);
   const [saving,setSaving]=useState(false);
@@ -1324,7 +1359,7 @@ function NuevaCampana({ campaigns, setCampaigns, onDone }) {
       const autoOn=!f.fecha_inicio||new Date(f.fecha_inicio)<=new Date();
       const scoreMax=totalScore();
       const {data:camp,error}=await sb.from("campanas").insert({
-        nombre:f.nombre,pais:f.pais,vehiculo:f.vehiculo,
+        nombre:f.nombre,pais:f.pais,vehiculo:f.vehiculos.join(" / ")||null,
         volumen_m3:f.volumen_m3||null,cantidad:parseInt(f.cantidad)||null,
         zona:f.zona||null,factura:f.factura.includes("Sí")?"Sí":"No",
         modalidad_pago:f.modalidad_pago,disponibilidad:f.disponibilidad,
@@ -1370,14 +1405,34 @@ function NuevaCampana({ campaigns, setCampaigns, onDone }) {
         <div className="field-row"><span className="field-label">Nombre de la campaña</span><input value={f.nombre} onChange={e=>upd("nombre",e.target.value)} placeholder="Ej: Conductores zona norte"/></div>
         <div className="two-col">
           <div className="field-row"><span className="field-label">País</span><select value={f.pais} onChange={e=>upd("pais",e.target.value)}><option>Chile</option><option>México</option></select></div>
-          <div className="field-row"><span className="field-label">Tipo de vehículo</span><select value={f.vehiculo} onChange={e=>upd("vehiculo",e.target.value)}>{["Moto","Auto","Furgón","Camión"].map(v=><option key={v}>{v}</option>)}</select></div>
+          <div className="field-row">
+            <span className="field-label">Tipo(s) de vehículo</span>
+            <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:4}}>
+              {["Auto","Small Van","Large Van"].map(vt=>{
+                const checked=f.vehiculos.includes(vt);
+                return (
+                  <label key={vt} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",border:`1px solid ${checked?"#1a3a6b":"#e4e7ec"}`,borderRadius:8,cursor:"pointer",background:checked?"#eef2ff":"#fff",fontSize:13}}>
+                    <input type="checkbox" checked={checked} style={{width:"auto",margin:0}} onChange={()=>{
+                      const next=checked?f.vehiculos.filter(x=>x!==vt):[...f.vehiculos,vt];
+                      // auto-completar volumen según selección
+                      const vols={Auto:"1,9",Small Van:"2,3 - 5,4",Large Van:"5,5 - 12,9"};
+                      const nextVol=next.length===1?vols[next[0]]+" m³":next.map(x=>vols[x]+" m³").join(" / ");
+                      upd("vehiculos",next);
+                      upd("volumen_m3",next.length>0?nextVol:"");
+                    }}/>
+                    {vt}
+                    <span style={{fontSize:11,color:"#888",marginLeft:"auto"}}>{vt==="Auto"?"1,9 m³":vt==="Small Van"?"2,3-5,4 m³":"5,5-12,9 m³"}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
         </div>
         <div className="two-col">
           <div className="field-row"><span className="field-label">Volumen (m³)</span>
-            <select value={f.volumen_m3} onChange={e=>upd("volumen_m3",e.target.value)}>
-              <option value="">-- Seleccionar --</option>
-              {["1 m³","2 m³","3 m³","4 m³","6 m³","8 m³","9 m³","12 m³","16 m³","20 m³","24 m³","Más de 24 m³"].map(v=><option key={v}>{v}</option>)}
-            </select>
+            <input value={f.volumen_m3} onChange={e=>upd("volumen_m3",e.target.value)}
+              placeholder="Se autocompleta al elegir vehículo"/>
+            <span style={{fontSize:11,color:"#888",marginTop:3,display:"block"}}>Puedes editar manualmente</span>
           </div>
           <div className="field-row"><span className="field-label">Cantidad de vehículos</span><input type="number" value={f.cantidad} onChange={e=>upd("cantidad",e.target.value)} placeholder="10"/></div>
         </div>
