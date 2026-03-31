@@ -1029,6 +1029,37 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
                         onError={e=>e.target.style.display="none"}/>
                     </a>
                     <div style={{fontSize:10,color:"#3B82F6",marginTop:4}}>← Clic para ver en tamaño completo</div>
+                    {/* Badge Claude Vision */}
+                    {lead.vehiculo_veredicto ? (
+                      <div style={{marginTop:10,padding:"10px 12px",borderRadius:10,
+                        background:lead.vehiculo_veredicto==="Aprobado"?"#dcfce7":lead.vehiculo_veredicto==="Revisar"?"#fef3c7":"#fee2e2",
+                        border:`1px solid ${lead.vehiculo_veredicto==="Aprobado"?"#86efac":lead.vehiculo_veredicto==="Revisar"?"#fcd34d":"#fca5a5"}`}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:lead.vehiculo_comentario?6:0}}>
+                          <span style={{fontSize:16}}>
+                            {lead.vehiculo_veredicto==="Aprobado"?"✅":lead.vehiculo_veredicto==="Revisar"?"⚠️":"❌"}
+                          </span>
+                          <span style={{fontSize:13,fontWeight:700,
+                            color:lead.vehiculo_veredicto==="Aprobado"?"#166534":lead.vehiculo_veredicto==="Revisar"?"#92400e":"#c0392b"}}>
+                            {lead.vehiculo_veredicto}
+                          </span>
+                          {lead.vehiculo_score!=null&&(
+                            <span style={{marginLeft:"auto",fontSize:12,fontWeight:700,
+                              color:lead.vehiculo_veredicto==="Aprobado"?"#166534":lead.vehiculo_veredicto==="Revisar"?"#92400e":"#c0392b"}}>
+                              {lead.vehiculo_score}/100
+                            </span>
+                          )}
+                        </div>
+                        {lead.vehiculo_comentario&&(
+                          <div style={{fontSize:11,color:"#555",fontStyle:"italic"}}>
+                            "{lead.vehiculo_comentario}"
+                          </div>
+                        )}
+                      </div>
+                    ):(
+                      <div style={{marginTop:8,fontSize:11,color:"#F47B20",fontWeight:600}}>
+                        ⏳ Verificación Claude Vision pendiente
+                      </div>
+                    )}
                   </div>
                 )}
                 {lead.onboarding_completado && !lead.url_vehiculo && (
@@ -1669,7 +1700,8 @@ export default function App() {
 
   const fetchLeads=async()=>{
     const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
-    try{const data=await sb.from("leads").select("*",{order:"created_at.desc"});
+    try{const {data,error}=await sb.from("leads").select("*").order("created_at",{ascending:false});
+      if(error) throw error;
       if(Array.isArray(data)){
         const normalized=data.map(l=>({...l,etapa:norm(l.etapa)}));
         setLeads(normalized);setLastUpdate(new Date());setError(null);
