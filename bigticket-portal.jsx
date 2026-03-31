@@ -556,17 +556,6 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
         });
       } catch(fetchErr) { console.log("N8N WhatsApp error:", fetchErr); }
 
-      // 2c. Llamar al flujo 13 — verificación vehículo con Claude Vision
-      if(lead.id && form.url_vehiculo){
-        try {
-          await fetch("https://bigticket2026.app.n8n.cloud/webhook/verificacion-vehiculo", {
-            method:"POST", mode:"no-cors",
-            headers:{"Content-Type":"application/json"},
-            body:JSON.stringify({ lead_id: lead.id, url_vehiculo: form.url_vehiculo }),
-          });
-        } catch(e){ console.log("N8N verificacion-vehiculo error:",e); }
-      }
-
       // 2b. Enviar correo de confirmación si tiene email
       if(form.email){
         try {
@@ -792,21 +781,6 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
             </div>
           </div>
         )}
-        <div className="form-card">
-          <div className="form-title">📷 Foto de tu vehículo</div>
-          <div style={{fontSize:12,color:"#666",marginBottom:12}}>Sube una foto de tu vehículo a Google Drive, Dropbox o similar y pega el enlace aquí. Lo usamos para verificar el estado del vehículo.</div>
-          <div className="field-row">
-            <span className="field-label">URL de la foto (opcional pero recomendado)</span>
-            <input value={form.url_vehiculo} onChange={e=>setForm({...form,url_vehiculo:e.target.value})} placeholder="https://drive.google.com/..."/>
-          </div>
-          {form.url_vehiculo&&(
-            <div style={{marginTop:8}}>
-              <img src={form.url_vehiculo} alt="Preview vehículo"
-                style={{width:"100%",maxHeight:200,objectFit:"cover",borderRadius:8,border:"1px solid #e4e7ec"}}
-                onError={e=>{e.target.style.display="none";}}/>
-            </div>
-          )}
-        </div>
         <button className="btn-orange" onClick={submit} disabled={loading}>{loading?"Enviando...":"Enviar postulación"}</button>
       </div>
     </div>
@@ -1154,7 +1128,7 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
 
   async function loadPost() {
     setLoadingPost(true);
-    const {data}=await sb.from("postulaciones").select("*, leads(nombre,telefono), campanas(nombre)").order("created_at",{ascending:false}).limit(50);
+    const {data}=await sb.from("postulaciones").select("*, leads(nombre,telefono,vehiculo_veredicto,vehiculo_score,vehiculo_comentario,url_vehiculo), campanas(nombre)").order("created_at",{ascending:false}).limit(50);
     setPostulaciones(data||[]);setLoadingPost(false);
   }
   async function toggleCamp(camp) {
@@ -1259,10 +1233,23 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
                     <div style={{flex:1}}>
                       <div style={{fontSize:14,fontWeight:600,color:"#1a1a1a"}}>{p.leads?.nombre||"Sin nombre"}</div>
                       <div style={{fontSize:12,color:"#888"}}>{p.campanas?.nombre||"Postulación libre"} · {ch.label} · {new Date(p.created_at).toLocaleDateString("es-CL")}</div>
+                      {p.leads?.vehiculo_veredicto&&(()=>{
+                        const v=p.leads.vehiculo_veredicto;
+                        const color=v==="Aprobado"?"#166534":v==="Revisar"?"#92400e":"#c0392b";
+                        const bg=v==="Aprobado"?"#dcfce7":v==="Revisar"?"#fef3c7":"#fee2e2";
+                        const icon=v==="Aprobado"?"✅":v==="Revisar"?"⚠️":"❌";
+                        return (
+                          <div style={{marginTop:5,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                            <span style={{fontSize:11,padding:"2px 8px",borderRadius:20,background:bg,color,fontWeight:600}}>{icon} Vehículo: {v}</span>
+                            {p.leads.vehiculo_score!=null&&<span style={{fontSize:11,color:"#888"}}>Score: {p.leads.vehiculo_score}/100</span>}
+                            {p.leads.vehiculo_comentario&&<span style={{fontSize:11,color:"#888",fontStyle:"italic"}}>"{p.leads.vehiculo_comentario}"</span>}
+                          </div>
+                        );
+                      })()}
                     </div>
                     <div style={{textAlign:"right"}}>
                       <div style={{fontSize:16,fontWeight:700,color:"#1a3a6b"}}>{p.score_calculado} pts</div>
-                      <div style={{fontSize:11,color:"#888"}}>CRM LogiFlow</div>
+                      {p.leads?.url_vehiculo&&<a href={p.leads.url_vehiculo} target="_blank" style={{fontSize:11,color:"#1a3a6b",display:"block",marginTop:4}}>📷 Ver foto</a>}
                     </div>
                   </div>
                 );
@@ -2050,6 +2037,14 @@ function ViewOnboarding({ lead, onVolver }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ lead_id: lead.id, nombre: lead.nombre, telefono: lead.telefono, pais: pais, url_vehiculo: formMX.url_vehiculo || "" }),
         });
+        // Flujo 13 — verificación vehículo con Claude Vision
+        if(formMX.url_vehiculo){
+          await fetch("https://bigticket2026.app.n8n.cloud/webhook/verificacion-vehiculo", {
+            method: "POST", mode: "no-cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ lead_id: lead.id, url_vehiculo: formMX.url_vehiculo }),
+          });
+        }
       } catch (e) { console.log("N8N error:", e); }
       setCompletado(true);
     } catch (e) { alert("Error al enviar: " + e.message); }
