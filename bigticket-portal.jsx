@@ -1415,7 +1415,7 @@ function NuevaCampana({ campaigns, setCampaigns, onDone }) {
                     <input type="checkbox" checked={checked} style={{width:"auto",margin:0}} onChange={()=>{
                       const next=checked?f.vehiculos.filter(x=>x!==vt):[...f.vehiculos,vt];
                       // auto-completar volumen según selección
-                      const vols={Auto:"1,9",Small Van:"2,3 - 5,4",Large Van:"5,5 - 12,9"};
+                      const vols={"Auto":"1,9","Small Van":"2,3 - 5,4","Large Van":"5,5 - 12,9"};
                       const nextVol=next.length===1?vols[next[0]]+" m³":next.map(x=>vols[x]+" m³").join(" / ");
                       upd("vehiculos",next);
                       upd("volumen_m3",next.length>0?nextVol:"");
