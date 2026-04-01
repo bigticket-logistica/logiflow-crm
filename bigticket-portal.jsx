@@ -901,11 +901,21 @@ function BiggiBubble({ paginaPrincipal=false }) {
           content:m.texto
         }));
 
+      // Cargar conocimiento dinámico de Supabase
+      let conocimientoExtra = "";
+      try {
+        const {data:conocimiento} = await sb.from("biggy_conocimiento").select("categoria,pregunta,respuesta").eq("activo",true).order("categoria");
+        if(conocimiento&&conocimiento.length>0) {
+          conocimientoExtra = "\n\n## CONOCIMIENTO ADICIONAL\n" +
+            conocimiento.map(k=>`[${k.categoria}] P: ${k.pregunta}\nR: ${k.respuesta}`).join("\n\n");
+        }
+      } catch(_) {}
+
       const res=await fetch("https://bigticket2026.app.n8n.cloud/webhook/biggi-chat",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
-          system:BIGGI_PROMPT,
+          system:BIGGI_PROMPT + conocimientoExtra,
           messages:[...historial,{role:"user",content:texto}]
         })
       });
@@ -1214,7 +1224,7 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
         <button className="btn-gw" onClick={onClose}>Ver portal →</button>
       </div>
       <div className="admin-nav">
-        {[["camps","Campañas"],["nueva","Nueva campaña"],["postulaciones","Postulaciones"],["vehiculos","🚗 Vehículos"],["canales","Canales"],["centros_mx","Centros México"]].map(([k,l])=>(
+        {[["camps","Campañas"],["nueva","Nueva campaña"],["postulaciones","Postulaciones"],["vehiculos","🚗 Vehículos"],["canales","Canales"],["centros_mx","Centros México"],["biggy","🤖 Biggy"]].map(([k,l])=>(
           <button key={k} className={`nav-btn ${tab===k?"active":""}`} onClick={()=>setTab(k)}>{l}</button>
         ))}
       </div>
@@ -1306,11 +1316,204 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
         {tab==="vehiculos"&&<VehiculosVerificacion/>}
         {tab==="canales"&&<CanalesView postulaciones={postulaciones} onLoad={loadPost}/>}
         {tab==="centros_mx"&&<CentrosMxAdmin/>}
+        {tab==="biggy"&&<BiggyAdmin/>}
       </div>
     </div>
   );
 }
 
+
+function BiggyAdmin() {
+  const CATEGORIAS = ["Tarifas México","Tarifas Chile","Pagos","CEDIS","Documentos México","Documentos Chile","Operaciones México","Operaciones Chile","Contrato","Desempeño","General"];
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [guardando, setGuardando] = useState(false);
+  const [editando, setEditando] = useState(null); // {id, categoria, pregunta, respuesta, activo}
+  const [nuevo, setNuevo] = useState({categoria:"General", pregunta:"", respuesta:""});
+  const [showForm, setShowForm] = useState(false);
+  const [filtro, setFiltro] = useState("Todos");
+
+  useEffect(() => { cargar(); }, []);
+
+  const cargar = async () => {
+    setLoading(true);
+    const {data} = await sb.from("biggy_conocimiento").select("*").order("categoria").order("created_at");
+    setItems(data||[]);
+    setLoading(false);
+  };
+
+  const guardar = async () => {
+    if(!nuevo.pregunta.trim()||!nuevo.respuesta.trim()) { alert("Completa pregunta y respuesta."); return; }
+    setGuardando(true);
+    try {
+      await sb.from("biggy_conocimiento").insert({...nuevo, updated_at: new Date().toISOString()});
+      setNuevo({categoria:"General", pregunta:"", respuesta:""});
+      setShowForm(false);
+      await cargar();
+    } catch(e) { alert("Error: "+e.message); }
+    finally { setGuardando(false); }
+  };
+
+  const actualizar = async () => {
+    if(!editando.pregunta.trim()||!editando.respuesta.trim()) return;
+    setGuardando(true);
+    try {
+      await sb.from("biggy_conocimiento").update({
+        categoria: editando.categoria,
+        pregunta: editando.pregunta,
+        respuesta: editando.respuesta,
+        updated_at: new Date().toISOString()
+      }).eq("id", editando.id);
+      setEditando(null);
+      await cargar();
+    } catch(e) { alert("Error: "+e.message); }
+    finally { setGuardando(false); }
+  };
+
+  const toggleActivo = async (item) => {
+    await sb.from("biggy_conocimiento").update({activo: !item.activo}).eq("id", item.id);
+    setItems(items.map(i => i.id===item.id ? {...i, activo: !i.activo} : i));
+  };
+
+  const eliminar = async (id) => {
+    if(!confirm("¿Eliminar este conocimiento?")) return;
+    await sb.from("biggy_conocimiento").delete().eq("id", id);
+    setItems(items.filter(i => i.id!==id));
+  };
+
+  const categorias = ["Todos", ...CATEGORIAS];
+  const filtrados = filtro==="Todos" ? items : items.filter(i=>i.categoria===filtro);
+  const activos = items.filter(i=>i.activo).length;
+
+  return (
+    <div>
+      <div className="sec-title" style={{marginBottom:4}}>🤖 Entrenamiento de Biggy</div>
+      <div className="sec-sub">Agrega preguntas y respuestas para que Biggy responda mejor</div>
+
+      {/* Stats */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:20,marginTop:16}}>
+        {[["Total",items.length,"#1a3a6b"],["Activos",activos,"#10B981"],["Inactivos",items.length-activos,"#888"]].map(([l,v,c])=>(
+          <div key={l} style={{background:"#fff",border:"0.5px solid #e4e7ec",borderRadius:10,padding:"12px 16px",textAlign:"center"}}>
+            <div style={{fontSize:24,fontWeight:800,color:c}}>{v}</div>
+            <div style={{fontSize:11,color:"#888",marginTop:2}}>{l}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filtro por categoría */}
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:16}}>
+        {categorias.map(c=>(
+          <button key={c} onClick={()=>setFiltro(c)}
+            style={{padding:"5px 12px",borderRadius:20,border:"1px solid #e4e7ec",fontSize:11,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",
+              background:filtro===c?"#1a3a6b":"#fff",color:filtro===c?"#fff":"#555",fontWeight:filtro===c?700:400}}>
+            {c}
+          </button>
+        ))}
+      </div>
+
+      {/* Botón agregar */}
+      {!showForm&&(
+        <button className="btn-orange" style={{marginBottom:16}} onClick={()=>setShowForm(true)}>
+          + Agregar nuevo conocimiento
+        </button>
+      )}
+
+      {/* Formulario nuevo */}
+      {showForm&&(
+        <div className="form-card" style={{marginBottom:16,border:"1px solid #F47B20"}}>
+          <div className="form-title">➕ Nuevo conocimiento para Biggy</div>
+          <div className="field-row">
+            <span className="field-label">Categoría</span>
+            <select value={nuevo.categoria} onChange={e=>setNuevo({...nuevo,categoria:e.target.value})}
+              style={{width:"100%",padding:"9px 12px",borderRadius:8,border:"0.5px solid #d0d5dd",fontSize:13}}>
+              {CATEGORIAS.map(c=><option key={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="field-row">
+            <span className="field-label">Pregunta que podría hacer el usuario</span>
+            <input value={nuevo.pregunta} onChange={e=>setNuevo({...nuevo,pregunta:e.target.value})}
+              placeholder="Ej: ¿Cuánto paga la Large Van?"/>
+          </div>
+          <div className="field-row">
+            <span className="field-label">Respuesta que debe dar Biggy</span>
+            <textarea value={nuevo.respuesta} onChange={e=>setNuevo({...nuevo,respuesta:e.target.value})}
+              placeholder="Ej: La tarifa es de $2,056 MXN netos + IVA por jornada..." style={{height:100}}/>
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <button className="btn-orange" onClick={guardar} disabled={guardando} style={{flex:1}}>
+              {guardando?"Guardando...":"💾 Guardar"}
+            </button>
+            <button onClick={()=>{setShowForm(false);setNuevo({categoria:"General",pregunta:"",respuesta:""});}}
+              style={{flex:1,background:"#f4f5f7",border:"none",borderRadius:10,padding:"11px",fontSize:13,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Lista */}
+      {loading ? <div className="loading">Cargando...</div> :
+        filtrados.length===0 ? <div className="empty">No hay conocimiento en esta categoría aún.</div> :
+        filtrados.map(item=>(
+          <div key={item.id} style={{background:"#fff",border:`0.5px solid ${item.activo?"#e4e7ec":"#f0f0f0"}`,borderRadius:10,padding:"14px 16px",marginBottom:10,opacity:item.activo?1:0.6}}>
+            {editando?.id===item.id ? (
+              <div>
+                <div className="field-row">
+                  <span className="field-label">Categoría</span>
+                  <select value={editando.categoria} onChange={e=>setEditando({...editando,categoria:e.target.value})}
+                    style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"0.5px solid #d0d5dd",fontSize:13}}>
+                    {CATEGORIAS.map(c=><option key={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div className="field-row">
+                  <span className="field-label">Pregunta</span>
+                  <input value={editando.pregunta} onChange={e=>setEditando({...editando,pregunta:e.target.value})}/>
+                </div>
+                <div className="field-row">
+                  <span className="field-label">Respuesta</span>
+                  <textarea value={editando.respuesta} onChange={e=>setEditando({...editando,respuesta:e.target.value})} style={{height:80}}/>
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <button className="btn-orange" onClick={actualizar} disabled={guardando} style={{flex:1,padding:"8px"}}>
+                    {guardando?"Guardando...":"✅ Guardar"}
+                  </button>
+                  <button onClick={()=>setEditando(null)}
+                    style={{flex:1,background:"#f4f5f7",border:"none",borderRadius:8,padding:"8px",fontSize:13,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10,marginBottom:6}}>
+                  <div style={{flex:1}}>
+                    <span style={{fontSize:10,padding:"2px 8px",borderRadius:20,background:"#eef2ff",color:"#1a3a6b",fontWeight:700,marginBottom:6,display:"inline-block"}}>
+                      {item.categoria}
+                    </span>
+                    <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a",marginBottom:4}}>❓ {item.pregunta}</div>
+                    <div style={{fontSize:12,color:"#555",lineHeight:1.5}}>💬 {item.respuesta}</div>
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
+                    <Toggle on={item.activo} onChange={()=>toggleActivo(item)}/>
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:8,marginTop:8}}>
+                  <button onClick={()=>setEditando({...item})}
+                    style={{fontSize:11,color:"#1a3a6b",background:"#eef2ff",border:"none",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>
+                    ✏️ Editar
+                  </button>
+                  <button onClick={()=>eliminar(item.id)} className="btn-danger" style={{fontSize:11,padding:"4px 10px"}}>
+                    🗑 Eliminar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))
+      }
+    </div>
+  );
+}
 
 function CentrosMxAdmin() {
   const CENTROS_DEFAULT = [
