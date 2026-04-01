@@ -1328,7 +1328,7 @@ function BiggyAdmin() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
-  const [editando, setEditando] = useState(null); // {id, categoria, pregunta, respuesta, activo}
+  const [editando, setEditando] = useState(null);
   const [nuevo, setNuevo] = useState({categoria:"General", pregunta:"", respuesta:""});
   const [showForm, setShowForm] = useState(false);
   const [filtro, setFiltro] = useState("Todos");
@@ -1337,7 +1337,8 @@ function BiggyAdmin() {
 
   const cargar = async () => {
     setLoading(true);
-    const {data} = await sb.from("biggy_conocimiento").select("*").order("categoria").order("created_at");
+    const {data, error} = await sb.from("biggy_conocimiento").select("*").order("categoria").order("created_at", {ascending:true});
+    if(error) console.error("Error cargando:", error);
     setItems(data||[]);
     setLoading(false);
   };
@@ -1346,11 +1347,21 @@ function BiggyAdmin() {
     if(!nuevo.pregunta.trim()||!nuevo.respuesta.trim()) { alert("Completa pregunta y respuesta."); return; }
     setGuardando(true);
     try {
-      await sb.from("biggy_conocimiento").insert({...nuevo, updated_at: new Date().toISOString()});
+      const payload = {
+        categoria: nuevo.categoria,
+        pregunta: nuevo.pregunta,
+        respuesta: nuevo.respuesta,
+        activo: true,
+        updated_at: new Date().toISOString()
+      };
+      console.log("Intentando guardar:", payload);
+      const {data, error} = await sb.from("biggy_conocimiento").insert(payload).select();
+      console.log("Resultado:", {data, error});
+      if(error) throw new Error(error.message + " | Code: " + error.code + " | Details: " + JSON.stringify(error.details));
       setNuevo({categoria:"General", pregunta:"", respuesta:""});
       setShowForm(false);
       await cargar();
-    } catch(e) { alert("Error: "+e.message); }
+    } catch(e) { alert("Error al guardar: "+e.message); }
     finally { setGuardando(false); }
   };
 
@@ -1358,12 +1369,13 @@ function BiggyAdmin() {
     if(!editando.pregunta.trim()||!editando.respuesta.trim()) return;
     setGuardando(true);
     try {
-      await sb.from("biggy_conocimiento").update({
+      const {error} = await sb.from("biggy_conocimiento").update({
         categoria: editando.categoria,
         pregunta: editando.pregunta,
         respuesta: editando.respuesta,
         updated_at: new Date().toISOString()
       }).eq("id", editando.id);
+      if(error) throw error;
       setEditando(null);
       await cargar();
     } catch(e) { alert("Error: "+e.message); }
@@ -1371,14 +1383,16 @@ function BiggyAdmin() {
   };
 
   const toggleActivo = async (item) => {
-    await sb.from("biggy_conocimiento").update({activo: !item.activo}).eq("id", item.id);
-    setItems(items.map(i => i.id===item.id ? {...i, activo: !i.activo} : i));
+    const {error} = await sb.from("biggy_conocimiento").update({activo: !item.activo}).eq("id", item.id);
+    if(error) { alert("Error: "+error.message); return; }
+    setItems(prev => prev.map(i => i.id===item.id ? {...i, activo: !i.activo} : i));
   };
 
   const eliminar = async (id) => {
     if(!confirm("¿Eliminar este conocimiento?")) return;
-    await sb.from("biggy_conocimiento").delete().eq("id", id);
-    setItems(items.filter(i => i.id!==id));
+    const {error} = await sb.from("biggy_conocimiento").delete().eq("id", id);
+    if(error) { alert("Error: "+error.message); return; }
+    setItems(prev => prev.filter(i => i.id!==id));
   };
 
   const categorias = ["Todos", ...CATEGORIAS];
@@ -1388,7 +1402,7 @@ function BiggyAdmin() {
   return (
     <div>
       <div className="sec-title" style={{marginBottom:4}}>🤖 Entrenamiento de Biggy</div>
-      <div className="sec-sub">Agrega preguntas y respuestas para que Biggy responda mejor</div>
+      <div className="sec-sub">Agrega preguntas y respuestas para que Biggy responda mejor en WhatsApp y en el portal</div>
 
       {/* Stats */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:20,marginTop:16}}>
@@ -1493,8 +1507,9 @@ function BiggyAdmin() {
                     <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a",marginBottom:4}}>❓ {item.pregunta}</div>
                     <div style={{fontSize:12,color:"#555",lineHeight:1.5}}>💬 {item.respuesta}</div>
                   </div>
-                  <div style={{display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
+                  <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,flexShrink:0}}>
                     <Toggle on={item.activo} onChange={()=>toggleActivo(item)}/>
+                    <span style={{fontSize:9,color:"#888"}}>{item.activo?"Activo":"Inactivo"}</span>
                   </div>
                 </div>
                 <div style={{display:"flex",gap:8,marginTop:8}}>
