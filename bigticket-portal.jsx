@@ -2874,6 +2874,7 @@ function ViewPropuesta() {
             codigo_postulacion: lead.codigo_postulacion,
             campana_nombre: campana?.nombre||"",
             link_onboarding: "https://bigticket-portal.vercel.app?onboarding=1",
+            pais: lead.pais||"Chile",
           }),
         });
       }catch(e){console.log("N8N onboarding error:",e);}
