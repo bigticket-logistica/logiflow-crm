@@ -1249,23 +1249,13 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
                         <button className="btn-danger" onClick={()=>deleteCamp(c.id)}>Eliminar</button>
                       </div>
                     </div>
-                    {/* Propuesta PDF */}
-                    <div style={{width:"100%",background:"#f8f9fa",borderRadius:10,padding:"12px 14px",border:"1px solid #e4e7ec"}}>
-                      <div style={{fontSize:12,fontWeight:700,color:"#1a1a1a",marginBottom:8}}>📄 Propuesta económica</div>
-                      {c.propuesta_url?(
-                        <div style={{display:"flex",alignItems:"center",gap:10}}>
-                          <span style={{fontSize:12,color:"#10B981"}}>✅ PDF cargado</span>
-                          <a href={c.propuesta_url} target="_blank" style={{fontSize:12,color:"#1a3a6b",fontWeight:600}}>Ver PDF</a>
-                          <label style={{fontSize:12,color:"#F47B20",fontWeight:600,cursor:"pointer"}}>
-                            Reemplazar
-                            <input type="file" accept=".pdf" style={{display:"none"}} onChange={e=>subirPropuesta(c,e.target.files[0])}/>
-                          </label>
-                        </div>
+                    {/* Propuesta */}
+                    <div style={{width:"100%",background:"#f8f9fa",borderRadius:10,padding:"10px 14px",border:"1px solid #e4e7ec"}}>
+                      <div style={{fontSize:12,fontWeight:700,color:"#1a1a1a",marginBottom:4}}>📄 Propuesta económica</div>
+                      {c.propuesta_cedis?(
+                        <span style={{fontSize:12,color:"#10B981"}}>✅ Propuesta incluida — {c.propuesta_cliente||"cliente"}</span>
                       ):(
-                        <label style={{display:"inline-flex",alignItems:"center",gap:8,background:"#F47B20",color:"#fff",borderRadius:8,padding:"8px 16px",fontSize:12,fontWeight:700,cursor:"pointer",opacity:uploadingId===c.id?0.6:1}}>
-                          {uploadingId===c.id?"Subiendo...":"⬆ Subir propuesta PDF"}
-                          <input type="file" accept=".pdf" style={{display:"none"}} disabled={uploadingId===c.id} onChange={e=>subirPropuesta(c,e.target.files[0])}/>
-                        </label>
+                        <span style={{fontSize:12,color:"#c0392b"}}>⚠️ Sin propuesta — recrea la campaña para agregarla</span>
                       )}
                     </div>
                   </div>
@@ -1595,17 +1585,45 @@ function newField() {
 
 function NuevaCampana({ campaigns, setCampaigns, onDone }) {
   const empty={nombre:"",pais:"Chile",vehiculos:[],volumen_m3:"",cantidad:"",zona:"",factura:"Sí requiere factura",modalidad_pago:"Semanal",disponibilidad:"Diurno",experiencia_anios:"0",ingreso_rango:"",descripcion:"",fecha_inicio:"",fecha_fin:""};
+  const emptyPropuesta={
+    cliente:"",cedis:"",horario:"Por confirmar",entregas:"80-100",
+    devolucion:"Mismo SVC hasta las 22:00 hrs",
+    tarifas:[
+      {categoria:"Large Van",tramos:{"0-100":"","101-150":"","151-200":"","201-250":"","251+":""}},
+      {categoria:"Small Van",tramos:{"0-100":"","101-150":"","151-200":"","201-250":"","251+":""}},
+    ],
+    auxiliar:"$300 MXN por día",
+    ns_minimo:"99.00%",ns_excelente:"99.50% - 100%",
+    ns_premio:"5% sobre tarifa diaria",ns_castigo:"3% sobre tarifa base",
+    semana_retenida:true,vigencia:"12 meses",
+    requisitos:"Carta de no antecedentes penales vigente\nHistorial de conductor\nLicencia de manejo vigente\nPermiso de Paquetería\nEquipo GPS (cargo al prestador)\nZapatos de seguridad\nTeléfono con plan de voz y datos",
+    notas:""
+  };
   const [f,setF]=useState(empty);
+  const [propuesta,setPropuesta]=useState(emptyPropuesta);
   const [scoreFields,setScoreFields]=useState([newField()]);
   const [saving,setSaving]=useState(false);
+  const [stepActual,setStepActual]=useState(0);
 
   function upd(k,v){setF(prev=>({...prev,[k]:v}));}
+  function updP(k,v){setPropuesta(prev=>({...prev,[k]:v}));}
+  function updTarifa(catIdx,tramo,val){
+    setPropuesta(prev=>{
+      const t=[...prev.tarifas];
+      t[catIdx]={...t[catIdx],tramos:{...t[catIdx].tramos,[tramo]:val}};
+      return {...prev,tarifas:t};
+    });
+  }
   function totalScore(){return scoreFields.reduce((s,sf)=>s+maxScoreField(sf),0);}
   function usedVars(){return scoreFields.map(sf=>sf.variable).filter(Boolean);}
 
   async function save() {
     if(!f.nombre){alert("Ingresa el nombre de la campaña.");return;}
     if(f.fecha_inicio&&f.fecha_fin&&f.fecha_inicio>f.fecha_fin){alert("Fecha inicio no puede ser mayor a fecha fin.");return;}
+    if(!propuesta.cliente.trim()){alert("La propuesta es obligatoria. Ingresa el nombre del cliente.");setStepActual(2);return;}
+    if(!propuesta.cedis.trim()){alert("La propuesta es obligatoria. Ingresa el CEDIS.");setStepActual(2);return;}
+    const tarifasOk=propuesta.tarifas.every(t=>Object.values(t.tramos).some(v=>v.trim()));
+    if(!tarifasOk){alert("Ingresa al menos una tarifa en la propuesta.");setStepActual(2);return;}
     setSaving(true);
     try {
       const autoOn=!f.fecha_inicio||new Date(f.fecha_inicio)<=new Date();
@@ -1619,27 +1637,24 @@ function NuevaCampana({ campaigns, setCampaigns, onDone }) {
         ingreso_rango:f.ingreso_rango||null,descripcion:f.descripcion||null,
         toggle_activo:autoOn,fecha_inicio:f.fecha_inicio||null,
         fecha_fin:f.fecha_fin||null,score_max:scoreMax,
+        propuesta_cliente:propuesta.cliente,propuesta_cedis:propuesta.cedis,
+        propuesta_horario:propuesta.horario,propuesta_entregas:propuesta.entregas,
+        propuesta_devolucion:propuesta.devolucion,propuesta_tarifas:propuesta.tarifas,
+        propuesta_auxiliar:propuesta.auxiliar,propuesta_ns_minimo:propuesta.ns_minimo,
+        propuesta_ns_excelente:propuesta.ns_excelente,propuesta_ns_premio:propuesta.ns_premio,
+        propuesta_ns_castigo:propuesta.ns_castigo,propuesta_semana_retenida:propuesta.semana_retenida,
+        propuesta_vigencia:propuesta.vigencia,propuesta_requisitos:propuesta.requisitos,
+        propuesta_notas:propuesta.notas,
       }).select().single();
       if(error)throw error;
       const valid=scoreFields.filter(sf=>sf.variable&&sf.pregunta);
       if(valid.length>0){
-        const varsToInsert=valid.map((sf,i)=>({
-          campana_id:camp.id,
-          variable:sf.variable,
-          pregunta:sf.pregunta,
-          tipo:sf.tipo,
-          opciones:JSON.stringify(sf.opciones),
-          puntos:maxScoreField(sf),
-          orden:i,
-        }));
+        const varsToInsert=valid.map((sf,i)=>({campana_id:camp.id,variable:sf.variable,pregunta:sf.pregunta,tipo:sf.tipo,opciones:JSON.stringify(sf.opciones),puntos:maxScoreField(sf),orden:i}));
         const {error:ve}=await sb.from("campana_variables").insert(varsToInsert);
-        if(ve){
-          await sb.from("campanas").delete().eq("id",camp.id);
-          throw new Error("Error guardando preguntas: "+ve.message);
-        }
+        if(ve){await sb.from("campanas").delete().eq("id",camp.id);throw new Error("Error guardando preguntas: "+ve.message);}
       }
       setCampaigns([...campaigns,camp]);
-      alert(`Campaña "${f.nombre}" creada con ${valid.length} pregunta(s) de scoring.`);
+      alert(`Campaña "${f.nombre}" creada con propuesta incluida ✅`);
       onDone();
     } catch(e){alert("Error: "+e.message);}
     finally{setSaving(false);}
@@ -1647,89 +1662,190 @@ function NuevaCampana({ campaigns, setCampaigns, onDone }) {
 
   const total=totalScore();
   const scoreColor=total>100?"#c0392b":total>=80?"#e65100":"#166534";
+  const TRAMOS=["0-100","101-150","151-200","201-250","251+"];
+  const steps=[{label:"Información",icon:"📋"},{label:"Scoring",icon:"⭐"},{label:"Propuesta",icon:"📄"}];
 
   return (
     <div>
       <div className="sec-title" style={{marginBottom:4}}>Crear nueva campaña</div>
-      <div className="sec-sub">Define los campos, fechas y modelo de puntuación</div>
-      <div className="form-card">
-        <div className="form-title">Información general</div>
-        <div className="field-row"><span className="field-label">Nombre de la campaña</span><input value={f.nombre} onChange={e=>upd("nombre",e.target.value)} placeholder="Ej: Conductores zona norte"/></div>
-        <div className="two-col">
-          <div className="field-row"><span className="field-label">País</span><select value={f.pais} onChange={e=>upd("pais",e.target.value)}><option>Chile</option><option>México</option></select></div>
-          <div className="field-row">
-            <span className="field-label">Tipo(s) de vehículo</span>
-            <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:4}}>
-              {["Auto","Small Van","Large Van"].map(vt=>{
-                const checked=f.vehiculos.includes(vt);
-                return (
-                  <label key={vt} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",border:`1px solid ${checked?"#1a3a6b":"#e4e7ec"}`,borderRadius:8,cursor:"pointer",background:checked?"#eef2ff":"#fff",fontSize:13}}>
-                    <input type="checkbox" checked={checked} style={{width:"auto",margin:0}} onChange={()=>{
-                      const next=checked?f.vehiculos.filter(x=>x!==vt):[...f.vehiculos,vt];
-                      // auto-completar volumen según selección
-                      const vols={"Auto":"1,9","Small Van":"2,3 - 5,4","Large Van":"5,5 - 12,9"};
-                      const nextVol=next.length===1?vols[next[0]]+" m³":next.map(x=>vols[x]+" m³").join(" / ");
-                      upd("vehiculos",next);
-                      upd("volumen_m3",next.length>0?nextVol:"");
-                    }}/>
-                    {vt}
-                    <span style={{fontSize:11,color:"#888",marginLeft:"auto"}}>{vt==="Auto"?"1,9 m³":vt==="Small Van"?"2,3-5,4 m³":"5,5-12,9 m³"}</span>
-                  </label>
-                );
-              })}
+      <div className="sec-sub">Define los campos, scoring y propuesta económica</div>
+      <div style={{display:"flex",gap:0,marginBottom:20,background:"#fff",borderRadius:12,border:"0.5px solid #e4e7ec",overflow:"hidden"}}>
+        {steps.map((s,i)=>(
+          <button key={i} onClick={()=>setStepActual(i)}
+            style={{flex:1,padding:"12px 8px",border:"none",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",
+              background:stepActual===i?"#1a3a6b":"#fff",color:stepActual===i?"#fff":"#666",
+              fontWeight:stepActual===i?700:400,fontSize:13,borderRight:i<2?"0.5px solid #e4e7ec":"none"}}>
+            {s.icon} {s.label}
+            {i===2&&<span style={{marginLeft:6,fontSize:10,background:stepActual===2?"rgba(255,255,255,0.3)":"#fee2e2",color:stepActual===2?"#fff":"#c0392b",borderRadius:10,padding:"1px 6px"}}>Obligatoria</span>}
+          </button>
+        ))}
+      </div>
+
+      {stepActual===0&&(
+        <>
+        <div className="form-card">
+          <div className="form-title">Información general</div>
+          <div className="field-row"><span className="field-label">Nombre de la campaña</span><input value={f.nombre} onChange={e=>upd("nombre",e.target.value)} placeholder="Ej: MELI Querétaro Large Van"/></div>
+          <div className="two-col">
+            <div className="field-row"><span className="field-label">País</span><select value={f.pais} onChange={e=>upd("pais",e.target.value)}><option>Chile</option><option>México</option></select></div>
+            <div className="field-row">
+              <span className="field-label">Tipo(s) de vehículo</span>
+              <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:4}}>
+                {["Auto","Small Van","Large Van"].map(vt=>{
+                  const checked=f.vehiculos.includes(vt);
+                  return (
+                    <label key={vt} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",border:`1px solid ${checked?"#1a3a6b":"#e4e7ec"}`,borderRadius:8,cursor:"pointer",background:checked?"#eef2ff":"#fff",fontSize:13}}>
+                      <input type="checkbox" checked={checked} style={{width:"auto",margin:0}} onChange={()=>{
+                        const next=checked?f.vehiculos.filter(x=>x!==vt):[...f.vehiculos,vt];
+                        const vols={"Auto":"1,9","Small Van":"2,3 - 5,4","Large Van":"5,5 - 12,9"};
+                        const nextVol=next.length===1?vols[next[0]]+" m³":next.map(x=>vols[x]+" m³").join(" / ");
+                        upd("vehiculos",next);upd("volumen_m3",next.length>0?nextVol:"");
+                      }}/>
+                      {vt}<span style={{fontSize:11,color:"#888",marginLeft:"auto"}}>{vt==="Auto"?"1,9 m³":vt==="Small Van"?"2,3-5,4 m³":"5,5-12,9 m³"}</span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
-        <div className="two-col">
-          <div className="field-row"><span className="field-label">Volumen (m³)</span>
-            <input value={f.volumen_m3} onChange={e=>upd("volumen_m3",e.target.value)}
-              placeholder="Se autocompleta al elegir vehículo"/>
-            <span style={{fontSize:11,color:"#888",marginTop:3,display:"block"}}>Puedes editar manualmente</span>
+          <div className="two-col">
+            <div className="field-row"><span className="field-label">Volumen (m³)</span>
+              <input value={f.volumen_m3} onChange={e=>upd("volumen_m3",e.target.value)} placeholder="Se autocompleta al elegir vehículo"/>
+              <span style={{fontSize:11,color:"#888",marginTop:3,display:"block"}}>Puedes editar manualmente</span>
+            </div>
+            <div className="field-row"><span className="field-label">Cantidad de vehículos</span><input type="number" value={f.cantidad} onChange={e=>upd("cantidad",e.target.value)} placeholder="10"/></div>
           </div>
-          <div className="field-row"><span className="field-label">Cantidad de vehículos</span><input type="number" value={f.cantidad} onChange={e=>upd("cantidad",e.target.value)} placeholder="10"/></div>
+          <div className="two-col">
+            <div className="field-row"><span className="field-label">Zona de reparto</span><input value={f.zona} onChange={e=>upd("zona",e.target.value)} placeholder="Ej: Querétaro"/></div>
+            <div className="field-row"><span className="field-label">Factura</span><select value={f.factura} onChange={e=>upd("factura",e.target.value)}><option>Sí requiere factura</option><option>No requiere factura</option></select></div>
+          </div>
+          <div className="two-col">
+            <div className="field-row"><span className="field-label">Modalidad de pago</span><select value={f.modalidad_pago} onChange={e=>upd("modalidad_pago",e.target.value)}>{["Semanal","Quincenal","Mensual"].map(v=><option key={v}>{v}</option>)}</select></div>
+            <div className="field-row"><span className="field-label">Disponibilidad</span><select value={f.disponibilidad} onChange={e=>upd("disponibilidad",e.target.value)}>{["Diurno","Nocturno","Mixto"].map(v=><option key={v}>{v}</option>)}</select></div>
+          </div>
+          <div className="two-col">
+            <div className="field-row"><span className="field-label">Experiencia (años)</span><input type="number" value={f.experiencia_anios} onChange={e=>upd("experiencia_anios",e.target.value)}/></div>
+            <div className="field-row"><span className="field-label">Rango de ingresos</span><input value={f.ingreso_rango} onChange={e=>upd("ingreso_rango",e.target.value)} placeholder="Ej: $1,856 - $2,056 MXN"/></div>
+          </div>
+          <div className="field-row"><span className="field-label">Descripción</span><textarea value={f.descripcion} onChange={e=>upd("descripcion",e.target.value)} placeholder="Detalles adicionales..."/></div>
         </div>
-        <div className="two-col">
-          <div className="field-row"><span className="field-label">Zona de reparto</span><input value={f.zona} onChange={e=>upd("zona",e.target.value)} placeholder="Ej: RM Norte"/></div>
-          <div className="field-row"><span className="field-label">Factura</span><select value={f.factura} onChange={e=>upd("factura",e.target.value)}><option>Sí requiere factura</option><option>No requiere factura</option></select></div>
+        <div className="form-card">
+          <div className="form-title">Vigencia de la campaña</div>
+          <div style={{fontSize:12,color:"#666",marginBottom:14}}>Se activa automáticamente en la fecha inicio y se desactiva en la fecha fin.</div>
+          <div className="two-col">
+            <div className="field-row"><span className="field-label">Fecha de inicio</span><input type="date" value={f.fecha_inicio} onChange={e=>upd("fecha_inicio",e.target.value)}/></div>
+            <div className="field-row"><span className="field-label">Fecha de cierre</span><input type="date" value={f.fecha_fin} onChange={e=>upd("fecha_fin",e.target.value)}/></div>
+          </div>
         </div>
-        <div className="two-col">
-          <div className="field-row"><span className="field-label">Modalidad de pago</span><select value={f.modalidad_pago} onChange={e=>upd("modalidad_pago",e.target.value)}>{["Semanal","Quincenal","Mensual"].map(v=><option key={v}>{v}</option>)}</select></div>
-          <div className="field-row"><span className="field-label">Disponibilidad</span><select value={f.disponibilidad} onChange={e=>upd("disponibilidad",e.target.value)}>{["Diurno","Nocturno","Mixto"].map(v=><option key={v}>{v}</option>)}</select></div>
+        <button className="btn-blue" onClick={()=>setStepActual(1)} style={{width:"100%"}}>Siguiente → Scoring ⭐</button>
+        </>
+      )}
+
+      {stepActual===1&&(
+        <>
+        <div className="form-card">
+          <div className="form-title">Modelo de puntuación (interno CRM)</div>
+          <div style={{fontSize:12,color:"#666",marginBottom:14}}>Define cada pregunta, su tipo y los puntos de cada opción. El postulante no ve puntajes.</div>
+          {scoreFields.map((sf,idx)=>(
+            <ScoreFieldBuilder key={sf._id} field={sf}
+              onUpdate={updated=>setScoreFields(scoreFields.map((x,i)=>i===idx?updated:x))}
+              onRemove={()=>setScoreFields(scoreFields.filter((_,i)=>i!==idx))}
+              usedVariables={usedVars().filter(v=>v!==sf.variable)}
+            />
+          ))}
+          <button className="add-opt-btn" style={{width:"100%",padding:"9px",marginTop:4}} onClick={()=>setScoreFields([...scoreFields,newField()])}>+ Agregar pregunta de scoring</button>
+          {total>100&&<div style={{fontSize:12,color:"#c0392b",marginTop:8}}>El score supera 100 puntos.</div>}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"#eef2ff",borderRadius:10,padding:"10px 14px",marginTop:12}}>
+            <span style={{fontSize:13,fontWeight:600,color:scoreColor}}>Score máximo posible</span>
+            <span style={{fontSize:20,fontWeight:700,color:scoreColor}}>{total} pts</span>
+          </div>
         </div>
-        <div className="two-col">
-          <div className="field-row"><span className="field-label">Experiencia (años)</span><input type="number" value={f.experiencia_anios} onChange={e=>upd("experiencia_anios",e.target.value)}/></div>
-          <div className="field-row"><span className="field-label">Rango de ingresos</span><input value={f.ingreso_rango} onChange={e=>upd("ingreso_rango",e.target.value)} placeholder="Ej: 600.000 - 900.000"/></div>
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={()=>setStepActual(0)} style={{flex:1,background:"#f4f5f7",border:"none",borderRadius:10,padding:"11px",fontSize:13,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>← Volver</button>
+          <button className="btn-blue" onClick={()=>setStepActual(2)} style={{flex:2}}>Siguiente → Propuesta económica 📄</button>
         </div>
-        <div className="field-row"><span className="field-label">Descripción</span><textarea value={f.descripcion} onChange={e=>upd("descripcion",e.target.value)} placeholder="Detalles..."/></div>
-      </div>
-      <div className="form-card">
-        <div className="form-title">Vigencia de la campaña</div>
-        <div style={{fontSize:12,color:"#666",marginBottom:14}}>Se activa automáticamente en la fecha inicio y se desactiva en la fecha fin.</div>
-        <div className="two-col">
-          <div className="field-row"><span className="field-label">Fecha de inicio</span><input type="date" value={f.fecha_inicio} onChange={e=>upd("fecha_inicio",e.target.value)}/></div>
-          <div className="field-row"><span className="field-label">Fecha de cierre</span><input type="date" value={f.fecha_fin} onChange={e=>upd("fecha_fin",e.target.value)}/></div>
+        </>
+      )}
+
+      {stepActual===2&&(
+        <>
+        <div className="form-card" style={{border:"1px solid #F47B20"}}>
+          <div className="form-title">📄 Propuesta económica <span style={{fontSize:11,color:"#c0392b",fontWeight:700}}>* Obligatoria</span></div>
+          <div style={{fontSize:12,color:"#666",marginBottom:14}}>Esta propuesta será visible para el conductor al revisar la oferta en el portal.</div>
+          <div className="two-col">
+            <div className="field-row"><span className="field-label">Cliente / Operación *</span><input value={propuesta.cliente} onChange={e=>updP("cliente",e.target.value)} placeholder="Ej: MELI Querétaro"/></div>
+            <div className="field-row"><span className="field-label">CEDIS / Lugar de presentación *</span><input value={propuesta.cedis} onChange={e=>updP("cedis",e.target.value)} placeholder="Ej: SQR1 | Prol. Av. Zaragoza 61"/></div>
+          </div>
+          <div className="two-col">
+            <div className="field-row"><span className="field-label">Horario de presentación</span><input value={propuesta.horario} onChange={e=>updP("horario",e.target.value)} placeholder="Por confirmar"/></div>
+            <div className="field-row"><span className="field-label">Entregas estimadas por unidad</span><input value={propuesta.entregas} onChange={e=>updP("entregas",e.target.value)} placeholder="80-100"/></div>
+          </div>
+          <div className="field-row"><span className="field-label">Lugar y hora de devolución de mercancía no entregada</span><input value={propuesta.devolucion} onChange={e=>updP("devolucion",e.target.value)} placeholder="Mismo SVC hasta las 22:00 hrs"/></div>
+          <div style={{marginTop:16,marginBottom:8}}>
+            <span className="field-label" style={{fontSize:13,fontWeight:700,color:"#1a1a1a"}}>Tarifas por jornada (netos + IVA) *</span>
+            <div style={{fontSize:11,color:"#888",marginBottom:8}}>Valores en MXN o CLP según corresponda. Dejar en 0 si no aplica el tramo.</div>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                <thead>
+                  <tr style={{background:"#1a3a6b",color:"#fff"}}>
+                    <th style={{padding:"8px 12px",textAlign:"left"}}>Categoría</th>
+                    {TRAMOS.map(t=><th key={t} style={{padding:"8px 10px",textAlign:"center"}}>{t} km</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {propuesta.tarifas.map((cat,ci)=>(
+                    <tr key={ci} style={{background:ci%2===0?"#f8f9fa":"#fff"}}>
+                      <td style={{padding:"8px 12px",fontWeight:700,color:"#1a3a6b"}}>{cat.categoria}</td>
+                      {TRAMOS.map(t=>(
+                        <td key={t} style={{padding:4}}>
+                          <input value={cat.tramos[t]||""} onChange={e=>updTarifa(ci,t,e.target.value)}
+                            placeholder="$0"
+                            style={{width:"100%",padding:"6px 8px",border:"0.5px solid #d0d5dd",borderRadius:6,fontSize:12,textAlign:"center"}}/>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="field-row" style={{marginTop:12}}><span className="field-label">Tarifa auxiliar diario</span><input value={propuesta.auxiliar} onChange={e=>updP("auxiliar",e.target.value)} placeholder="$300 MXN por día"/></div>
+          <div style={{marginTop:16,padding:"12px 14px",background:"#f8f9fa",borderRadius:10,marginBottom:8}}>
+            <span className="field-label" style={{fontSize:13,fontWeight:700,color:"#1a1a1a",marginBottom:10,display:"block"}}>Nivel de servicio</span>
+            <div className="two-col">
+              <div className="field-row"><span className="field-label">NS mínimo exigido</span><input value={propuesta.ns_minimo} onChange={e=>updP("ns_minimo",e.target.value)} placeholder="99.00%"/></div>
+              <div className="field-row"><span className="field-label">NS excelente</span><input value={propuesta.ns_excelente} onChange={e=>updP("ns_excelente",e.target.value)} placeholder="99.50% - 100%"/></div>
+            </div>
+            <div className="two-col">
+              <div className="field-row"><span className="field-label">Premio por NS excelente</span><input value={propuesta.ns_premio} onChange={e=>updP("ns_premio",e.target.value)} placeholder="5% sobre tarifa diaria"/></div>
+              <div className="field-row"><span className="field-label">Castigo por bajo NS</span><input value={propuesta.ns_castigo} onChange={e=>updP("ns_castigo",e.target.value)} placeholder="3% sobre tarifa base"/></div>
+            </div>
+          </div>
+          <div style={{padding:"12px 14px",background:"#f8f9fa",borderRadius:10,marginBottom:8}}>
+            <span className="field-label" style={{fontSize:13,fontWeight:700,color:"#1a1a1a",marginBottom:10,display:"block"}}>Condiciones de pago</span>
+            <div className="two-col">
+              <div className="field-row"><span className="field-label">Vigencia del contrato</span><input value={propuesta.vigencia} onChange={e=>updP("vigencia",e.target.value)} placeholder="12 meses"/></div>
+              <div className="field-row" style={{display:"flex",alignItems:"center",gap:10,paddingTop:20}}>
+                <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13}}>
+                  <input type="checkbox" checked={propuesta.semana_retenida} style={{width:"auto"}} onChange={e=>updP("semana_retenida",e.target.checked)}/>
+                  Semana retenida como garantía
+                </label>
+              </div>
+            </div>
+          </div>
+          <div className="field-row"><span className="field-label">Requisitos del prestador (uno por línea)</span>
+            <textarea value={propuesta.requisitos} onChange={e=>updP("requisitos",e.target.value)} style={{height:120}} placeholder="Carta de no antecedentes penales&#10;Licencia vigente..."/>
+          </div>
+          <div className="field-row"><span className="field-label">Notas adicionales</span>
+            <textarea value={propuesta.notas} onChange={e=>updP("notas",e.target.value)} style={{height:60}} placeholder="Condiciones especiales de esta campaña..."/>
+          </div>
         </div>
-      </div>
-      <div className="form-card">
-        <div className="form-title">Modelo de puntuación (interno CRM)</div>
-        <div style={{fontSize:12,color:"#666",marginBottom:14}}>Define cada pregunta, su tipo y los puntos de cada opción. El postulante no ve puntajes. Puedes asignar cualquier valor — una moto puede valer más que un camión si la campaña lo requiere.</div>
-        {scoreFields.map((sf,idx)=>(
-          <ScoreFieldBuilder key={sf._id} field={sf}
-            onUpdate={updated=>setScoreFields(scoreFields.map((x,i)=>i===idx?updated:x))}
-            onRemove={()=>setScoreFields(scoreFields.filter((_,i)=>i!==idx))}
-            usedVariables={usedVars().filter(v=>v!==sf.variable)}
-          />
-        ))}
-        <button className="add-opt-btn" style={{width:"100%",padding:"9px",marginTop:4}} onClick={()=>setScoreFields([...scoreFields,newField()])}>
-          + Agregar pregunta de scoring
-        </button>
-        {total>100&&<div style={{fontSize:12,color:"#c0392b",marginTop:8}}>El score supera 100 puntos. Considera ajustar los valores.</div>}
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"#eef2ff",borderRadius:10,padding:"10px 14px",marginTop:12}}>
-          <span style={{fontSize:13,fontWeight:600,color:scoreColor}}>Score máximo posible</span>
-          <span style={{fontSize:20,fontWeight:700,color:scoreColor}}>{total} pts</span>
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={()=>setStepActual(1)} style={{flex:1,background:"#f4f5f7",border:"none",borderRadius:10,padding:"11px",fontSize:13,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>← Volver</button>
+          <button className="btn-blue" onClick={save} disabled={saving} style={{flex:2}}>{saving?"Guardando...":"✅ Crear campaña con propuesta"}</button>
         </div>
-      </div>
-      <button className="btn-blue" onClick={save} disabled={saving} style={{width:"100%"}}>{saving?"Guardando...":"Crear y publicar campaña"}</button>
+        </>
+      )}
     </div>
   );
 }
@@ -2782,9 +2898,108 @@ function ViewPropuesta() {
           <div style={{fontSize:13,color:"#555"}}>A continuación encontrarás la propuesta económica para la campaña <strong>{campana?.nombre||"BigTicket"}</strong>. Por favor revísala y responde al final.</div>
         </div>
 
-        {campana?.propuesta_url?(
-          <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",overflow:"hidden",marginBottom:16}}>
-            <iframe src={campana.propuesta_url} style={{width:"100%",height:600,border:"none"}} title="Propuesta económica"/>
+        {campana?.propuesta_cedis?(
+          <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",marginBottom:16,overflow:"hidden"}}>
+            {/* Header */}
+            <div style={{background:"#1a3a6b",padding:"20px 24px"}}>
+              <div style={{color:"#F47B20",fontSize:11,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Propuesta Económica</div>
+              <div style={{color:"#fff",fontSize:20,fontWeight:800}}>{campana.propuesta_cliente||campana.nombre}</div>
+              <div style={{color:"#aac3e8",fontSize:12,marginTop:2}}>Última Milla — Condiciones Generales y Específicas de Servicio</div>
+            </div>
+            {/* Contenido scrolleable */}
+            <div style={{padding:"20px 24px",overflowY:"auto"}}>
+              {/* Condiciones generales */}
+              <div style={{marginBottom:20}}>
+                <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:10,paddingBottom:6,borderBottom:"2px solid #F47B20"}}>Condiciones Generales de la Operación</div>
+                {[["📍 Lugar de presentación (CEDIS)",campana.propuesta_cedis],["🕐 Horario de presentación",campana.propuesta_horario],["📦 Entregas estimadas por unidad",campana.propuesta_entregas],["🔄 Devolución de mercancía no entregada",campana.propuesta_devolucion]].map(([l,v])=>v&&(
+                  <div key={l} style={{display:"flex",gap:12,padding:"8px 0",borderBottom:"1px solid #f4f5f7",flexWrap:"wrap"}}>
+                    <span style={{fontSize:12,color:"#888",minWidth:200,flexShrink:0}}>{l}</span>
+                    <span style={{fontSize:12,color:"#1a1a1a",fontWeight:600}}>{v}</span>
+                  </div>
+                ))}
+              </div>
+              {/* Tarifas */}
+              {campana.propuesta_tarifas?.length>0&&(
+                <div style={{marginBottom:20}}>
+                  <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:10,paddingBottom:6,borderBottom:"2px solid #F47B20"}}>Tarifa del Servicio por Jornada</div>
+                  <div style={{overflowX:"auto",marginBottom:8}}>
+                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                      <thead>
+                        <tr style={{background:"#1a3a6b",color:"#fff"}}>
+                          {["Categoría","Zonif.","0-100 km","101-150","151-200","201-250","251+"].map(h=>(
+                            <th key={h} style={{padding:"8px 10px",textAlign:"left",fontWeight:600,whiteSpace:"nowrap"}}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {campana.propuesta_tarifas.map((t,i)=>(
+                          <tr key={i} style={{background:i%2===0?"#f8f9fa":"#fff"}}>
+                            <td style={{padding:"8px 10px",fontWeight:700,color:"#1a3a6b"}}>{t.categoria}</td>
+                            <td style={{padding:"8px 10px",color:"#555"}}>L3</td>
+                            {["0-100","101-150","151-200","201-250","251+"].map(k=>(
+                              <td key={k} style={{padding:"8px 10px",fontWeight:600}}>
+                                {t.tramos?.[k]?`$ ${t.tramos[k]}`:"—"}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{fontSize:11,color:"#888",fontStyle:"italic"}}>*Todos los valores expresados son netos + IVA.</div>
+                  {campana.propuesta_auxiliar&&<div style={{fontSize:12,color:"#555",marginTop:6}}>💼 Tarifa auxiliar diario: <strong>{campana.propuesta_auxiliar}</strong></div>}
+                </div>
+              )}
+              {/* Nivel de servicio */}
+              <div style={{marginBottom:20}}>
+                <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:10,paddingBottom:6,borderBottom:"2px solid #F47B20"}}>Nivel de Servicio</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                  <div style={{background:"#eef2ff",borderRadius:8,padding:"10px 14px"}}>
+                    <div style={{fontSize:10,color:"#888",fontWeight:700,marginBottom:2}}>CUMPLIMIENTO MÍNIMO</div>
+                    <div style={{fontSize:18,fontWeight:800,color:"#1a3a6b"}}>{campana.propuesta_ns_minimo||"99.00%"}</div>
+                    <div style={{fontSize:11,color:"#555"}}>efectividad de entregas</div>
+                  </div>
+                  <div style={{background:"#dcfce7",borderRadius:8,padding:"10px 14px"}}>
+                    <div style={{fontSize:10,color:"#166534",fontWeight:700,marginBottom:2}}>NIVEL EXCELENTE 🏆</div>
+                    <div style={{fontSize:18,fontWeight:800,color:"#166534"}}>{campana.propuesta_ns_excelente||"99.50%-100%"}</div>
+                    <div style={{fontSize:11,color:"#166534"}}>Premio: {campana.propuesta_ns_premio||"5% sobre tarifa diaria"}</div>
+                  </div>
+                </div>
+                <div style={{background:"#fff3e0",borderRadius:8,padding:"10px 14px",border:"1px solid #fde8cc"}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#e65100",marginBottom:2}}>⚠️ Castigo por bajo desempeño</div>
+                  <div style={{fontSize:12,color:"#555"}}>{campana.propuesta_ns_castigo||"3% sobre tarifa base"} — rutas con menos del 99.5% de domicilios visitados o nivel de servicio inferior al 95%</div>
+                </div>
+              </div>
+              {/* Pagos */}
+              <div style={{marginBottom:20}}>
+                <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:10,paddingBottom:6,borderBottom:"2px solid #F47B20"}}>Condiciones de Pago</div>
+                <div style={{fontSize:12,color:"#555",lineHeight:2}}>
+                  <div>✅ Pago <strong>semanal</strong> — cada <strong>viernes</strong>, por la semana inmediata anterior</div>
+                  <div>✅ Transferencia bancaria en MXN, previa emisión de <strong>CFDI</strong></div>
+                  <div>✅ No se otorgan anticipos ni pagos en efectivo</div>
+                  {campana.propuesta_semana_retenida&&<div>⚠️ Se retiene una semana al inicio como garantía operativa</div>}
+                  <div>📋 Vigencia del contrato: <strong>{campana.propuesta_vigencia||"12 meses"}</strong></div>
+                </div>
+              </div>
+              {/* Requisitos */}
+              {campana.propuesta_requisitos&&(
+                <div style={{marginBottom:20}}>
+                  <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:10,paddingBottom:6,borderBottom:"2px solid #F47B20"}}>Requisitos del Prestador</div>
+                  <div style={{fontSize:12,color:"#555",lineHeight:2}}>
+                    {campana.propuesta_requisitos.split("\n").filter(Boolean).map((r,i)=>(
+                      <div key={i}>✓ {r}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* Notas */}
+              {campana.propuesta_notas&&(
+                <div style={{background:"#f0f9ff",borderRadius:10,padding:"12px 16px",border:"1px solid #bae6fd"}}>
+                  <div style={{fontSize:12,fontWeight:700,color:"#0369a1",marginBottom:4}}>📌 Nota adicional</div>
+                  <div style={{fontSize:12,color:"#555"}}>{campana.propuesta_notas}</div>
+                </div>
+              )}
+            </div>
           </div>
         ):(
           <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",padding:40,textAlign:"center",marginBottom:16,color:"#888"}}>
