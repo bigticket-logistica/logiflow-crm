@@ -1253,7 +1253,7 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
         <button className="btn-gw" onClick={onClose}>Ver portal →</button>
       </div>
       <div className="admin-nav">
-        {[["camps","Campañas"],["nueva","Nueva campaña"],["postulaciones","Postulaciones"],["vehiculos","🚗 Vehículos"],["canales","Canales"],["centros_mx","Centros México"],["biggy","🤖 Biggy"]].map(([k,l])=>(
+        {[["camps","Campañas"],["nueva","Nueva campaña"],["postulaciones","Postulaciones"],["vehiculos","🚗 Vehículos"],["canales","Canales"],["centros_mx","Centros México"],["biggy","🤖 Biggy"],["feedback","📋 Feedback"]].map(([k,l])=>(
           <button key={k} className={`nav-btn ${tab===k?"active":""}`} onClick={()=>setTab(k)}>{l}</button>
         ))}
       </div>
@@ -1336,6 +1336,7 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
         {tab==="canales"&&<CanalesView postulaciones={postulaciones} onLoad={loadPost}/>}
         {tab==="centros_mx"&&<CentrosMxAdmin/>}
         {tab==="biggy"&&<BiggyAdmin/>}
+        {tab==="feedback"&&<FeedbackAdmin/>}
       </div>
     </div>
   );
@@ -1545,6 +1546,367 @@ function BiggyAdmin() {
           </div>
         ))
       }
+    </div>
+  );
+}
+
+function FeedbackForm({ onVolver }) {
+  const [f, setF] = useState({
+    nombre:"", pais:"Chile", dispositivo:"Android",
+    t1_facilidad:0, t1_problemas:"",
+    t2_encontro_biggy:"", t2_respuesta_clara:0,
+    t3_formulario_facil:0, t3_recibio_confirmacion:"", t3_guardo_codigo:"",
+    t4_prefiltro_claro:"", t4_digitar_numeros:"", t4_experiencia_fluida:0,
+    t5_recupero_codigo:"",
+    t6_propuesta_legible:"", t6_informacion_clara:0, t6_boton_funciono:"",
+    nps:0, mejoras:"", comentario_libre:""
+  });
+  const [enviado, setEnviado] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+
+  const upd = (k,v) => setF(p=>({...p,[k]:v}));
+
+  const Estrellas = ({campo, valor}) => (
+    <div style={{display:"flex",gap:8,marginTop:6}}>
+      {[1,2,3,4,5].map(n=>(
+        <button key={n} onClick={()=>upd(campo,n)}
+          style={{fontSize:24,background:"none",border:"none",cursor:"pointer",
+            opacity:valor>=n?1:0.3,transition:"opacity 0.1s"}}>⭐</button>
+      ))}
+      {valor>0&&<span style={{fontSize:12,color:"#888",alignSelf:"center"}}>{["","Muy difícil","Difícil","Regular","Fácil","Muy fácil"][valor]}</span>}
+    </div>
+  );
+
+  const OpcionesSiNo = ({campo, valor}) => (
+    <div style={{display:"flex",gap:8,marginTop:6}}>
+      {["Sí","No","Parcialmente"].map(op=>(
+        <button key={op} onClick={()=>upd(campo,op)}
+          style={{padding:"6px 14px",borderRadius:20,border:"1px solid #e4e7ec",fontSize:12,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",
+            background:valor===op?"#1a3a6b":"#fff",color:valor===op?"#fff":"#555",fontWeight:valor===op?700:400}}>
+          {op}
+        </button>
+      ))}
+    </div>
+  );
+
+  const NPS = ({valor}) => (
+    <div style={{display:"flex",gap:4,marginTop:8,flexWrap:"wrap"}}>
+      {[1,2,3,4,5,6,7,8,9,10].map(n=>(
+        <button key={n} onClick={()=>upd("nps",n)}
+          style={{width:36,height:36,borderRadius:8,border:"1px solid #e4e7ec",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",
+            background:valor===n?(n>=9?"#10B981":n>=7?"#F59E0B":"#EF4444"):"#fff",
+            color:valor===n?"#fff":(n>=9?"#10B981":n>=7?"#F59E0B":"#EF4444")}}>
+          {n}
+        </button>
+      ))}
+    </div>
+  );
+
+  const enviar = async () => {
+    if(!f.nombre.trim()){alert("Ingresa tu nombre.");return;}
+    if(!f.nps){alert("Responde la pregunta NPS.");return;}
+    setGuardando(true);
+    try {
+      const {error} = await sb.from("feedback_testing").insert(f);
+      if(error) throw error;
+      setEnviado(true);
+    } catch(e){alert("Error al enviar: "+e.message);}
+    finally{setGuardando(false);}
+  };
+
+  if(enviado) return(
+    <div style={{maxWidth:480,margin:"60px auto",padding:"0 20px"}}>
+      <div style={{background:"#fff",borderRadius:16,padding:"40px 32px",textAlign:"center",border:"0.5px solid #e4e7ec"}}>
+        <div style={{fontSize:48,marginBottom:16}}>🙏</div>
+        <div style={{fontSize:20,fontWeight:700,color:"#166534",marginBottom:8}}>¡Gracias por tu feedback!</div>
+        <div style={{fontSize:13,color:"#555",marginBottom:24}}>Tu opinión nos ayuda a mejorar BigTicket para todos los conductores 🚛</div>
+        {onVolver&&<button className="btn-orange" onClick={onVolver}>Volver al portal</button>}
+      </div>
+    </div>
+  );
+
+  return(
+    <div style={{maxWidth:600,margin:"0 auto",padding:"20px 16px"}}>
+      <div style={{background:"#1a3a6b",borderRadius:"12px 12px 0 0",padding:"20px 24px",textAlign:"center"}}>
+        <span style={{color:"#F47B20",fontSize:20,fontWeight:700}}>big</span>
+        <span style={{color:"#fff",fontSize:20,fontWeight:700}}>ticket</span>
+        <div style={{color:"#aac3e8",fontSize:12,marginTop:4}}>Formulario de Feedback — Testing Portal</div>
+      </div>
+      <div style={{background:"#fff",borderRadius:"0 0 12px 12px",padding:"24px",border:"0.5px solid #e4e7ec",marginBottom:16}}>
+        <div style={{fontSize:13,color:"#555"}}>Gracias por ayudarnos a mejorar. Este formulario toma aproximadamente <strong>5 minutos</strong>.</div>
+      </div>
+
+      {/* Datos personales */}
+      <div className="form-card">
+        <div className="form-title">Tus datos</div>
+        <div className="two-col">
+          <div className="field-row"><span className="field-label">Nombre *</span>
+            <input value={f.nombre} onChange={e=>upd("nombre",e.target.value)} placeholder="Tu nombre"/>
+          </div>
+          <div className="field-row"><span className="field-label">País</span>
+            <select value={f.pais} onChange={e=>upd("pais",e.target.value)}>
+              <option>Chile</option><option>México</option>
+            </select>
+          </div>
+        </div>
+        <div className="field-row"><span className="field-label">Dispositivo que usaste</span>
+          <div style={{display:"flex",gap:8,marginTop:4}}>
+            {["Android","iPhone","Computador"].map(d=>(
+              <button key={d} onClick={()=>upd("dispositivo",d)}
+                style={{flex:1,padding:"8px",borderRadius:8,border:"1px solid #e4e7ec",fontSize:12,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",
+                  background:f.dispositivo===d?"#1a3a6b":"#fff",color:f.dispositivo===d?"#fff":"#555",fontWeight:f.dispositivo===d?700:400}}>
+                {d==="Android"?"🤖":d==="iPhone"?"🍎":"💻"} {d}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* T1 Portal */}
+      <div className="form-card">
+        <div className="form-title">📱 Tarea 1 — Acceso al portal</div>
+        <div className="field-row">
+          <span className="field-label">¿Qué tan fácil fue entrar y navegar el portal?</span>
+          <Estrellas campo="t1_facilidad" valor={f.t1_facilidad}/>
+        </div>
+        <div className="field-row"><span className="field-label">¿Tuviste algún problema? ¿Cuál?</span>
+          <textarea value={f.t1_problemas} onChange={e=>upd("t1_problemas",e.target.value)} placeholder="Describe cualquier problema o confusión..."/>
+        </div>
+      </div>
+
+      {/* T2 Biggy Portal */}
+      <div className="form-card">
+        <div className="form-title">💬 Tarea 2 — Biggy en el portal</div>
+        <div className="field-row">
+          <span className="field-label">¿Encontraste fácilmente el chat de Biggy?</span>
+          <OpcionesSiNo campo="t2_encontro_biggy" valor={f.t2_encontro_biggy}/>
+        </div>
+        <div className="field-row">
+          <span className="field-label">¿Biggy respondió correctamente tus preguntas?</span>
+          <Estrellas campo="t2_respuesta_clara" valor={f.t2_respuesta_clara}/>
+        </div>
+      </div>
+
+      {/* T3 Postulación */}
+      <div className="form-card">
+        <div className="form-title">📝 Tarea 3 — Proceso de postulación</div>
+        <div className="field-row">
+          <span className="field-label">¿Qué tan fácil fue completar el formulario de postulación?</span>
+          <Estrellas campo="t3_formulario_facil" valor={f.t3_formulario_facil}/>
+        </div>
+        <div className="field-row">
+          <span className="field-label">¿Recibiste correo y WhatsApp de confirmación?</span>
+          <OpcionesSiNo campo="t3_recibio_confirmacion" valor={f.t3_recibio_confirmacion}/>
+        </div>
+        <div className="field-row">
+          <span className="field-label">¿Guardaste tu código BT-XXXXX?</span>
+          <OpcionesSiNo campo="t3_guardo_codigo" valor={f.t3_guardo_codigo}/>
+        </div>
+      </div>
+
+      {/* T4 Biggy WhatsApp */}
+      <div className="form-card">
+        <div className="form-title">🚛 Tarea 4 — Biggy por WhatsApp</div>
+        <div className="field-row">
+          <span className="field-label">¿Las preguntas del pre-filtro fueron claras?</span>
+          <OpcionesSiNo campo="t4_prefiltro_claro" valor={f.t4_prefiltro_claro}/>
+        </div>
+        <div className="field-row">
+          <span className="field-label">¿Pudiste responder digitando los números (1, 2, 3...)?</span>
+          <OpcionesSiNo campo="t4_digitar_numeros" valor={f.t4_digitar_numeros}/>
+        </div>
+        <div className="field-row">
+          <span className="field-label">¿La experiencia con Biggy por WhatsApp fue fluida?</span>
+          <Estrellas campo="t4_experiencia_fluida" valor={f.t4_experiencia_fluida}/>
+        </div>
+      </div>
+
+      {/* T5 Recuperar código */}
+      <div className="form-card">
+        <div className="form-title">🔑 Tarea 5 — Recuperar código</div>
+        <div className="field-row">
+          <span className="field-label">¿Biggy te entregó tu código correctamente?</span>
+          <div style={{display:"flex",gap:8,marginTop:6}}>
+            {["Sí","No","No lo intenté"].map(op=>(
+              <button key={op} onClick={()=>upd("t5_recupero_codigo",op)}
+                style={{flex:1,padding:"6px 8px",borderRadius:20,border:"1px solid #e4e7ec",fontSize:11,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",
+                  background:f.t5_recupero_codigo===op?"#1a3a6b":"#fff",color:f.t5_recupero_codigo===op?"#fff":"#555",fontWeight:f.t5_recupero_codigo===op?700:400}}>
+                {op}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* T6 Propuesta */}
+      <div className="form-card">
+        <div className="form-title">📄 Tarea 6 — Propuesta económica</div>
+        <div className="field-row">
+          <span className="field-label">¿Pudiste leer la propuesta completa en tu celular?</span>
+          <OpcionesSiNo campo="t6_propuesta_legible" valor={f.t6_propuesta_legible}/>
+        </div>
+        <div className="field-row">
+          <span className="field-label">¿La información de la propuesta fue clara y suficiente?</span>
+          <Estrellas campo="t6_informacion_clara" valor={f.t6_informacion_clara}/>
+        </div>
+        <div className="field-row">
+          <span className="field-label">¿El botón de aceptar/rechazar funcionó correctamente?</span>
+          <OpcionesSiNo campo="t6_boton_funciono" valor={f.t6_boton_funciono}/>
+        </div>
+      </div>
+
+      {/* NPS */}
+      <div className="form-card" style={{border:"1px solid #F47B20"}}>
+        <div className="form-title">⭐ Evaluación general</div>
+        <div className="field-row">
+          <span className="field-label">Del 1 al 10, ¿recomendarías este proceso a otro conductor?</span>
+          <NPS valor={f.nps}/>
+          <div style={{display:"flex",justifyContent:"space-between",marginTop:4}}>
+            <span style={{fontSize:10,color:"#EF4444"}}>No recomendaría</span>
+            <span style={{fontSize:10,color:"#10B981"}}>Totalmente recomendaría</span>
+          </div>
+        </div>
+        <div className="field-row"><span className="field-label">¿Qué mejorarías del proceso?</span>
+          <textarea value={f.mejoras} onChange={e=>upd("mejoras",e.target.value)} placeholder="Tu opinión es muy valiosa..."/>
+        </div>
+        <div className="field-row"><span className="field-label">Comentario libre</span>
+          <textarea value={f.comentario_libre} onChange={e=>upd("comentario_libre",e.target.value)} placeholder="¿Algo más que quieras contarnos?"/>
+        </div>
+      </div>
+
+      <button className="btn-orange" onClick={enviar} disabled={guardando}>
+        {guardando?"Enviando...":"Enviar feedback 🙏"}
+      </button>
+      <div style={{height:20}}/>
+    </div>
+  );
+}
+
+function FeedbackAdmin() {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState(null);
+
+  useEffect(()=>{cargar();},[]);
+
+  const cargar = async () => {
+    setLoading(true);
+    const {data} = await sb.from("feedback_testing").select("*").order("created_at",{ascending:false});
+    setItems(data||[]);
+    setLoading(false);
+  };
+
+  const eliminar = async (id) => {
+    if(!confirm("¿Eliminar este feedback?")) return;
+    await sb.from("feedback_testing").delete().eq("id",id);
+    setItems(prev=>prev.filter(i=>i.id!==id));
+    if(selected?.id===id) setSelected(null);
+  };
+
+  const promedio = (campo) => {
+    const vals = items.map(i=>i[campo]).filter(v=>v>0);
+    return vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1) : "—";
+  };
+
+  const contar = (campo, valor) => items.filter(i=>i[campo]===valor).length;
+  const pct = (n) => items.length ? Math.round(n/items.length*100)+"%" : "0%";
+
+  const Barra = ({label, valor, max=5, color="#1a3a6b"}) => (
+    <div style={{marginBottom:8}}>
+      <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:3}}>
+        <span style={{color:"#555"}}>{label}</span>
+        <span style={{fontWeight:700,color}}>{valor} / {max}</span>
+      </div>
+      <div style={{height:6,background:"#f0f0f0",borderRadius:3}}>
+        <div style={{height:"100%",width:`${(valor/max)*100}%`,background:color,borderRadius:3,transition:"width 0.5s"}}/>
+      </div>
+    </div>
+  );
+
+  if(selected) return(
+    <div>
+      <button onClick={()=>setSelected(null)} className="btn-back" style={{marginBottom:16}}>← Volver a la lista</button>
+      <div style={{background:"#fff",borderRadius:12,border:"0.5px solid #e4e7ec",padding:"20px 24px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
+          <div>
+            <div style={{fontSize:16,fontWeight:700}}>{selected.nombre}</div>
+            <div style={{fontSize:12,color:"#888"}}>{selected.pais} · {selected.dispositivo} · {new Date(selected.created_at).toLocaleDateString("es-CL")}</div>
+          </div>
+          <div style={{textAlign:"center",background:selected.nps>=9?"#dcfce7":selected.nps>=7?"#fef3c7":"#fee2e2",borderRadius:10,padding:"8px 16px"}}>
+            <div style={{fontSize:24,fontWeight:900,color:selected.nps>=9?"#166534":selected.nps>=7?"#92400e":"#c0392b"}}>{selected.nps}</div>
+            <div style={{fontSize:10,color:"#888"}}>NPS</div>
+          </div>
+        </div>
+        {[
+          ["📱 Portal — Facilidad","t1_facilidad",5],["💬 Biggy Portal — Respuesta","t2_respuesta_clara",5],
+          ["📝 Formulario — Facilidad","t3_formulario_facil",5],["🚛 Biggy WA — Experiencia","t4_experiencia_fluida",5],
+          ["📄 Propuesta — Claridad","t6_informacion_clara",5],
+        ].map(([l,k,m])=><Barra key={k} label={l} valor={selected[k]||0} max={m}/>)}
+        <div style={{marginTop:16,display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:12}}>
+          {[["Encontró Biggy",selected.t2_encontro_biggy],["Recibió confirmación",selected.t3_recibio_confirmacion],
+            ["Guardó código",selected.t3_guardo_codigo],["Pre-filtro claro",selected.t4_prefiltro_claro],
+            ["Digitar números",selected.t4_digitar_numeros],["Recuperó código",selected.t5_recupero_codigo],
+            ["Propuesta legible",selected.t6_propuesta_legible],["Botón funcionó",selected.t6_boton_funciono]
+          ].map(([l,v])=>(
+            <div key={l} style={{padding:"6px 10px",background:"#f8f9fa",borderRadius:8}}>
+              <span style={{color:"#888"}}>{l}: </span>
+              <span style={{fontWeight:700,color:v==="Sí"?"#166534":v==="No"?"#c0392b":"#555"}}>{v||"—"}</span>
+            </div>
+          ))}
+        </div>
+        {selected.t1_problemas&&<div style={{marginTop:12,padding:"10px 14px",background:"#fff3e0",borderRadius:8}}><strong style={{fontSize:11}}>Problemas:</strong><p style={{fontSize:12,color:"#555",marginTop:4}}>{selected.t1_problemas}</p></div>}
+        {selected.mejoras&&<div style={{marginTop:8,padding:"10px 14px",background:"#eef2ff",borderRadius:8}}><strong style={{fontSize:11}}>Mejoras:</strong><p style={{fontSize:12,color:"#555",marginTop:4}}>{selected.mejoras}</p></div>}
+        {selected.comentario_libre&&<div style={{marginTop:8,padding:"10px 14px",background:"#f8f9fa",borderRadius:8}}><strong style={{fontSize:11}}>Comentario:</strong><p style={{fontSize:12,color:"#555",marginTop:4}}>{selected.comentario_libre}</p></div>}
+        <button onClick={()=>eliminar(selected.id)} className="btn-danger" style={{marginTop:16,width:"100%"}}>🗑 Eliminar este feedback</button>
+      </div>
+    </div>
+  );
+
+  return(
+    <div>
+      <div className="sec-title" style={{marginBottom:4}}>📋 Feedback Testing</div>
+      <div className="sec-sub">Respuestas del plan de testing del portal</div>
+
+      {/* Link para compartir */}
+      <div style={{background:"#eef2ff",borderRadius:10,padding:"12px 16px",marginBottom:20,marginTop:16}}>
+        <div style={{fontSize:12,fontWeight:700,color:"#1a3a6b",marginBottom:4}}>🔗 Link para compartir con testers</div>
+        <div style={{fontSize:12,color:"#555",fontFamily:"monospace",background:"#fff",padding:"6px 10px",borderRadius:6,border:"1px solid #c7d7f9"}}>
+          https://bigticket-portal.vercel.app?feedback=1
+        </div>
+      </div>
+
+      {loading ? <div className="loading">Cargando...</div> : items.length===0 ? <div className="empty">Aún no hay respuestas. Comparte el link con los testers 👆</div> : (
+        <>
+        {/* Resumen */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:10,marginBottom:20}}>
+          {[["Total respuestas",items.length,"#1a3a6b"],["NPS promedio",promedio("nps"),"#F47B20"],
+            ["Portal ⭐",promedio("t1_facilidad"),"#10B981"],["Biggy WA ⭐",promedio("t4_experiencia_fluida"),"#8B5CF6"],
+          ].map(([l,v,c])=>(
+            <div key={l} style={{background:"#fff",border:"0.5px solid #e4e7ec",borderRadius:10,padding:"12px",textAlign:"center"}}>
+              <div style={{fontSize:22,fontWeight:800,color:c}}>{v}</div>
+              <div style={{fontSize:10,color:"#888",marginTop:2}}>{l}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Lista */}
+        {items.map(item=>(
+          <div key={item.id} className="camp-row" style={{cursor:"pointer"}} onClick={()=>setSelected(item)}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:14,fontWeight:600,color:"#1a1a1a"}}>{item.nombre}</div>
+              <div style={{fontSize:12,color:"#888"}}>{item.pais} · {item.dispositivo} · {new Date(item.created_at).toLocaleDateString("es-CL")}</div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div style={{textAlign:"center",background:item.nps>=9?"#dcfce7":item.nps>=7?"#fef3c7":"#fee2e2",borderRadius:8,padding:"4px 10px"}}>
+                <span style={{fontSize:16,fontWeight:700,color:item.nps>=9?"#166534":item.nps>=7?"#92400e":"#c0392b"}}>{item.nps}</span>
+                <span style={{fontSize:9,color:"#888",display:"block"}}>NPS</span>
+              </div>
+              <span style={{fontSize:18,color:"#888"}}>›</span>
+            </div>
+          </div>
+        ))}
+        </>
+      )}
     </div>
   );
 }
@@ -3077,6 +3439,9 @@ export default function App() {
   const params=new URLSearchParams(window.location.search);
   if(params.get("lead")&&params.get("propuesta")==="1"){
     return <><style>{css}</style><ViewPropuesta/></>;
+  }
+  if(params.get("feedback")==="1"){
+    return <><style>{css}</style><FeedbackForm onVolver={()=>window.location.href="https://bigticket-portal.vercel.app"}/></>;
   }
   // Detectar URL de onboarding
   if(params.get("onboarding")==="1"){
