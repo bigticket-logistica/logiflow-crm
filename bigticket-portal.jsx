@@ -86,7 +86,7 @@ const css = `
   .canal-badge{font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(255,255,255,0.15);color:#fff;}
   .btn-gw{background:transparent;color:#fff;border:0.5px solid rgba(255,255,255,0.3);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;}
   .btn-gw:hover{background:rgba(255,255,255,0.1);}
-  .pg{padding:20px;max-width:960px;margin:0 auto;} .pg-form{padding:20px;max-width:960px;margin:0 auto;padding-top:16px;}
+  .pg{padding:20px;max-width:960px;margin:0 auto;padding-bottom:90px;} .pg-form{padding:20px;max-width:960px;margin:0 auto;padding-top:16px;padding-bottom:90px;}
   .sec-title{font-size:20px;font-weight:600;color:#1a1a1a;margin-bottom:4px;}
   .sec-sub{font-size:13px;color:#666;margin-bottom:20px;}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:28px;}
@@ -993,22 +993,22 @@ function BiggiBubble({ paginaPrincipal=false }) {
     <>
       {/* Botón flotante */}
       {!abierto&&(
-        <div onClick={()=>setAbierto(true)} style={{position:"fixed",bottom:24,right:24,zIndex:999,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+        <div onClick={()=>setAbierto(true)} style={{position:"fixed",bottom:16,right:16,zIndex:999,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
           {paginaPrincipal&&(
-            <div style={{background:"#1a3a6b",color:"#fff",borderRadius:12,padding:"8px 14px",fontSize:12,fontWeight:600,boxShadow:"0 4px 16px rgba(0,0,0,0.2)",whiteSpace:"nowrap",animation:"pulse 2s infinite"}}>
-              💬 ¿Tienes dudas? ¡Pregúntale a Biggy!
+            <div style={{background:"#1a3a6b",color:"#fff",borderRadius:12,padding:"6px 12px",fontSize:11,fontWeight:600,boxShadow:"0 4px 16px rgba(0,0,0,0.2)",whiteSpace:"nowrap",animation:"pulse 2s infinite",maxWidth:180,textAlign:"center"}}>
+              💬 ¿Dudas? ¡Pregúntale a Biggy!
             </div>
           )}
-          <div style={{width:80,height:80,borderRadius:"50%",overflow:"hidden",boxShadow:"0 4px 20px rgba(244,123,32,0.5)",border:"3px solid #F47B20"}}>
+          <div style={{width:56,height:56,borderRadius:"50%",overflow:"hidden",boxShadow:"0 4px 20px rgba(244,123,32,0.5)",border:"2.5px solid #F47B20"}}>
             <img src={DONB_URL} alt="Biggy" style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:"top"}}/>
           </div>
-          <div style={{background:"#1a3a6b",color:"#fff",borderRadius:8,padding:"3px 10px",fontSize:11,fontWeight:700}}>Biggy</div>
+          <div style={{background:"#1a3a6b",color:"#fff",borderRadius:8,padding:"2px 8px",fontSize:10,fontWeight:700}}>Biggy</div>
         </div>
       )}
 
       {/* Ventana del chat */}
       {abierto&&(
-        <div style={{position:"fixed",bottom:24,right:24,zIndex:999,width:340,height:480,background:"#fff",borderRadius:16,boxShadow:"0 8px 40px rgba(0,0,0,0.2)",display:"flex",flexDirection:"column",overflow:"hidden",border:"1px solid #e4e7ec"}}>
+        <div style={{position:"fixed",bottom:16,right:16,zIndex:999,width:"min(340px, calc(100vw - 32px))",height:"min(480px, calc(100vh - 80px))",background:"#fff",borderRadius:16,boxShadow:"0 8px 40px rgba(0,0,0,0.2)",display:"flex",flexDirection:"column",overflow:"hidden",border:"1px solid #e4e7ec"}}>
           {/* Header */}
           <div style={{background:"linear-gradient(135deg,#1a3a6b,#2a5a9b)",padding:"12px 16px",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
             <BiggiFace size={48}/>
