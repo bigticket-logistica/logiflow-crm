@@ -1208,6 +1208,8 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
   const [postulaciones,setPostulaciones]=useState([]);
   const [loadingPost,setLoadingPost]=useState(false);
   const [uploadingId,setUploadingId]=useState(null);
+  const [editandoPropuesta,setEditandoPropuesta]=useState(null); // campana completa
+  const [previewPropuesta,setPreviewPropuesta]=useState(null); // campana completa
 
   useEffect(()=>{if(tab==="postulaciones")loadPost();},[tab]);
 
@@ -1243,8 +1245,233 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
     finally{setUploadingId(null);}
   }
 
+  const TRAMOS = ["0-100","101-150","151-200","201-250","251+"];
+
+  const guardarPropuesta = async () => {
+    if(!editandoPropuesta) return;
+    try {
+      const {error} = await sb.from("campanas").update({
+        propuesta_cliente: editandoPropuesta.propuesta_cliente||"",
+        propuesta_cedis: editandoPropuesta.propuesta_cedis||"",
+        propuesta_horario: editandoPropuesta.propuesta_horario||"",
+        propuesta_entregas: editandoPropuesta.propuesta_entregas||"",
+        propuesta_devolucion: editandoPropuesta.propuesta_devolucion||"",
+        propuesta_tarifas: editandoPropuesta.propuesta_tarifas,
+        propuesta_auxiliar: editandoPropuesta.propuesta_auxiliar||"",
+        propuesta_ns_minimo: editandoPropuesta.propuesta_ns_minimo||"",
+        propuesta_ns_excelente: editandoPropuesta.propuesta_ns_excelente||"",
+        propuesta_ns_premio: editandoPropuesta.propuesta_ns_premio||"",
+        propuesta_ns_castigo: editandoPropuesta.propuesta_ns_castigo||"",
+        propuesta_semana_retenida: editandoPropuesta.propuesta_semana_retenida,
+        propuesta_vigencia: editandoPropuesta.propuesta_vigencia||"",
+        propuesta_requisitos: editandoPropuesta.propuesta_requisitos||"",
+        propuesta_notas: editandoPropuesta.propuesta_notas||"",
+      }).eq("id", editandoPropuesta.id);
+      if(error) throw error;
+      setCampaigns(campaigns.map(c=>c.id===editandoPropuesta.id?{...c,...editandoPropuesta}:c));
+      alert("✅ Propuesta actualizada correctamente");
+      setEditandoPropuesta(null);
+    } catch(e){alert("Error: "+e.message);}
+  };
+
+  const updEP = (k,v) => setEditandoPropuesta(p=>({...p,[k]:v}));
+  const updTarifaEP = (ci,tramo,val) => setEditandoPropuesta(p=>{
+    const t=[...p.propuesta_tarifas];
+    t[ci]={...t[ci],tramos:{...t[ci].tramos,[tramo]:val}};
+    return {...p,propuesta_tarifas:t};
+  });
+
   return (
     <div>
+      {/* Modal Preview */}
+      {previewPropuesta&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:200,overflowY:"auto",padding:"20px 16px"}}>
+          <div style={{maxWidth:680,margin:"0 auto",background:"#fff",borderRadius:16,overflow:"hidden",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+            <div style={{background:"#1a3a6b",padding:"16px 24px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div>
+                <div style={{color:"#F47B20",fontSize:11,fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Preview — Vista del conductor</div>
+                <div style={{color:"#fff",fontSize:16,fontWeight:700,marginTop:2}}>{previewPropuesta.propuesta_cliente||previewPropuesta.nombre}</div>
+              </div>
+              <button onClick={()=>setPreviewPropuesta(null)}
+                style={{background:"rgba(255,255,255,0.15)",border:"none",color:"#fff",borderRadius:"50%",width:32,height:32,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+            </div>
+            <div style={{padding:"20px 24px",overflowY:"auto",maxHeight:"75vh"}}>
+              {/* Condiciones generales */}
+              <div style={{marginBottom:20}}>
+                <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:10,paddingBottom:6,borderBottom:"2px solid #F47B20"}}>Condiciones Generales de la Operación</div>
+                {[["📍 CEDIS",previewPropuesta.propuesta_cedis],["🕐 Horario",previewPropuesta.propuesta_horario],["📦 Entregas estimadas",previewPropuesta.propuesta_entregas],["🔄 Devolución",previewPropuesta.propuesta_devolucion]].map(([l,v])=>v&&(
+                  <div key={l} style={{display:"flex",gap:12,padding:"7px 0",borderBottom:"1px solid #f4f5f7",flexWrap:"wrap"}}>
+                    <span style={{fontSize:12,color:"#888",minWidth:180,flexShrink:0}}>{l}</span>
+                    <span style={{fontSize:12,color:"#1a1a1a",fontWeight:600}}>{v}</span>
+                  </div>
+                ))}
+              </div>
+              {/* Tarifas */}
+              {previewPropuesta.propuesta_tarifas?.length>0&&(
+                <div style={{marginBottom:20}}>
+                  <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:10,paddingBottom:6,borderBottom:"2px solid #F47B20"}}>Tarifas por Jornada</div>
+                  <div style={{overflowX:"auto"}}>
+                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                      <thead>
+                        <tr style={{background:"#1a3a6b",color:"#fff"}}>
+                          <th style={{padding:"8px 10px",textAlign:"left"}}>Categoría</th>
+                          {TRAMOS.map(t=><th key={t} style={{padding:"8px 10px",textAlign:"center"}}>{t} km</th>)}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {previewPropuesta.propuesta_tarifas.map((t,i)=>(
+                          <tr key={i} style={{background:i%2===0?"#f8f9fa":"#fff"}}>
+                            <td style={{padding:"8px 10px",fontWeight:700,color:"#1a3a6b"}}>{t.categoria}</td>
+                            {TRAMOS.map(k=><td key={k} style={{padding:"8px 10px",textAlign:"center",fontWeight:600}}>{t.tramos?.[k]?`$ ${t.tramos[k]}`:"—"}</td>)}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{fontSize:11,color:"#888",marginTop:6,fontStyle:"italic"}}>*Valores netos + IVA</div>
+                  {previewPropuesta.propuesta_auxiliar&&<div style={{fontSize:12,color:"#555",marginTop:6}}>💼 Auxiliar: <strong>{previewPropuesta.propuesta_auxiliar}</strong></div>}
+                </div>
+              )}
+              {/* NS */}
+              <div style={{marginBottom:20}}>
+                <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:10,paddingBottom:6,borderBottom:"2px solid #F47B20"}}>Nivel de Servicio</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                  <div style={{background:"#eef2ff",borderRadius:8,padding:"10px 14px"}}>
+                    <div style={{fontSize:10,color:"#888",fontWeight:700}}>MÍNIMO EXIGIDO</div>
+                    <div style={{fontSize:18,fontWeight:800,color:"#1a3a6b"}}>{previewPropuesta.propuesta_ns_minimo||"99.00%"}</div>
+                  </div>
+                  <div style={{background:"#dcfce7",borderRadius:8,padding:"10px 14px"}}>
+                    <div style={{fontSize:10,color:"#166534",fontWeight:700}}>EXCELENTE 🏆</div>
+                    <div style={{fontSize:14,fontWeight:700,color:"#166534"}}>{previewPropuesta.propuesta_ns_excelente}</div>
+                    <div style={{fontSize:11,color:"#166534"}}>Premio: {previewPropuesta.propuesta_ns_premio}</div>
+                  </div>
+                </div>
+                <div style={{background:"#fff3e0",borderRadius:8,padding:"10px 14px",border:"1px solid #fde8cc"}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#e65100"}}>⚠️ Castigo</div>
+                  <div style={{fontSize:12,color:"#555"}}>{previewPropuesta.propuesta_ns_castigo}</div>
+                </div>
+              </div>
+              {/* Pagos */}
+              <div style={{marginBottom:20}}>
+                <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:10,paddingBottom:6,borderBottom:"2px solid #F47B20"}}>Condiciones de Pago</div>
+                <div style={{fontSize:12,color:"#555",lineHeight:2}}>
+                  <div>✅ Pago <strong>semanal</strong> cada <strong>viernes</strong></div>
+                  <div>✅ Transferencia bancaria, previa emisión de <strong>CFDI</strong></div>
+                  {previewPropuesta.propuesta_semana_retenida&&<div>⚠️ Semana retenida al inicio como garantía</div>}
+                  <div>📋 Vigencia: <strong>{previewPropuesta.propuesta_vigencia}</strong></div>
+                </div>
+              </div>
+              {/* Requisitos */}
+              {previewPropuesta.propuesta_requisitos&&(
+                <div style={{marginBottom:16}}>
+                  <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:10,paddingBottom:6,borderBottom:"2px solid #F47B20"}}>Requisitos del Prestador</div>
+                  <div style={{fontSize:12,color:"#555",lineHeight:2}}>
+                    {previewPropuesta.propuesta_requisitos.split("\n").filter(Boolean).map((r,i)=><div key={i}>✓ {r}</div>)}
+                  </div>
+                </div>
+              )}
+              {previewPropuesta.propuesta_notas&&(
+                <div style={{background:"#f0f9ff",borderRadius:10,padding:"12px 16px",border:"1px solid #bae6fd"}}>
+                  <div style={{fontSize:12,fontWeight:700,color:"#0369a1",marginBottom:4}}>📌 Nota adicional</div>
+                  <div style={{fontSize:12,color:"#555"}}>{previewPropuesta.propuesta_notas}</div>
+                </div>
+              )}
+            </div>
+            <div style={{padding:"12px 24px",borderTop:"1px solid #e4e7ec",background:"#f8f9fa"}}>
+              <button onClick={()=>setPreviewPropuesta(null)} className="btn-blue" style={{width:"100%"}}>Cerrar preview</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar Propuesta */}
+      {editandoPropuesta&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:200,overflowY:"auto",padding:"20px 16px"}}>
+          <div style={{maxWidth:680,margin:"0 auto",background:"#fff",borderRadius:16,overflow:"hidden",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+            <div style={{background:"#1a3a6b",padding:"16px 24px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div>
+                <div style={{color:"#F47B20",fontSize:11,fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Editar propuesta económica</div>
+                <div style={{color:"#fff",fontSize:16,fontWeight:700,marginTop:2}}>{editandoPropuesta.nombre}</div>
+              </div>
+              <button onClick={()=>setEditandoPropuesta(null)}
+                style={{background:"rgba(255,255,255,0.15)",border:"none",color:"#fff",borderRadius:"50%",width:32,height:32,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+            </div>
+            <div style={{padding:"20px 24px",overflowY:"auto",maxHeight:"70vh",display:"flex",flexDirection:"column",gap:14}}>
+              <div className="two-col">
+                <div className="field-row"><span className="field-label">Cliente / Operación *</span><input value={editandoPropuesta.propuesta_cliente||""} onChange={e=>updEP("propuesta_cliente",e.target.value)} placeholder="Ej: MELI Querétaro"/></div>
+                <div className="field-row"><span className="field-label">CEDIS *</span><input value={editandoPropuesta.propuesta_cedis||""} onChange={e=>updEP("propuesta_cedis",e.target.value)} placeholder="Ej: SQR1 | Av. Zaragoza 61"/></div>
+              </div>
+              <div className="two-col">
+                <div className="field-row"><span className="field-label">Horario de presentación</span><input value={editandoPropuesta.propuesta_horario||""} onChange={e=>updEP("propuesta_horario",e.target.value)} placeholder="Por confirmar"/></div>
+                <div className="field-row"><span className="field-label">Entregas estimadas</span><input value={editandoPropuesta.propuesta_entregas||""} onChange={e=>updEP("propuesta_entregas",e.target.value)} placeholder="80-100"/></div>
+              </div>
+              <div className="field-row"><span className="field-label">Devolución de mercancía no entregada</span><input value={editandoPropuesta.propuesta_devolucion||""} onChange={e=>updEP("propuesta_devolucion",e.target.value)} placeholder="Mismo SVC hasta las 22:00 hrs"/></div>
+
+              {/* Tarifas */}
+              <div>
+                <span className="field-label" style={{fontSize:13,fontWeight:700,color:"#1a1a1a"}}>Tarifas por jornada *</span>
+                <div style={{overflowX:"auto",marginTop:8}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                    <thead>
+                      <tr style={{background:"#1a3a6b",color:"#fff"}}>
+                        <th style={{padding:"8px 12px",textAlign:"left"}}>Categoría</th>
+                        {TRAMOS.map(t=><th key={t} style={{padding:"8px 10px",textAlign:"center"}}>{t} km</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(editandoPropuesta.propuesta_tarifas||[]).map((cat,ci)=>(
+                        <tr key={ci} style={{background:ci%2===0?"#f8f9fa":"#fff"}}>
+                          <td style={{padding:"8px 12px",fontWeight:700,color:"#1a3a6b"}}>{cat.categoria}</td>
+                          {TRAMOS.map(t=>(
+                            <td key={t} style={{padding:4}}>
+                              <input value={cat.tramos?.[t]||""} onChange={e=>updTarifaEP(ci,t,e.target.value)}
+                                placeholder="$0" style={{width:"100%",padding:"5px 6px",border:"0.5px solid #d0d5dd",borderRadius:6,fontSize:12,textAlign:"center"}}/>
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="field-row"><span className="field-label">Tarifa auxiliar diario</span><input value={editandoPropuesta.propuesta_auxiliar||""} onChange={e=>updEP("propuesta_auxiliar",e.target.value)} placeholder="$300 MXN por día"/></div>
+              <div className="two-col">
+                <div className="field-row"><span className="field-label">NS mínimo</span><input value={editandoPropuesta.propuesta_ns_minimo||""} onChange={e=>updEP("propuesta_ns_minimo",e.target.value)} placeholder="99.00%"/></div>
+                <div className="field-row"><span className="field-label">NS excelente</span><input value={editandoPropuesta.propuesta_ns_excelente||""} onChange={e=>updEP("propuesta_ns_excelente",e.target.value)} placeholder="99.50% - 100%"/></div>
+              </div>
+              <div className="two-col">
+                <div className="field-row"><span className="field-label">Premio NS excelente</span><input value={editandoPropuesta.propuesta_ns_premio||""} onChange={e=>updEP("propuesta_ns_premio",e.target.value)} placeholder="5% sobre tarifa diaria"/></div>
+                <div className="field-row"><span className="field-label">Castigo bajo NS</span><input value={editandoPropuesta.propuesta_ns_castigo||""} onChange={e=>updEP("propuesta_ns_castigo",e.target.value)} placeholder="3% sobre tarifa base"/></div>
+              </div>
+              <div className="two-col">
+                <div className="field-row"><span className="field-label">Vigencia del contrato</span><input value={editandoPropuesta.propuesta_vigencia||""} onChange={e=>updEP("propuesta_vigencia",e.target.value)} placeholder="12 meses"/></div>
+                <div className="field-row" style={{display:"flex",alignItems:"center",paddingTop:20}}>
+                  <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13}}>
+                    <input type="checkbox" checked={editandoPropuesta.propuesta_semana_retenida||false} style={{width:"auto"}} onChange={e=>updEP("propuesta_semana_retenida",e.target.checked)}/>
+                    Semana retenida como garantía
+                  </label>
+                </div>
+              </div>
+              <div className="field-row"><span className="field-label">Requisitos (uno por línea)</span>
+                <textarea value={editandoPropuesta.propuesta_requisitos||""} onChange={e=>updEP("propuesta_requisitos",e.target.value)} style={{height:100}} placeholder="Carta de no antecedentes penales&#10;Licencia vigente..."/>
+              </div>
+              <div className="field-row"><span className="field-label">Notas adicionales</span>
+                <textarea value={editandoPropuesta.propuesta_notas||""} onChange={e=>updEP("propuesta_notas",e.target.value)} style={{height:60}} placeholder="Condiciones especiales..."/>
+              </div>
+            </div>
+            <div style={{padding:"12px 24px",borderTop:"1px solid #e4e7ec",background:"#f8f9fa",display:"flex",gap:10}}>
+              <button onClick={()=>setEditandoPropuesta(null)}
+                style={{flex:1,background:"#f4f5f7",border:"none",borderRadius:10,padding:"11px",fontSize:13,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>
+                Cancelar
+              </button>
+              <button onClick={guardarPropuesta} className="btn-blue" style={{flex:2}}>
+                💾 Guardar propuesta
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{background:"#1a3a6b",padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <div>
           <div style={{color:"#fff",fontSize:15,fontWeight:600}}>Panel administrador</div>
@@ -1280,11 +1507,30 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
                     </div>
                     {/* Propuesta */}
                     <div style={{width:"100%",background:"#f8f9fa",borderRadius:10,padding:"10px 14px",border:"1px solid #e4e7ec"}}>
-                      <div style={{fontSize:12,fontWeight:700,color:"#1a1a1a",marginBottom:4}}>📄 Propuesta económica</div>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+                        <div style={{fontSize:12,fontWeight:700,color:"#1a1a1a"}}>📄 Propuesta económica</div>
+                        <div style={{display:"flex",gap:6}}>
+                          {c.propuesta_cedis&&(
+                            <button onClick={()=>setPreviewPropuesta(c)}
+                              style={{fontSize:11,padding:"3px 10px",borderRadius:6,border:"1px solid #bfdbfe",background:"#eff6ff",color:"#1d4ed8",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontWeight:600}}>
+                              👁 Preview
+                            </button>
+                          )}
+                          <button onClick={()=>setEditandoPropuesta({...c,
+                            propuesta_tarifas: c.propuesta_tarifas || [
+                              {categoria:"Large Van",tramos:{"0-100":"","101-150":"","151-200":"","201-250":"","251+":""}},
+                              {categoria:"Small Van",tramos:{"0-100":"","101-150":"","151-200":"","201-250":"","251+":""}},
+                            ]
+                          })}
+                            style={{fontSize:11,padding:"3px 10px",borderRadius:6,border:"1px solid #fed7aa",background:"#fff7ed",color:"#c2410c",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontWeight:600}}>
+                            ✏️ {c.propuesta_cedis?"Editar":"Agregar"} propuesta
+                          </button>
+                        </div>
+                      </div>
                       {c.propuesta_cedis?(
                         <span style={{fontSize:12,color:"#10B981"}}>✅ Propuesta incluida — {c.propuesta_cliente||"cliente"}</span>
                       ):(
-                        <span style={{fontSize:12,color:"#c0392b"}}>⚠️ Sin propuesta — recrea la campaña para agregarla</span>
+                        <span style={{fontSize:12,color:"#c0392b"}}>⚠️ Sin propuesta</span>
                       )}
                     </div>
                   </div>
