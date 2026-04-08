@@ -1417,93 +1417,131 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
       {previewPropuesta&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:200,overflowY:"auto",padding:"20px 16px"}}>
           <div style={{maxWidth:680,margin:"0 auto",background:"#fff",borderRadius:16,overflow:"hidden",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-            <div style={{background:"#1a3a6b",padding:"16px 24px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-              <div>
-                <div style={{color:"#F47B20",fontSize:11,fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Preview — Vista del conductor</div>
-                <div style={{color:"#fff",fontSize:16,fontWeight:700,marginTop:2}}>{previewPropuesta.propuesta_cliente||previewPropuesta.nombre}</div>
+            {/* Header con logo */}
+            <div style={{background:"#1a3a6b",padding:"14px 24px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <img src="https://psvdtgjvognbmxfvqbaa.supabase.co/storage/v1/object/public/assets/LOGO%20ENCUESTA%20Y%20PROPUESTA.png"
+                alt="Bigticket" style={{height:34,objectFit:"contain"}}/>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <span style={{color:"#fff",fontSize:11,fontWeight:600,letterSpacing:1,textTransform:"uppercase"}}>Vista del Conductor</span>
+                <button onClick={()=>setPreviewPropuesta(null)}
+                  style={{background:"rgba(255,255,255,0.15)",border:"none",color:"#fff",borderRadius:"50%",width:30,height:30,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
               </div>
-              <button onClick={()=>setPreviewPropuesta(null)}
-                style={{background:"rgba(255,255,255,0.15)",border:"none",color:"#fff",borderRadius:"50%",width:32,height:32,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
             </div>
-            <div style={{padding:"20px 24px",overflowY:"auto",maxHeight:"75vh"}}>
+            <div style={{overflowY:"auto",maxHeight:"75vh"}}>
+              {/* Título */}
+              <div style={{padding:"24px 24px 16px"}}>
+                <div style={{fontSize:22,fontWeight:800,color:"#1a1a1a",marginBottom:6}}>Propuesta Económica</div>
+                <div style={{width:48,height:3,background:"#F47B20",borderRadius:2}}/>
+              </div>
               {/* Condiciones generales */}
-              <div style={{marginBottom:20}}>
-                <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:10,paddingBottom:6,borderBottom:"2px solid #F47B20"}}>Condiciones Generales de la Operación</div>
-                {[["📍 CEDIS",previewPropuesta.propuesta_cedis],["🕐 Horario",previewPropuesta.propuesta_horario],["📦 Entregas estimadas",previewPropuesta.propuesta_entregas],["🔄 Devolución",previewPropuesta.propuesta_devolucion]].map(([l,v])=>v&&(
-                  <div key={l} style={{display:"flex",gap:12,padding:"7px 0",borderBottom:"1px solid #f4f5f7",flexWrap:"wrap"}}>
-                    <span style={{fontSize:12,color:"#888",minWidth:180,flexShrink:0}}>{l}</span>
-                    <span style={{fontSize:12,color:"#1a1a1a",fontWeight:600}}>{v}</span>
-                  </div>
-                ))}
+              <div style={{padding:"0 24px 20px"}}>
+                <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+                  <div style={{width:4,height:18,background:"#F47B20",borderRadius:2}}/>
+                  Condiciones Generales de la Operación
+                </div>
+                <div style={{background:"#f8f9fa",borderRadius:10,padding:"16px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,border:"0.5px solid #e4e7ec"}}>
+                  {[["📍","Dirección CEDIS",previewPropuesta.propuesta_cedis,"#e74c3c"],
+                    ["🕐","Horario",previewPropuesta.propuesta_horario,"#F47B20"],
+                    ["📦","Entregas estimadas",previewPropuesta.propuesta_entregas,"#27ae60"],
+                    ["🗓","Devolución",previewPropuesta.propuesta_devolucion,"#2980b9"],
+                  ].filter(([,,,])=>true).map(([ic,l,v,c])=>v&&(
+                    <div key={l}>
+                      <div style={{fontSize:10,color:c,fontWeight:700,textTransform:"uppercase",marginBottom:3}}>{ic} {l}</div>
+                      <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a"}}>{v}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
               {/* Tarifas */}
               {previewPropuesta.propuesta_tarifas?.length>0&&(
-                <div style={{marginBottom:20}}>
-                  <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:10,paddingBottom:6,borderBottom:"2px solid #F47B20"}}>Tarifas por Jornada</div>
-                  <div style={{overflowX:"auto"}}>
+                <div style={{padding:"0 24px 20px"}}>
+                  <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+                    <div style={{width:4,height:18,background:"#F47B20",borderRadius:2}}/>
+                    Tarifas por Jornada
+                  </div>
+                  <div style={{overflowX:"auto",borderRadius:10,overflow:"hidden",border:"0.5px solid #e4e7ec"}}>
                     <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
                       <thead>
                         <tr style={{background:"#1a3a6b",color:"#fff"}}>
-                          <th style={{padding:"8px 10px",textAlign:"left"}}>Categoría</th>
-                          {TRAMOS.map(t=><th key={t} style={{padding:"8px 10px",textAlign:"center"}}>{t} km</th>)}
+                          <th style={{padding:"9px 12px",textAlign:"left"}}>Categoría</th>
+                          {TRAMOS.map(t=><th key={t} style={{padding:"9px 8px",textAlign:"center"}}>{t} km</th>)}
                         </tr>
                       </thead>
                       <tbody>
                         {previewPropuesta.propuesta_tarifas.map((t,i)=>(
-                          <tr key={i} style={{background:i%2===0?"#f8f9fa":"#fff"}}>
-                            <td style={{padding:"8px 10px",fontWeight:700,color:"#1a3a6b"}}>{t.categoria}</td>
-                            {TRAMOS.map(k=><td key={k} style={{padding:"8px 10px",textAlign:"center",fontWeight:600}}>{t.tramos?.[k]?`$ ${t.tramos[k]}`:"—"}</td>)}
+                          <tr key={i} style={{background:i%2===0?"#f8f9fa":"#fff",borderBottom:"0.5px solid #e4e7ec"}}>
+                            <td style={{padding:"9px 12px",fontWeight:700,color:"#1a1a1a"}}>{t.categoria}</td>
+                            {TRAMOS.map(k=><td key={k} style={{padding:"9px 8px",textAlign:"center",fontWeight:600,color:"#1a1a1a"}}>{t.tramos?.[k]?`$ ${t.tramos[k]}`:"—"}</td>)}
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                  <div style={{fontSize:11,color:"#888",marginTop:6,fontStyle:"italic"}}>*Valores netos + IVA</div>
-                  {previewPropuesta.propuesta_auxiliar&&<div style={{fontSize:12,color:"#555",marginTop:6}}>💼 Auxiliar: <strong>{previewPropuesta.propuesta_auxiliar}</strong></div>}
+                  <div style={{fontSize:11,color:"#888",marginTop:6}}>*Valores netos + IVA{previewPropuesta.propuesta_auxiliar?` | Auxiliar: ${previewPropuesta.propuesta_auxiliar}`:""}</div>
                 </div>
               )}
               {/* NS */}
-              <div style={{marginBottom:20}}>
-                <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:10,paddingBottom:6,borderBottom:"2px solid #F47B20"}}>Nivel de Servicio</div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-                  <div style={{background:"#eef2ff",borderRadius:8,padding:"10px 14px"}}>
-                    <div style={{fontSize:10,color:"#888",fontWeight:700}}>MÍNIMO EXIGIDO</div>
-                    <div style={{fontSize:18,fontWeight:800,color:"#1a3a6b"}}>{previewPropuesta.propuesta_ns_minimo||"99.00%"}</div>
+              <div style={{padding:"0 24px 20px"}}>
+                <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+                  <div style={{width:4,height:18,background:"#F47B20",borderRadius:2}}/>
+                  Nivel de Servicio
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+                  <div style={{background:"#f0f2f5",borderRadius:10,padding:"14px",textAlign:"center"}}>
+                    <div style={{fontSize:10,color:"#888",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Mínimo exigido</div>
+                    <div style={{fontSize:22,fontWeight:800,color:"#1a3a6b"}}>{previewPropuesta.propuesta_ns_minimo||"99.00%"}</div>
                   </div>
-                  <div style={{background:"#dcfce7",borderRadius:8,padding:"10px 14px"}}>
-                    <div style={{fontSize:10,color:"#166534",fontWeight:700}}>EXCELENTE 🏆</div>
-                    <div style={{fontSize:14,fontWeight:700,color:"#166534"}}>{previewPropuesta.propuesta_ns_excelente}</div>
-                    <div style={{fontSize:11,color:"#166534"}}>Premio: {previewPropuesta.propuesta_ns_premio}</div>
+                  <div style={{background:"#f0fdf4",borderRadius:10,padding:"14px",textAlign:"center",border:"1.5px solid #86efac"}}>
+                    <div style={{fontSize:10,color:"#166534",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Excelente 🏆</div>
+                    <div style={{fontSize:16,fontWeight:800,color:"#166534"}}>{previewPropuesta.propuesta_ns_excelente}</div>
+                    <div style={{fontSize:11,color:"#166534",marginTop:4}}>Premio: {previewPropuesta.propuesta_ns_premio}</div>
                   </div>
                 </div>
-                <div style={{background:"#fff3e0",borderRadius:8,padding:"10px 14px",border:"1px solid #fde8cc"}}>
-                  <div style={{fontSize:11,fontWeight:700,color:"#e65100"}}>⚠️ Castigo</div>
-                  <div style={{fontSize:12,color:"#555"}}>{previewPropuesta.propuesta_ns_castigo}</div>
+                <div style={{background:"#fffbeb",borderRadius:10,padding:"12px 16px",border:"1px solid #fde68a",display:"flex",gap:8,alignItems:"flex-start"}}>
+                  <span style={{color:"#F47B20",flexShrink:0}}>⚠️</span>
+                  <div style={{fontSize:12,color:"#92400e"}}><strong>Castigo:</strong> {previewPropuesta.propuesta_ns_castigo}</div>
                 </div>
               </div>
               {/* Pagos */}
-              <div style={{marginBottom:20}}>
-                <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:10,paddingBottom:6,borderBottom:"2px solid #F47B20"}}>Condiciones de Pago</div>
-                <div style={{fontSize:12,color:"#555",lineHeight:2}}>
-                  <div>✅ Pago <strong>semanal</strong> cada <strong>viernes</strong></div>
-                  <div>✅ Transferencia bancaria, previa emisión de <strong>CFDI</strong></div>
-                  {previewPropuesta.propuesta_semana_retenida&&<div>⚠️ Semana retenida al inicio como garantía</div>}
-                  <div>📋 Vigencia: <strong>{previewPropuesta.propuesta_vigencia}</strong></div>
+              <div style={{padding:"0 24px 20px"}}>
+                <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+                  <div style={{width:4,height:18,background:"#F47B20",borderRadius:2}}/>
+                  Condiciones de Pago
+                </div>
+                <div style={{fontSize:13,color:"#444",display:"flex",flexDirection:"column",gap:8}}>
+                  {["Pago semanal cada viernes","Transferencia bancaria, previa emisión de CFDI",
+                    previewPropuesta.propuesta_semana_retenida?"Semana retenida al inicio como garantía":null,
+                    `Vigencia del contrato: ${previewPropuesta.propuesta_vigencia||"12 meses"} condicionado al cumplimiento de los niveles de servicio.`
+                  ].filter(Boolean).map((item,i)=>(
+                    <div key={i} style={{display:"flex",gap:8,alignItems:"flex-start"}}>
+                      <span style={{color:"#27ae60",fontWeight:700,flexShrink:0}}>✓</span>
+                      <span>{item}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
               {/* Requisitos */}
               {previewPropuesta.propuesta_requisitos&&(
-                <div style={{marginBottom:16}}>
-                  <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:10,paddingBottom:6,borderBottom:"2px solid #F47B20"}}>Requisitos del Prestador</div>
-                  <div style={{fontSize:12,color:"#555",lineHeight:2}}>
-                    {previewPropuesta.propuesta_requisitos.split("\n").filter(Boolean).map((r,i)=><div key={i}>✓ {r}</div>)}
+                <div style={{padding:"0 24px 20px"}}>
+                  <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+                    <div style={{width:4,height:18,background:"#F47B20",borderRadius:2}}/>
+                    Requisitos del Prestador
+                  </div>
+                  <div style={{fontSize:13,color:"#444",display:"flex",flexDirection:"column",gap:8}}>
+                    {previewPropuesta.propuesta_requisitos.split("\n").filter(Boolean).map((r,i)=>(
+                      <div key={i} style={{display:"flex",gap:8,alignItems:"flex-start"}}>
+                        <span style={{color:"#27ae60",fontWeight:700,flexShrink:0}}>✓</span>
+                        <span>{r}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
               {previewPropuesta.propuesta_notas&&(
-                <div style={{background:"#f0f9ff",borderRadius:10,padding:"12px 16px",border:"1px solid #bae6fd"}}>
-                  <div style={{fontSize:12,fontWeight:700,color:"#0369a1",marginBottom:4}}>📌 Nota adicional</div>
-                  <div style={{fontSize:12,color:"#555"}}>{previewPropuesta.propuesta_notas}</div>
+                <div style={{padding:"0 24px 20px"}}>
+                  <div style={{background:"#f0f9ff",borderRadius:10,padding:"12px 16px",border:"1px solid #bae6fd",fontSize:12,color:"#0369a1"}}>
+                    <strong>📌 Nota:</strong> {previewPropuesta.propuesta_notas}
+                  </div>
                 </div>
               )}
             </div>
