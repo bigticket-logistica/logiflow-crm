@@ -3592,27 +3592,29 @@ function ViewPropuesta() {
           <div style={{background:"#fff",borderRadius:12,overflow:"hidden",marginBottom:20,border:"0.5px solid #e4e7ec"}}>
 
             {/* Título propuesta */}
-            <div style={{padding:"24px 24px 16px"}}>
-              <div style={{fontSize:22,fontWeight:800,color:"#1a1a1a",marginBottom:4}}>Propuesta Económica</div>
-              <div style={{width:48,height:3,background:"#F47B20",borderRadius:2}}/>
+            <div style={{padding:"28px 24px 20px"}}>
+              <div style={{fontSize:26,fontWeight:800,color:"#1a1a1a",marginBottom:6}}>Propuesta Económica</div>
+              <div style={{width:52,height:3,background:"#F47B20",borderRadius:2}}/>
             </div>
 
             {/* Condiciones generales */}
-            <div style={{padding:"0 24px 20px"}}>
-              <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
-                <div style={{width:3,height:16,background:"#1a3a6b",borderRadius:2}}/>
+            <div style={{padding:"0 24px 24px"}}>
+              <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+                <div style={{width:4,height:18,background:"#F47B20",borderRadius:2}}/>
                 Condiciones Generales de la Operación
               </div>
-              <div style={{background:"#f8f9fa",borderRadius:10,padding:"16px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+              <div style={{background:"#f8f9fa",borderRadius:10,padding:"16px 20px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,border:"0.5px solid #e4e7ec"}}>
                 {[
-                  ["📍","Dirección CEDIS",campana.propuesta_cedis],
-                  ["🕐","Horario de presentación",campana.propuesta_horario],
-                  ["📦","Entregas estimadas",campana.propuesta_entregas],
-                  ["🔄","Devolución",campana.propuesta_devolucion],
-                ].filter(([,,v])=>v).map(([ic,l,v])=>(
+                  ["📍","Dirección CEDIS",campana.propuesta_cedis,"#e74c3c"],
+                  ["🕐","Horario de presentación",campana.propuesta_horario,"#F47B20"],
+                  ["📦","Entregas estimadas",campana.propuesta_entregas,"#27ae60"],
+                  ["🗓","Devolución",campana.propuesta_devolucion,"#2980b9"],
+                ].filter(([,,,, ]) => true).map(([ic,l,v,c])=>v&&(
                   <div key={l}>
-                    <div style={{fontSize:10,color:"#F47B20",fontWeight:700,textTransform:"uppercase",marginBottom:3}}>{ic} {l}</div>
-                    <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a"}}>{v}</div>
+                    <div style={{fontSize:10,color:c||"#888",fontWeight:700,textTransform:"uppercase",marginBottom:4,display:"flex",alignItems:"center",gap:4}}>
+                      <span>{ic}</span> {l}
+                    </div>
+                    <div style={{fontSize:14,fontWeight:700,color:"#1a1a1a"}}>{v}</div>
                   </div>
                 ))}
               </div>
@@ -3620,27 +3622,27 @@ function ViewPropuesta() {
 
             {/* Tarifas */}
             {campana.propuesta_tarifas?.length>0&&(
-              <div style={{padding:"0 24px 20px"}}>
-                <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
-                  <div style={{width:3,height:16,background:"#1a3a6b",borderRadius:2}}/>
+              <div style={{padding:"0 24px 24px"}}>
+                <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+                  <div style={{width:4,height:18,background:"#F47B20",borderRadius:2}}/>
                   Tarifas por Jornada
                 </div>
-                <div style={{overflowX:"auto"}}>
+                <div style={{overflowX:"auto",borderRadius:10,overflow:"hidden",border:"0.5px solid #e4e7ec"}}>
                   <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
                     <thead>
                       <tr style={{background:"#1a3a6b",color:"#fff"}}>
-                        <th style={{padding:"10px 14px",textAlign:"left",fontWeight:600}}>Categoría</th>
+                        <th style={{padding:"11px 16px",textAlign:"left",fontWeight:600}}>Categoría</th>
                         {["0-100 km","101-150 km","151-200 km","201-250 km","251+ km"].map(h=>(
-                          <th key={h} style={{padding:"10px 10px",textAlign:"center",fontWeight:600,whiteSpace:"nowrap"}}>{h}</th>
+                          <th key={h} style={{padding:"11px 10px",textAlign:"center",fontWeight:600,whiteSpace:"nowrap"}}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {campana.propuesta_tarifas.map((t,i)=>(
-                        <tr key={i} style={{background:i%2===0?"#f8f9fa":"#fff"}}>
-                          <td style={{padding:"10px 14px",fontWeight:700,color:"#1a1a1a"}}>{t.categoria}</td>
+                        <tr key={i} style={{background:i%2===0?"#f8f9fa":"#fff",borderBottom:"0.5px solid #e4e7ec"}}>
+                          <td style={{padding:"11px 16px",fontWeight:700,color:"#1a1a1a"}}>{t.categoria}</td>
                           {["0-100","101-150","151-200","201-250","251+"].map(k=>(
-                            <td key={k} style={{padding:"10px",textAlign:"center",fontWeight:600,color:"#1a3a6b"}}>
+                            <td key={k} style={{padding:"11px 10px",textAlign:"center",fontWeight:600,color:"#1a1a1a"}}>
                               {t.tramos?.[k]?`$ ${t.tramos[k]}`:"—"}
                             </td>
                           ))}
@@ -3649,49 +3651,53 @@ function ViewPropuesta() {
                     </tbody>
                   </table>
                 </div>
-                <div style={{fontSize:11,color:"#888",marginTop:8,fontStyle:"italic"}}>*Valores netos + IVA{campana.propuesta_auxiliar?` | Auxiliar: ${campana.propuesta_auxiliar}`:""}</div>
+                <div style={{fontSize:11,color:"#888",marginTop:8}}>
+                  *Valores netos + IVA{campana.propuesta_auxiliar?<span> | <strong>Auxiliar: {campana.propuesta_auxiliar}</strong></span>:""}
+                </div>
               </div>
             )}
 
             {/* Nivel de servicio */}
-            <div style={{padding:"0 24px 20px"}}>
-              <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
-                <div style={{width:3,height:16,background:"#1a3a6b",borderRadius:2}}/>
+            <div style={{padding:"0 24px 24px"}}>
+              <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+                <div style={{width:4,height:18,background:"#F47B20",borderRadius:2}}/>
                 Nivel de Servicio
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
-                <div style={{background:"#f0f4ff",borderRadius:10,padding:"14px 16px",textAlign:"center"}}>
-                  <div style={{fontSize:10,color:"#666",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Mínimo exigido</div>
-                  <div style={{fontSize:24,fontWeight:800,color:"#1a3a6b"}}>{campana.propuesta_ns_minimo||"99.00%"}</div>
+                <div style={{background:"#f0f2f5",borderRadius:10,padding:"16px",textAlign:"center"}}>
+                  <div style={{fontSize:10,color:"#888",fontWeight:700,textTransform:"uppercase",marginBottom:8,letterSpacing:0.5}}>Mínimo exigido</div>
+                  <div style={{fontSize:26,fontWeight:800,color:"#1a3a6b"}}>{campana.propuesta_ns_minimo||"99.00%"}</div>
                 </div>
-                <div style={{background:"#f0fdf4",borderRadius:10,padding:"14px 16px",textAlign:"center",border:"1px solid #bbf7d0"}}>
-                  <div style={{fontSize:10,color:"#166534",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>Excelente 🏆</div>
-                  <div style={{fontSize:18,fontWeight:800,color:"#166534"}}>{campana.propuesta_ns_excelente||"99.50% - 100%"}</div>
-                  <div style={{fontSize:11,color:"#166534",marginTop:4}}>Premio: {campana.propuesta_ns_premio||"5% sobre tarifa diaria"}</div>
+                <div style={{background:"#f0fdf4",borderRadius:10,padding:"16px",textAlign:"center",border:"1.5px solid #86efac"}}>
+                  <div style={{fontSize:10,color:"#166534",fontWeight:700,textTransform:"uppercase",marginBottom:8,letterSpacing:0.5}}>Excelente 🏆</div>
+                  <div style={{fontSize:20,fontWeight:800,color:"#166534"}}>{campana.propuesta_ns_excelente||"99.50% - 100%"}</div>
+                  <div style={{fontSize:11,color:"#166534",marginTop:6}}>Premio: {campana.propuesta_ns_premio||"5% sobre tarifa diaria"}</div>
                 </div>
               </div>
-              <div style={{background:"#fff8ed",borderRadius:10,padding:"12px 16px",border:"1px solid #fed7aa",display:"flex",gap:10,alignItems:"flex-start"}}>
-                <span style={{fontSize:16}}>⚠️</span>
-                <div style={{fontSize:12,color:"#92400e"}}><strong>Castigo:</strong> {campana.propuesta_ns_castigo||"3% sobre tarifa base"} — rutas con menos del 99.5% de domicilios o NS inferior al 95%</div>
+              <div style={{background:"#fffbeb",borderRadius:10,padding:"12px 16px",border:"1px solid #fde68a",display:"flex",gap:10,alignItems:"flex-start"}}>
+                <span style={{color:"#F47B20",fontSize:16,flexShrink:0}}>⚠️</span>
+                <div style={{fontSize:12,color:"#92400e"}}>
+                  <strong>Castigo:</strong> Las rutas que posean un nivel de domicilios visitados inferior al 99,5% y un nivel de servicio inferior al 95%, tendrán un castigo del {campana.propuesta_ns_castigo||"3% sobre la tarifa base del viaje"}.
+                </div>
               </div>
             </div>
 
             {/* Condiciones de pago */}
-            <div style={{padding:"0 24px 20px"}}>
-              <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
-                <div style={{width:3,height:16,background:"#1a3a6b",borderRadius:2}}/>
+            <div style={{padding:"0 24px 24px"}}>
+              <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+                <div style={{width:4,height:18,background:"#F47B20",borderRadius:2}}/>
                 Condiciones de Pago
               </div>
-              <div style={{fontSize:13,color:"#444",lineHeight:2.2}}>
+              <div style={{fontSize:13,color:"#444",display:"flex",flexDirection:"column",gap:8}}>
                 {[
-                  "Pago semanal cada viernes",
-                  "Transferencia bancaria, previa emisión de CFDI",
-                  campana.propuesta_semana_retenida?"Semana retenida al inicio como garantía":null,
-                  `Vigencia del contrato: ${campana.propuesta_vigencia||"12 meses"} condicionado al cumplimiento de los niveles de servicio.`
-                ].filter(Boolean).map((item,i)=>(
+                  ["Pago ", <strong>semanal</strong>, " cada ", <strong>viernes</strong>],
+                  ["Transferencia bancaria, previa emisión de ", <strong>CFDI</strong>],
+                  campana.propuesta_semana_retenida?["Semana retenida al inicio como garantía"]:null,
+                  ["Vigencia del", <span style={{textDecoration:"underline"}}> contrato</span>, `: ${campana.propuesta_vigencia||"12 meses"} condicionado al cumplimiento de los niveles de servicio.`],
+                ].filter(Boolean).map((parts,i)=>(
                   <div key={i} style={{display:"flex",alignItems:"flex-start",gap:8}}>
-                    <span style={{color:"#F47B20",fontWeight:700,flexShrink:0}}>✓</span>
-                    <span>{item}</span>
+                    <span style={{color:"#27ae60",fontWeight:700,flexShrink:0,marginTop:1}}>✓</span>
+                    <span>{Array.isArray(parts)?parts.map((p,j)=><span key={j}>{p}</span>):parts}</span>
                   </div>
                 ))}
               </div>
@@ -3699,15 +3705,15 @@ function ViewPropuesta() {
 
             {/* Requisitos */}
             {campana.propuesta_requisitos&&(
-              <div style={{padding:"0 24px 20px"}}>
-                <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
-                  <div style={{width:3,height:16,background:"#1a3a6b",borderRadius:2}}/>
+              <div style={{padding:"0 24px 24px"}}>
+                <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+                  <div style={{width:4,height:18,background:"#F47B20",borderRadius:2}}/>
                   Requisitos del Prestador
                 </div>
-                <div style={{fontSize:13,color:"#444",lineHeight:2.2}}>
+                <div style={{fontSize:13,color:"#444",display:"flex",flexDirection:"column",gap:8}}>
                   {campana.propuesta_requisitos.split("\n").filter(Boolean).map((r,i)=>(
                     <div key={i} style={{display:"flex",alignItems:"flex-start",gap:8}}>
-                      <span style={{color:"#F47B20",fontWeight:700,flexShrink:0}}>✓</span>
+                      <span style={{color:"#27ae60",fontWeight:700,flexShrink:0,marginTop:1}}>✓</span>
                       <span>{r}</span>
                     </div>
                   ))}
@@ -3716,7 +3722,7 @@ function ViewPropuesta() {
             )}
 
             {campana.propuesta_notas&&(
-              <div style={{padding:"0 24px 20px"}}>
+              <div style={{padding:"0 24px 24px"}}>
                 <div style={{background:"#f0f9ff",borderRadius:10,padding:"12px 16px",border:"1px solid #bae6fd",fontSize:12,color:"#0369a1"}}>
                   <strong>📌 Nota:</strong> {campana.propuesta_notas}
                 </div>
