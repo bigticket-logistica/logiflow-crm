@@ -3167,7 +3167,7 @@ function ViewOnboarding({ lead, onVolver }) {
       if (!formMX.url_rfc) nuevosErrores.url_rfc = "Debes adjuntar tu RFC";
       if (!formMX.url_vehiculo) nuevosErrores.url_vehiculo = "Debes adjuntar una foto de tu vehículo";
       if (!formMX.email?.trim()) nuevosErrores.email = "Campo obligatorio";
-      if (!formMX.colonia?.trim()) nuevosErrores.colonia = "Campo obligatorio";
+      if (!formMX.colonia?.trim()) {}
       if (formMX.puesto !== 'Ayudante') {
         if (!formMX.licencia?.trim()) nuevosErrores.licencia = "Campo obligatorio";
         if (!formMX.url_licencia) nuevosErrores.url_licencia = "Debes adjuntar tu licencia";
@@ -3388,7 +3388,7 @@ function ViewOnboarding({ lead, onVolver }) {
             <div className="two-col">
               <SelectField errores={errores} setErrores={setErrores} label="Localidad (SVC)" campo="localidad" opciones={ESTADOS_MEXICO}
                 value={formMX.localidad} onChange={v => updMX("localidad", v)} />
-              <TextField errores={errores} setErrores={setErrores} label="Colonia" campo="colonia" value={formMX.colonia} onChange={v => updMX("colonia", v)} placeholder="Tu colonia" required />
+              <TextField errores={errores} setErrores={setErrores} label="Colonia" campo="colonia" value={formMX.colonia} onChange={v => updMX("colonia", v)} placeholder="Tu colonia" />
             </div>
 
             <div style={{ marginTop: 8, padding: "12px 14px", background: "#f8f9fa", borderRadius: 10, marginBottom: 8 }}>
