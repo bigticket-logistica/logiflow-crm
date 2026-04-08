@@ -1316,7 +1316,7 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
       {editandoCampana&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:200,overflowY:"auto",padding:"20px 16px"}}>
           <div style={{maxWidth:640,margin:"0 auto",background:"#fff",borderRadius:16,overflow:"hidden",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-            <div style={{background:"#1a3a6b",padding:"16px 24px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div style={{background:"#0d1b2a",padding:"16px 24px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
               <div>
                 <div style={{color:"#F47B20",fontSize:11,fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Editar campaña</div>
                 <div style={{color:"#fff",fontSize:16,fontWeight:700,marginTop:2}}>{editandoCampana.nombre}</div>
@@ -1418,7 +1418,7 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:200,overflowY:"auto",padding:"20px 16px"}}>
           <div style={{maxWidth:680,margin:"0 auto",background:"#fff",borderRadius:16,overflow:"hidden",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
             {/* Header con logo */}
-            <div style={{background:"#1a3a6b",padding:"14px 24px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div style={{background:"#0d1b2a",padding:"14px 24px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
               <img src="https://psvdtgjvognbmxfvqbaa.supabase.co/storage/v1/object/public/assets/LOGO%20ENCUESTA%20Y%20PROPUESTA.png"
                 alt="Bigticket" style={{height:34,objectFit:"contain"}}/>
               <div style={{display:"flex",alignItems:"center",gap:12}}>
@@ -1556,7 +1556,7 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
       {editandoPropuesta&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:200,overflowY:"auto",padding:"20px 16px"}}>
           <div style={{maxWidth:680,margin:"0 auto",background:"#fff",borderRadius:16,overflow:"hidden",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-            <div style={{background:"#1a3a6b",padding:"16px 24px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div style={{background:"#0d1b2a",padding:"16px 24px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
               <div>
                 <div style={{color:"#F47B20",fontSize:11,fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Editar propuesta económica</div>
                 <div style={{color:"#fff",fontSize:16,fontWeight:700,marginTop:2}}>{editandoPropuesta.nombre}</div>
@@ -2028,7 +2028,7 @@ function FeedbackForm({ onVolver }) {
   return(
     <div style={{maxWidth:560,margin:"0 auto",padding:"0 0 40px"}}>
       {/* Header con logo */}
-      <div style={{background:"#1a3a6b",padding:"16px 24px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+      <div style={{background:"#0d1b2a",padding:"16px 24px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <img src={LOGO} alt="Bigticket" style={{height:40,objectFit:"contain"}}/>
         <span style={{color:"#fff",fontSize:12,fontWeight:600,letterSpacing:1,textTransform:"uppercase"}}>Feedback de Innovación</span>
       </div>
@@ -3615,7 +3615,7 @@ function ViewPropuesta() {
   return(
     <div style={{background:"#f5f5f5",minHeight:"100vh"}}>
       {/* Header */}
-      <div style={{background:"#1a3a6b",padding:"14px 24px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+      <div style={{background:"#0d1b2a",padding:"14px 24px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <img src={LOGO} alt="Bigticket" style={{height:38,objectFit:"contain"}}/>
         <span style={{color:"#fff",fontSize:12,fontWeight:600,letterSpacing:1,textTransform:"uppercase"}}>Vista del Conductor</span>
       </div>
