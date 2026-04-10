@@ -37,6 +37,30 @@ function getCanal() {
   if (typeof window === "undefined") return "portal";
   return new URLSearchParams(window.location.search).get("canal") || "portal";
 }
+
+function getFingerprint() {
+  const nav = window.navigator;
+  const screen = window.screen;
+  const str = [
+    nav.language, nav.platform, nav.hardwareConcurrency,
+    screen.width, screen.height, screen.colorDepth,
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+  ].join("|");
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+
+async function registrarVisita(canal) {
+  if (canal === "portal") return; // no registrar visitas directas sin canal
+  try {
+    const fingerprint = getFingerprint();
+    await sb.from("canal_visitas").insert({ canal, fingerprint });
+  } catch(_) {}
+}
 function isCampActive(c) {
   if (!c.toggle_activo) return false;
   const now = new Date(); now.setHours(0,0,0,0);
@@ -341,7 +365,7 @@ function ViewCountry({ onSelect, busquedaCodigo, setBusquedaCodigo, buscarPostul
         </div>
         <div style={{background:"#eef2ff",border:"1px solid #c7d7f9",borderRadius:14,padding:"20px 20px"}}>
           <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:4}}>📋 Formulario de incorporación</div>
-          <div style={{fontSize:12,color:"#555",marginBottom:14}}>¿Tu propuesta fue aceptada? Completa tu formulario de incorporación a BigTicket</div>
+          <div style={{fontSize:12,color:"#555",marginBottom:14}}>¿Tu propuesta fue aceptada? Completa tu formulario de incorporación a Bigticket</div>
           <button onClick={e=>{e.currentTarget.textContent="Cargando...";e.currentTarget.disabled=true;window.location.href="?onboarding=1";}}
             style={{background:"#1a3a6b",color:"#fff",border:"none",borderRadius:8,padding:"10px 18px",fontSize:13,fontWeight:700,cursor:"pointer",width:"100%"}}>
             Completar formulario →
@@ -799,17 +823,17 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
 }
 
 // ─── BIGGI — ASISTENTE VIRTUAL ────────────────────────────────────────────────
-const BIGGI_PROMPT = `Eres Biggy 🚛, el asistente virtual de BigTicket — empresa de logística que conecta conductores independientes con campañas de reparto en Chile y México.
+const BIGGI_PROMPT = `Eres Biggy 🚛, el asistente virtual de Bigticket — empresa de logística que conecta conductores independientes con campañas de reparto en Chile y México.
 
 ## TU PERSONALIDAD
 - Amable, directo y profesional
 - Usas emojis ocasionalmente 🚛😊✅
-- Respondes CUALQUIER pregunta relacionándola siempre con BigTicket
+- Respondes CUALQUIER pregunta relacionándola siempre con Bigticket
 - Nunca dices "no sé" — siempre orientas o derivas al equipo
-- Si te preguntan algo no relacionado con BigTicket, redirige amablemente
+- Si te preguntan algo no relacionado con Bigticket, redirige amablemente
 
 ## ¿QUÉ ES BIGTICKET?
-BigTicket es una empresa de logística de última milla que conecta conductores independientes (terceros) con campañas de reparto para grandes clientes como Mercado Libre, Amazon y otros. Operamos en Chile y México.
+Bigticket es una empresa de logística de última milla que conecta conductores independientes (terceros) con campañas de reparto para grandes clientes como Mercado Libre, Amazon y otros. Operamos en Chile y México.
 
 ## VEHÍCULOS Y CAPACIDADES
 - Auto / Car: Hasta 1,9 m³
@@ -829,8 +853,8 @@ BigTicket es una empresa de logística de última milla que conecta conductores 
 - Frecuencia: semanal cada viernes
 - México: transferencia bancaria previa emisión de CFDI
 - Chile: requiere factura electrónica o boleta
-- Realizar certificación BigTicket para no tener problemas con el pago
-- BigTicket puede retener el pago si no se acredita cumplimiento de obligaciones laborales, fiscales y de seguridad social
+- Realizar certificación Bigticket para no tener problemas con el pago
+- Bigticket puede retener el pago si no se acredita cumplimiento de obligaciones laborales, fiscales y de seguridad social
 
 ## CEDIS MÉXICO
 - SQR1 Querétaro: Prol. Av. Zaragoza 61, La Capilla, 76170 Santiago de Querétaro, Qro. Devoluciones hasta las 22:00 hrs.
@@ -860,7 +884,7 @@ BigTicket es una empresa de logística de última milla que conecta conductores 
 - Vigencia inicial: 12 meses, condicionada al cumplimiento de niveles de servicio
 - Modalidades: Apoyo (demanda puntual), Planta (ruta fija estable), Temporada (período específico)
 - Prestación de servicios como tercero independiente (no relación laboral)
-- BigTicket puede rotar operadores entre zonas según necesidades operativas
+- Bigticket puede rotar operadores entre zonas según necesidades operativas
 
 ## PROCESO PARA EMPEZAR
 1. Postulas en el portal: https://bigticket-portal.vercel.app
@@ -875,8 +899,8 @@ Período de trabajo con cliente específico. Tiene fechas, zona, tipo de vehícu
 
 ## INCIDENTES Y SEGURO
 - Reportar inmediatamente al coordinador ante cualquier incidente
-- BigTicket exige seguro de responsabilidad civil propio del conductor
-- BigTicket cubre las mercancías transportadas
+- Bigticket exige seguro de responsabilidad civil propio del conductor
+- Bigticket cubre las mercancías transportadas
 
 ## REGLAS
 - Si no sabes algo → "Para más detalles: +56957730804"
@@ -884,13 +908,13 @@ Período de trabajo con cliente específico. Tiene fechas, zona, tipo de vehícu
 - Siempre lleva al portal: https://bigticket-portal.vercel.app
 - No inventes información fuera de este prompt
 - Máximo 4 líneas por respuesta salvo cuando el usuario pide detalle
-- Si preguntan algo no relacionado con BigTicket: "Mi especialidad es todo lo de BigTicket 🚛 ¿Tienes dudas sobre cómo trabajar con nosotros?"`;
+- Si preguntan algo no relacionado con Bigticket: "Mi especialidad es todo lo de Bigticket 🚛 ¿Tienes dudas sobre cómo trabajar con nosotros?"`;
 
 
 
 function BiggiBubble({ paginaPrincipal=false }) {
   const [abierto,setAbierto]=useState(false);
-  const [mensajes,setMensajes]=useState([{rol:"biggi",texto:"¡Hola! Soy Biggy 🚛 el asistente virtual de BigTicket. ¿En qué puedo ayudarte hoy?"}]);
+  const [mensajes,setMensajes]=useState([{rol:"biggi",texto:"¡Hola! Soy Biggy 🚛 el asistente virtual de Bigticket. ¿En qué puedo ayudarte hoy?"}]);
   const [input,setInput]=useState("");
   const [cargando,setCargando]=useState(false);
   const endRef=useRef(null);
@@ -1026,7 +1050,7 @@ function BiggiBubble({ paginaPrincipal=false }) {
             </div>
             <div>
               <div style={{color:"#fff",fontSize:13,fontWeight:700}}>Biggy</div>
-              <div style={{color:"#aac3e8",fontSize:11}}>Asistente Virtual BigTicket</div>
+              <div style={{color:"#aac3e8",fontSize:11}}>Asistente Virtual Bigticket</div>
             </div>
           </div>
           <div style={{background:"#F47B20",color:"#fff",borderRadius:20,padding:"7px 16px",fontSize:12,fontWeight:700,whiteSpace:"nowrap"}}>
@@ -1043,7 +1067,7 @@ function BiggiBubble({ paginaPrincipal=false }) {
             <BiggiFace size={48}/>
             <div style={{flex:1}}>
               <div style={{color:"#fff",fontSize:14,fontWeight:700}}>Biggy</div>
-              <div style={{color:"#aac3e8",fontSize:11}}>Asistente Virtual BigTicket</div>
+              <div style={{color:"#aac3e8",fontSize:11}}>Asistente Virtual Bigticket</div>
             </div>
             <button onClick={()=>setAbierto(false)} style={{background:"rgba(255,255,255,0.15)",border:"none",color:"#fff",borderRadius:"50%",width:28,height:28,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
           </div>
@@ -1185,7 +1209,7 @@ function AdminLogin({ onSuccess, onClose }) {
           </div>
         </div>
         <div style={{fontSize:16,fontWeight:600,color:"#1a1a1a",marginBottom:6,textAlign:"center"}}>Acceso administrador</div>
-        <div style={{fontSize:13,color:"#888",textAlign:"center",marginBottom:24}}>Solo para personal autorizado BigTicket</div>
+        <div style={{fontSize:13,color:"#888",textAlign:"center",marginBottom:24}}>Solo para personal autorizado Bigticket</div>
         {error&&<div className="login-error">{error}</div>}
         <div className="field-row">
           <span className="field-label">Clave de acceso</span>
@@ -1211,6 +1235,7 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
   const [editandoPropuesta,setEditandoPropuesta]=useState(null); // campana completa
   const [previewPropuesta,setPreviewPropuesta]=useState(null); // campana completa
   const [editandoCampana,setEditandoCampana]=useState(null);
+  const [verScoring,setVerScoring]=useState(null);
 
   const guardarCampana = async () => {
     if(!editandoCampana) return;
@@ -1312,6 +1337,16 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
 
   return (
     <div>
+      {/* Modal Scoring */}
+      {verScoring&&(
+        <ModalScoring campana={verScoring} onClose={()=>setVerScoring(null)}
+          onGuardar={(campanaActualizada)=>{
+            setCampaigns(campaigns.map(c=>c.id===campanaActualizada.id?campanaActualizada:c));
+            setVerScoring(campanaActualizada);
+          }}
+        />
+      )}
+
       {/* Modal Editar Campaña */}
       {editandoCampana&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:200,overflowY:"auto",padding:"20px 16px"}}>
@@ -1643,7 +1678,7 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
       <div style={{background:"#1a3a6b",padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <div>
           <div style={{color:"#fff",fontSize:15,fontWeight:600}}>Panel administrador</div>
-          <div style={{color:"#aac3e8",fontSize:12}}>BigTicket — Gestión de campañas</div>
+          <div style={{color:"#aac3e8",fontSize:12}}>Bigticket — Gestión de campañas</div>
         </div>
         <button className="btn-gw" onClick={onClose}>Ver portal →</button>
       </div>
@@ -1673,6 +1708,10 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
                         <button onClick={()=>setEditandoCampana({...c})}
                           style={{fontSize:11,padding:"4px 10px",borderRadius:6,border:"1px solid #bfdbfe",background:"#eff6ff",color:"#1d4ed8",cursor:"pointer",fontFamily:"'Geist',sans-serif",fontWeight:600}}>
                           ✏️ Editar
+                        </button>
+                        <button onClick={()=>setVerScoring(c)}
+                          style={{fontSize:11,padding:"4px 10px",borderRadius:6,border:"1px solid #d8b4fe",background:"#faf5ff",color:"#7c3aed",cursor:"pointer",fontFamily:"'Geist',sans-serif",fontWeight:600}}>
+                          ⭐ Scoring
                         </button>
                         <button className="btn-danger" onClick={()=>deleteCamp(c.id)}>Eliminar</button>
                       </div>
@@ -2243,6 +2282,179 @@ function FeedbackAdmin() {
   );
 }
 
+function ModalScoring({ campana, onClose, onGuardar }) {
+  const [vars, setVars] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [guardando, setGuardando] = useState(false);
+  const [scoreFields, setScoreFields] = useState([]);
+  const [modo, setModo] = useState("ver"); // ver | editar
+
+  useEffect(()=>{ cargarVars(); },[campana.id]);
+
+  const cargarVars = async () => {
+    setLoading(true);
+    const {data} = await sb.from("campana_variables").select("*").eq("campana_id", campana.id).order("orden");
+    setVars(data||[]);
+    // Convertir a formato scoreFields
+    if(data&&data.length>0) {
+      setScoreFields(data.map(v=>({
+        _id: v.id,
+        id: v.id,
+        variable: v.variable,
+        pregunta: v.pregunta,
+        tipo: v.tipo,
+        opciones: typeof v.opciones === "string" ? JSON.parse(v.opciones) : (v.opciones||[]),
+        puntos: v.puntos,
+        orden: v.orden,
+      })));
+    } else {
+      setScoreFields([newField()]);
+    }
+    setLoading(false);
+  };
+
+  const guardar = async () => {
+    setGuardando(true);
+    try {
+      // Eliminar variables existentes
+      await sb.from("campana_variables").delete().eq("campana_id", campana.id);
+      // Insertar nuevas
+      const valid = scoreFields.filter(sf=>sf.variable&&sf.pregunta);
+      if(valid.length > 0) {
+        const toInsert = valid.map((sf,i)=>({
+          campana_id: campana.id,
+          variable: sf.variable,
+          pregunta: sf.pregunta,
+          tipo: sf.tipo,
+          opciones: JSON.stringify(sf.opciones),
+          puntos: maxScoreField(sf),
+          orden: i,
+        }));
+        await sb.from("campana_variables").insert(toInsert);
+      }
+      const scoreMax = valid.reduce((s,sf)=>s+maxScoreField(sf),0);
+      await sb.from("campanas").update({score_max:scoreMax}).eq("id",campana.id);
+      onGuardar({...campana, score_max:scoreMax});
+      alert("✅ Scoring guardado correctamente");
+      setModo("ver");
+      cargarVars();
+    } catch(e){alert("Error: "+e.message);}
+    finally{setGuardando(false);}
+  };
+
+  const usedVars = scoreFields.map(sf=>sf.variable).filter(Boolean);
+  const total = scoreFields.reduce((s,sf)=>s+maxScoreField(sf),0);
+  const scoreColor = total>100?"#c0392b":total>=80?"#e65100":"#166534";
+
+  const TIPO_LABEL = {sino:"Sí/No",escala:"Escala",seleccion:"Selección",texto:"Texto"};
+  const TIPO_COLOR = {sino:"#e8eef8",escala:"#fff3e0",seleccion:"#e8f5e9",texto:"#f3e8ff"};
+  const TIPO_TEXT  = {sino:"#1a3a6b",escala:"#e65100",seleccion:"#1b5e20",texto:"#4a1080"};
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:200,overflowY:"auto",padding:"20px 16px"}}>
+      <div style={{maxWidth:700,margin:"0 auto",background:"#fff",borderRadius:16,overflow:"hidden",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+        {/* Header */}
+        <div style={{background:"#1a3a6b",padding:"16px 24px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div>
+            <div style={{color:"#F47B20",fontSize:11,fontWeight:700,letterSpacing:1,textTransform:"uppercase"}}>Modelo de puntuación</div>
+            <div style={{color:"#fff",fontSize:16,fontWeight:700,marginTop:2}}>{campana.nombre}</div>
+          </div>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            {modo==="ver"&&(
+              <button onClick={()=>setModo("editar")}
+                style={{fontSize:12,padding:"6px 14px",borderRadius:8,border:"1px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.1)",color:"#fff",cursor:"pointer",fontFamily:"'Geist',sans-serif"}}>
+                ✏️ Editar scoring
+              </button>
+            )}
+            <button onClick={onClose}
+              style={{background:"rgba(255,255,255,0.15)",border:"none",color:"#fff",borderRadius:"50%",width:32,height:32,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+          </div>
+        </div>
+
+        <div style={{padding:"20px 24px",overflowY:"auto",maxHeight:"70vh"}}>
+          {loading ? <div style={{textAlign:"center",padding:40,color:"#888"}}>Cargando...</div> :
+
+          modo === "ver" ? (
+            // Vista de preguntas
+            <>
+              {vars.length === 0 ? (
+                <div style={{textAlign:"center",padding:40,color:"#888"}}>
+                  <div style={{fontSize:32,marginBottom:12}}>⭐</div>
+                  <div style={{fontWeight:600,marginBottom:8}}>Sin preguntas de scoring</div>
+                  <div style={{fontSize:12}}>Haz click en "Editar scoring" para agregar preguntas</div>
+                </div>
+              ) : vars.map((v,i)=>{
+                const opts = typeof v.opciones === "string" ? JSON.parse(v.opciones||"[]") : (v.opciones||[]);
+                return (
+                  <div key={v.id} style={{background:"#f8f9fa",borderRadius:10,padding:"14px 16px",marginBottom:10,border:"0.5px solid #e4e7ec"}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontSize:11,fontWeight:700,color:"#888"}}>#{i+1}</span>
+                        <span style={{fontSize:13,fontWeight:700,color:"#1a1a1a"}}>{v.variable}</span>
+                        <span style={{fontSize:10,padding:"2px 8px",borderRadius:20,background:TIPO_COLOR[v.tipo],color:TIPO_TEXT[v.tipo],fontWeight:600}}>{TIPO_LABEL[v.tipo]}</span>
+                      </div>
+                      <span style={{fontSize:13,fontWeight:700,color:scoreColor}}>{v.puntos} pts</span>
+                    </div>
+                    <div style={{fontSize:12,color:"#555",marginBottom:8}}>📝 {v.pregunta}</div>
+                    {opts.length>0 && v.tipo !== "texto" && (
+                      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                        {opts.map((o,j)=>(
+                          <div key={j} style={{fontSize:11,padding:"3px 10px",borderRadius:20,background:"#fff",border:"0.5px solid #e4e7ec",display:"flex",gap:6,alignItems:"center"}}>
+                            <span>{o.valor}</span>
+                            <span style={{fontWeight:700,color:o.puntos>0?"#166534":"#888"}}>→ {o.puntos}pts</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {vars.length>0 && (
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"#eef2ff",borderRadius:10,padding:"10px 14px",marginTop:4}}>
+                  <span style={{fontSize:13,fontWeight:600,color:scoreColor}}>Score máximo posible</span>
+                  <span style={{fontSize:20,fontWeight:700,color:scoreColor}}>{campana.score_max} pts</span>
+                </div>
+              )}
+            </>
+          ) : (
+            // Editor de preguntas
+            <>
+              <div style={{fontSize:12,color:"#666",marginBottom:14}}>Define cada pregunta, tipo y puntos. El postulante no ve los puntajes.</div>
+              {scoreFields.map((sf,idx)=>(
+                <ScoreFieldBuilder key={sf._id} field={sf}
+                  onUpdate={updated=>setScoreFields(scoreFields.map((x,i)=>i===idx?updated:x))}
+                  onRemove={()=>setScoreFields(scoreFields.filter((_,i)=>i!==idx))}
+                  usedVariables={usedVars.filter(v=>v!==sf.variable)}
+                />
+              ))}
+              <button className="add-opt-btn" style={{width:"100%",padding:"9px",marginTop:4}} onClick={()=>setScoreFields([...scoreFields,newField()])}>
+                + Agregar pregunta de scoring
+              </button>
+              {total>100&&<div style={{fontSize:12,color:"#c0392b",marginTop:8}}>El score supera 100 puntos. Considera ajustar los valores.</div>}
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"#eef2ff",borderRadius:10,padding:"10px 14px",marginTop:12}}>
+                <span style={{fontSize:13,fontWeight:600,color:scoreColor}}>Score máximo posible</span>
+                <span style={{fontSize:20,fontWeight:700,color:scoreColor}}>{total} pts</span>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div style={{padding:"12px 24px",borderTop:"1px solid #e4e7ec",background:"#f8f9fa",display:"flex",gap:10}}>
+          <button onClick={()=>modo==="editar"?setModo("ver"):onClose()}
+            style={{flex:1,background:"#f4f5f7",border:"none",borderRadius:10,padding:"11px",fontSize:13,cursor:"pointer",fontFamily:"'Geist',sans-serif"}}>
+            {modo==="editar"?"Cancelar":"Cerrar"}
+          </button>
+          {modo==="editar"&&(
+            <button onClick={guardar} disabled={guardando} className="btn-blue" style={{flex:2}}>
+              {guardando?"Guardando...":"💾 Guardar scoring"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CentrosMxAdmin() {
   const CENTROS_DEFAULT = [
     "SMX1 San Jerónimo Tepetlacalco","SMX2 Complejo Industrial Tecnológico/Iztapalapa",
@@ -2641,37 +2853,174 @@ function VehiculosVerificacion() {
 }
 
 function CanalesView({ postulaciones, onLoad }) {
-  useEffect(()=>{onLoad();},[]);
+  const [visitas, setVisitas] = useState([]);
+  const [loadingV, setLoadingV] = useState(true);
+  const [filtroCanal, setFiltroCanal] = useState("facebook");
+
+  useEffect(()=>{
+    onLoad();
+    cargarVisitas();
+  },[]);
+
+  const cargarVisitas = async () => {
+    setLoadingV(true);
+    const {data} = await sb.from("canal_visitas").select("*").order("created_at",{ascending:false});
+    setVisitas(data||[]);
+    setLoadingV(false);
+  };
+
   const stats={};
   postulaciones.forEach(p=>{stats[p.canal]=(stats[p.canal]||0)+1;});
   const total=postulaciones.length;
+
+  // Stats de visitas por canal
+  const visitasPorCanal = {};
+  const visitasUnicasPorCanal = {};
+  visitas.forEach(v => {
+    visitasPorCanal[v.canal] = (visitasPorCanal[v.canal]||0) + 1;
+    if (!visitasUnicasPorCanal[v.canal]) visitasUnicasPorCanal[v.canal] = new Set();
+    if (v.fingerprint) visitasUnicasPorCanal[v.canal].add(v.fingerprint);
+  });
+
+  // Visitas del canal seleccionado por día/hora
+  const visitasFiltradas = visitas.filter(v => v.canal === filtroCanal);
+  const porDia = {};
+  const porHora = {};
+  visitasFiltradas.forEach(v => {
+    const d = new Date(v.created_at);
+    const dia = d.toLocaleDateString("es-CL",{weekday:"short",day:"numeric",month:"short"});
+    const hora = `${d.getHours()}:00`;
+    porDia[dia] = (porDia[dia]||0) + 1;
+    porHora[hora] = (porHora[hora]||0) + 1;
+  });
+  const maxDia = Math.max(...Object.values(porDia), 1);
+  const maxHora = Math.max(...Object.values(porHora), 1);
+
+  const copiarURL = (canal) => {
+    navigator.clipboard.writeText(`https://bigticket-portal.vercel.app?canal=${canal}`);
+    alert("✅ URL copiada al portapapeles");
+  };
+
   return (
     <div>
       <div className="sec-title" style={{marginBottom:4}}>Análisis de canales</div>
-      <div className="sec-sub">Origen de todas las postulaciones recibidas</div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:12,marginBottom:28}}>
-        {Object.entries(CANALES).map(([k,c])=>{
-          const count=stats[k]||0;const pct=total?Math.round(count/total*100):0;
-          return (
-            <div key={k} className="stat-card">
-              <div style={{width:36,height:36,borderRadius:"50%",background:c.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:600,color:"#fff",margin:"0 auto 8px"}}>{c.initial}</div>
-              <div style={{fontSize:13,fontWeight:600,color:"#1a1a1a"}}>{c.label}</div>
-              <div className="stat-val">{count}</div>
-              <div className="stat-label">{pct}% del total</div>
-            </div>
-          );
-        })}
+      <div className="sec-sub">Visitas y postulaciones por canal de captación</div>
+
+      {/* Tabla comparativa canales */}
+      <div className="form-card" style={{marginBottom:20}}>
+        <div className="form-title">Resumen por canal</div>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+            <thead>
+              <tr style={{background:"#1a3a6b",color:"#fff"}}>
+                {["Canal","Visitas totales","Visitas únicas","Postulaciones","Conversión",""].map(h=>(
+                  <th key={h} style={{padding:"10px 14px",textAlign:"left",fontWeight:600,whiteSpace:"nowrap"}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(CANALES).filter(([k])=>k!=="portal").map(([k,c],i)=>{
+                const vTotal = visitasPorCanal[k]||0;
+                const vUnicas = visitasUnicasPorCanal[k]?.size||0;
+                const posts = stats[k]||0;
+                const conv = vTotal ? Math.round(posts/vTotal*100) : 0;
+                return (
+                  <tr key={k} style={{background:i%2===0?"#f8f9fa":"#fff",borderBottom:"1px solid #e4e7ec"}}>
+                    <td style={{padding:"10px 14px"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <div style={{width:28,height:28,borderRadius:"50%",background:c.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:600,color:"#fff",flexShrink:0}}>{c.initial}</div>
+                        <span style={{fontWeight:600}}>{c.label}</span>
+                      </div>
+                    </td>
+                    <td style={{padding:"10px 14px",fontWeight:700,color:"#1a3a6b",fontSize:16}}>{vTotal}</td>
+                    <td style={{padding:"10px 14px",color:"#555"}}>{vUnicas}</td>
+                    <td style={{padding:"10px 14px",fontWeight:600}}>{posts}</td>
+                    <td style={{padding:"10px 14px"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <div style={{width:60,height:6,background:"#f0f0f0",borderRadius:3}}>
+                          <div style={{width:`${Math.min(conv,100)}%`,height:"100%",background:conv>=20?"#10B981":conv>=10?"#F59E0B":"#EF4444",borderRadius:3}}/>
+                        </div>
+                        <span style={{fontSize:12,fontWeight:600,color:conv>=20?"#166534":conv>=10?"#92400e":"#c0392b"}}>{conv}%</span>
+                      </div>
+                    </td>
+                    <td style={{padding:"10px 14px"}}>
+                      <button onClick={()=>setFiltroCanal(k)}
+                        style={{fontSize:11,padding:"4px 10px",borderRadius:6,border:`1px solid ${filtroCanal===k?"#1a3a6b":"#e4e7ec"}`,
+                          background:filtroCanal===k?"#1a3a6b":"#fff",color:filtroCanal===k?"#fff":"#555",
+                          cursor:"pointer",fontFamily:"'Geist',sans-serif"}}>
+                        Ver detalle
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
+
+      {/* Detalle del canal seleccionado */}
+      {filtroCanal && (
+        <div className="form-card" style={{marginBottom:20}}>
+          <div className="form-title" style={{display:"flex",alignItems:"center",gap:8}}>
+            <div style={{width:24,height:24,borderRadius:"50%",background:CANALES[filtroCanal]?.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:600,color:"#fff"}}>{CANALES[filtroCanal]?.initial}</div>
+            {CANALES[filtroCanal]?.label} — Detalle de visitas
+          </div>
+
+          {visitasFiltradas.length === 0 ? (
+            <div style={{textAlign:"center",padding:"20px",color:"#888",fontSize:13}}>Sin visitas registradas aún para este canal</div>
+          ) : (
+            <div className="two-col">
+              {/* Por día */}
+              <div>
+                <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:10}}>Visitas por día (últimas 30)</div>
+                {Object.entries(porDia).slice(-10).map(([dia,n])=>(
+                  <div key={dia} style={{marginBottom:6}}>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:2}}>
+                      <span style={{color:"#555"}}>{dia}</span>
+                      <span style={{fontWeight:700,color:"#1a3a6b"}}>{n}</span>
+                    </div>
+                    <div style={{height:5,background:"#f0f0f0",borderRadius:3}}>
+                      <div style={{width:`${(n/maxDia)*100}%`,height:"100%",background:"#1a3a6b",borderRadius:3}}/>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Por hora */}
+              <div>
+                <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:10}}>Visitas por hora del día</div>
+                {Array.from({length:24},(_,h)=>`${h}:00`).filter(h=>porHora[h]).map(hora=>(
+                  <div key={hora} style={{marginBottom:6}}>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:2}}>
+                      <span style={{color:"#555"}}>{hora}</span>
+                      <span style={{fontWeight:700,color:"#F47B20"}}>{porHora[hora]||0}</span>
+                    </div>
+                    <div style={{height:5,background:"#f0f0f0",borderRadius:3}}>
+                      <div style={{width:`${((porHora[hora]||0)/maxHora)*100}%`,height:"100%",background:"#F47B20",borderRadius:3}}/>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* URLs de captación */}
       <div className="form-card">
         <div className="form-title">URLs de captación por canal</div>
-        <div style={{fontSize:12,color:"#666",marginBottom:12}}>Comparte estas URLs para rastrear el origen automáticamente</div>
-        {Object.entries(CANALES).map(([k,c])=>(
+        <div style={{fontSize:12,color:"#666",marginBottom:12}}>Comparte estas URLs — cada visita queda registrada automáticamente</div>
+        {Object.entries(CANALES).filter(([k])=>k!=="portal").map(([k,c])=>(
           <div key={k} className="url-row">
             <div style={{width:24,height:24,borderRadius:"50%",background:c.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff",flexShrink:0}}>{c.initial}</div>
-            <div>
+            <div style={{flex:1}}>
               <div style={{fontSize:12,fontWeight:600,color:"#1a1a1a"}}>{c.label}</div>
               <div className="url-text">https://bigticket-portal.vercel.app?canal={k}</div>
             </div>
+            <button onClick={()=>copiarURL(k)}
+              style={{fontSize:11,padding:"4px 10px",borderRadius:6,border:"1px solid #e4e7ec",background:"#fff",cursor:"pointer",fontFamily:"'Geist',sans-serif",whiteSpace:"nowrap"}}>
+              📋 Copiar
+            </button>
           </div>
         ))}
       </div>
@@ -2773,7 +3122,7 @@ function OnboardingLogin({ onIngresar, onVolver }) {
       .single();
     if(e||!data){setError("Código no encontrado. Verifica tus datos.");setCargando(false);return;}
     if(!["Propuesta Aceptada","Contrato Firmado","Contrato No Firmado","Onboarding Pendiente","Entrevistas y Validaciones","Postulante Aprobado","Postulante No Calificado"].includes(data.etapa)){
-      setError(`Tu postulación está en etapa "${data.etapa}". El formulario de incorporación se habilitará cuando el equipo BigTicket te lo indique.`);setCargando(false);return;}
+      setError(`Tu postulación está en etapa "${data.etapa}". El formulario de incorporación se habilitará cuando el equipo Bigticket te lo indique.`);setCargando(false);return;}
     setLeadParcial(data);
     setPaso(2);
     setCargando(false);
@@ -3512,7 +3861,7 @@ function ViewOnboarding({ lead, onVolver }) {
             <span style={{ fontSize: 13, color: "#555", lineHeight: 1.5 }}>
               Acepto las <button onClick={e => { e.preventDefault(); setShowPrivacidad(true); }}
                 style={{ background: "none", border: "none", color: "#1a3a6b", fontWeight: 700, cursor: "pointer", fontSize: 13, padding: 0, textDecoration: "underline" }}>
-                Políticas de Privacidad</button> de BigTicket
+                Políticas de Privacidad</button> de Bigticket
             </span>
           </label>
 
@@ -3530,13 +3879,13 @@ function ViewOnboarding({ lead, onVolver }) {
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 500 }}>
             <div style={{ background: "#fff", borderRadius: 14, width: 560, maxHeight: "80vh", display: "flex", flexDirection: "column" }}>
               <div style={{ padding: "16px 20px", borderBottom: "1px solid #e4e7ec", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ fontSize: 15, fontWeight: 700 }}>Políticas de Privacidad — BigTicket</div>
+                <div style={{ fontSize: 15, fontWeight: 700 }}>Políticas de Privacidad — Bigticket</div>
                 <button onClick={() => setShowPrivacidad(false)} style={{ background: "#f0f2f5", border: "none", borderRadius: 6, width: 28, height: 28, cursor: "pointer", fontSize: 16 }}>×</button>
               </div>
               <div style={{ padding: "16px 20px", overflow: "auto", fontSize: 13, color: "#555", lineHeight: 1.7 }}>
-                <p style={{ marginBottom: 12 }}>Conforme a lo dispuesto en el artículo 19 N° 4 de la Constitución Política de la República y a las normas pertinentes de la Ley N° 19.628 sobre protección de la vida privada, el tratamiento de datos personales que se realiza en BigTicket se rige por las siguientes reglas:</p>
+                <p style={{ marginBottom: 12 }}>Conforme a lo dispuesto en el artículo 19 N° 4 de la Constitución Política de la República y a las normas pertinentes de la Ley N° 19.628 sobre protección de la vida privada, el tratamiento de datos personales que se realiza en Bigticket se rige por las siguientes reglas:</p>
                 <ul style={{ paddingLeft: 20, marginBottom: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-                  <li>BigTicket asegura la confidencialidad de los datos personales de los usuarios.</li>
+                  <li>Bigticket asegura la confidencialidad de los datos personales de los usuarios.</li>
                   <li>Los datos serán utilizados para el cumplimiento de los fines indicados en el formulario.</li>
                   <li>El usuario podrá ejercer los derechos otorgados por la Ley N° 19.628 en cualquier momento.</li>
                 </ul>
@@ -3834,6 +4183,8 @@ export default function App() {
   const [adminAuth,setAdminAuth]=useState(!!sessionStorage.getItem("admin_auth"));
   const [successCodigo,setSuccessCodigo]=useState(null);
   const [busquedaCodigo,setBusquedaCodigo]=useState("");
+
+  useEffect(()=>{ registrarVisita(canal); },[]);
   const [resultadoBusqueda,setResultadoBusqueda]=useState(null);
   const [buscando,setBuscando]=useState(false);
   const [errorBusqueda,setErrorBusqueda]=useState("");
