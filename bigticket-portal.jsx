@@ -185,6 +185,8 @@ const css = `
     .pg-form{padding-bottom:80px!important;}
     .biggy-fab{display:none!important;}
     .biggy-bar{display:flex!important;}
+    .tarifas-mobile{display:block!important;}
+    .tarifas-desktop{display:none!important;}
   }
   @media (min-width:601px){
     .biggy-fab{display:flex!important;}
@@ -4076,13 +4078,13 @@ function ViewPropuesta() {
               </div>
               <div style={{background:"#f8f9fa",borderRadius:10,padding:"16px 20px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,border:"0.5px solid #e4e7ec"}}>
                 {[
-                  ["📍","Dirección CEDIS",campana.propuesta_cedis,"#e74c3c"],
-                  ["🕐","Horario de presentación",campana.propuesta_horario,"#F47B20"],
-                  ["📦","Entregas estimadas",campana.propuesta_entregas,"#27ae60"],
-                  ["🗓","Devolución",campana.propuesta_devolucion,"#2980b9"],
-                ].filter(([,,,, ]) => true).map(([ic,l,v,c])=>v&&(
+                  ["📍","Dirección CEDIS",campana.propuesta_cedis],
+                  ["🕐","Horario de presentación",campana.propuesta_horario],
+                  ["📦","Entregas estimadas",campana.propuesta_entregas],
+                  ["🗓","Devolución",campana.propuesta_devolucion],
+                ].filter(([,,v]) => v).map(([ic,l,v])=>(
                   <div key={l}>
-                    <div style={{fontSize:10,color:c||"#888",fontWeight:700,textTransform:"uppercase",marginBottom:4,display:"flex",alignItems:"center",gap:4}}>
+                    <div style={{fontSize:10,color:"#1a1a1a",fontWeight:700,textTransform:"uppercase",marginBottom:4,display:"flex",alignItems:"center",gap:4}}>
                       <span>{ic}</span> {l}
                     </div>
                     <div style={{fontSize:14,fontWeight:700,color:"#1a1a1a"}}>{v}</div>
@@ -4098,23 +4100,40 @@ function ViewPropuesta() {
                   <div style={{width:4,height:18,background:"#F47B20",borderRadius:2}}/>
                   Tarifas por Jornada
                 </div>
-                <div style={{overflowX:"auto",borderRadius:10,overflow:"hidden",border:"0.5px solid #e4e7ec"}}>
-                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+                {/* Tabla en móvil: layout de cards por categoría */}
+                <div style={{display:"none"}} className="tarifas-mobile">
+                  {campana.propuesta_tarifas.map((t,i)=>(
+                    <div key={i} style={{background:i%2===0?"#f8f9fa":"#fff",borderRadius:8,padding:"12px",marginBottom:8,border:"0.5px solid #e4e7ec"}}>
+                      <div style={{fontWeight:700,color:"#1a3a6b",marginBottom:8,fontSize:14}}>{t.categoria}</div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                        {["0-100","101-150","151-200","201-250","251+"].map(k=>t.tramos?.[k]&&(
+                          <div key={k} style={{background:"#fff",borderRadius:6,padding:"6px 8px",border:"0.5px solid #e4e7ec"}}>
+                            <div style={{fontSize:9,color:"#888",fontWeight:600,marginBottom:2}}>{k} km</div>
+                            <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a"}}>$ {t.tramos[k]}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {/* Tabla normal en desktop */}
+                <div className="tarifas-desktop" style={{overflowX:"auto",borderRadius:10,border:"0.5px solid #e4e7ec"}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:400}}>
                     <thead>
                       <tr style={{background:"#1a3a6b",color:"#fff"}}>
-                        <th style={{padding:"11px 16px",textAlign:"left",fontWeight:600}}>Categoría</th>
-                        {["0-100 km","101-150 km","151-200 km","201-250 km","251+ km"].map(h=>(
-                          <th key={h} style={{padding:"11px 10px",textAlign:"center",fontWeight:600,whiteSpace:"nowrap"}}>{h}</th>
+                        <th style={{padding:"9px 12px",textAlign:"left",fontWeight:600,whiteSpace:"nowrap"}}>Categoría</th>
+                        {["0-100","101-150","151-200","201-250","251+"].map(h=>(
+                          <th key={h} style={{padding:"9px 8px",textAlign:"center",fontWeight:600,whiteSpace:"nowrap"}}>{h} km</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {campana.propuesta_tarifas.map((t,i)=>(
                         <tr key={i} style={{background:i%2===0?"#f8f9fa":"#fff",borderBottom:"0.5px solid #e4e7ec"}}>
-                          <td style={{padding:"11px 16px",fontWeight:700,color:"#1a1a1a"}}>{t.categoria}</td>
+                          <td style={{padding:"9px 12px",fontWeight:700,color:"#1a1a1a",whiteSpace:"nowrap"}}>{t.categoria}</td>
                           {["0-100","101-150","151-200","201-250","251+"].map(k=>(
-                            <td key={k} style={{padding:"11px 10px",textAlign:"center",fontWeight:600,color:"#1a1a1a"}}>
-                              {t.tramos?.[k]?`$ ${t.tramos[k]}`:"—"}
+                            <td key={k} style={{padding:"9px 8px",textAlign:"center",fontWeight:600,color:"#1a1a1a",whiteSpace:"nowrap"}}>
+                              {t.tramos?.[k]?`$${t.tramos[k]}`:"—"}
                             </td>
                           ))}
                         </tr>
