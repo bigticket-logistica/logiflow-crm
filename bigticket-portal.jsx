@@ -2969,40 +2969,124 @@ function CanalesView({ postulaciones, onLoad }) {
 
           {visitasFiltradas.length === 0 ? (
             <div style={{textAlign:"center",padding:"20px",color:"#888",fontSize:13}}>Sin visitas registradas aún para este canal</div>
-          ) : (
-            <div className="two-col">
-              {/* Por día */}
+          ) : (()=>{
+            // Calcular insights
+            const diaMayor = Object.entries(porDia).sort((a,b)=>b[1]-a[1])[0];
+            const horaMayor = Object.entries(porHora).sort((a,b)=>b[1]-a[1])[0];
+            const totalVisitas = visitasFiltradas.length;
+            const unicasCanal = visitasUnicasPorCanal[filtroCanal]?.size||0;
+            const retorno = totalVisitas - unicasCanal;
+            const diasEntradas = Object.keys(porDia).length;
+            const promDia = diasEntradas ? (totalVisitas/diasEntradas).toFixed(1) : 0;
+
+            // Gráfico de barras SVG por día
+            const diasArr = Object.entries(porDia).slice(-14);
+            const barW = Math.max(20, Math.min(40, 500/Math.max(diasArr.length,1)));
+            const svgW = diasArr.length * (barW + 6);
+            const svgH = 120;
+
+            // Gráfico de línea por hora
+            const horasArr = Array.from({length:24},(_,h)=>({h:`${h}:00`, n:porHora[`${h}:00`]||0}));
+            const maxH = Math.max(...horasArr.map(x=>x.n),1);
+            const ptsLinea = horasArr.map((x,i)=>`${(i/23)*460},${svgH-20-(x.n/maxH)*(svgH-30)}`).join(" ");
+
+            return (
               <div>
-                <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:10}}>Visitas por día (últimas 30)</div>
-                {Object.entries(porDia).slice(-10).map(([dia,n])=>(
-                  <div key={dia} style={{marginBottom:6}}>
-                    <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:2}}>
-                      <span style={{color:"#555"}}>{dia}</span>
-                      <span style={{fontWeight:700,color:"#1a3a6b"}}>{n}</span>
+                {/* Panel de insights */}
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:10,marginBottom:20}}>
+                  {[
+                    ["Total visitas", totalVisitas, "#1a3a6b"],
+                    ["Visitas únicas", unicasCanal, "#7c3aed"],
+                    ["Revisitas", retorno, "#F47B20"],
+                    ["Prom. por día", promDia, "#0369a1"],
+                  ].map(([l,v,c])=>(
+                    <div key={l} style={{background:"#f8f9fa",borderRadius:10,padding:"12px",textAlign:"center",border:"0.5px solid #e4e7ec"}}>
+                      <div style={{fontSize:22,fontWeight:800,color:c}}>{v}</div>
+                      <div style={{fontSize:10,color:"#888",marginTop:2}}>{l}</div>
                     </div>
-                    <div style={{height:5,background:"#f0f0f0",borderRadius:3}}>
-                      <div style={{width:`${(n/maxDia)*100}%`,height:"100%",background:"#1a3a6b",borderRadius:3}}/>
+                  ))}
+                  {diaMayor&&(
+                    <div style={{background:"#fff7ed",borderRadius:10,padding:"12px",textAlign:"center",border:"1px solid #fed7aa",gridColumn:"span 1"}}>
+                      <div style={{fontSize:11,color:"#c2410c",fontWeight:700,marginBottom:4}}>📅 Día pico</div>
+                      <div style={{fontSize:12,fontWeight:700,color:"#92400e"}}>{diaMayor[0]}</div>
+                      <div style={{fontSize:18,fontWeight:800,color:"#c2410c"}}>{diaMayor[1]} visitas</div>
                     </div>
+                  )}
+                  {horaMayor&&(
+                    <div style={{background:"#f0fdf4",borderRadius:10,padding:"12px",textAlign:"center",border:"1px solid #86efac",gridColumn:"span 1"}}>
+                      <div style={{fontSize:11,color:"#166534",fontWeight:700,marginBottom:4}}>🕐 Hora pico</div>
+                      <div style={{fontSize:18,fontWeight:800,color:"#166534"}}>{horaMayor[0]}</div>
+                      <div style={{fontSize:11,color:"#166534"}}>{horaMayor[1]} visitas</div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Gráfico barras por día */}
+                <div style={{marginBottom:20}}>
+                  <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:8}}>Visitas por día (últimos 14 días)</div>
+                  <div style={{overflowX:"auto"}}>
+                    <svg width={Math.max(svgW+40,300)} height={svgH+40} style={{display:"block"}}>
+                      {/* Líneas guía */}
+                      {[0.25,0.5,0.75,1].map(p=>(
+                        <line key={p} x1={20} y1={svgH-20-(p*(svgH-30))} x2={svgW+20} y2={svgH-20-(p*(svgH-30))} stroke="#e4e7ec" strokeWidth={0.5} strokeDasharray="3,3"/>
+                      ))}
+                      {diasArr.map(([dia,n],i)=>{
+                        const x = 20 + i*(barW+6);
+                        const h = (n/maxDia)*(svgH-30);
+                        const isMax = n === diaMayor?.[1];
+                        return (
+                          <g key={dia}>
+                            <rect x={x} y={svgH-20-h} width={barW} height={h} rx={4}
+                              fill={isMax?"#F47B20":"#1a3a6b"} opacity={0.85}/>
+                            <text x={x+barW/2} y={svgH-24-h} textAnchor="middle" fontSize={10} fill={isMax?"#c2410c":"#1a3a6b"} fontWeight="700">{n}</text>
+                            <text x={x+barW/2} y={svgH+12} textAnchor="middle" fontSize={9} fill="#888">{dia.split(" ").slice(0,2).join(" ")}</text>
+                          </g>
+                        );
+                      })}
+                      {/* Eje X */}
+                      <line x1={20} y1={svgH-20} x2={svgW+20} y2={svgH-20} stroke="#d0d5dd" strokeWidth={1}/>
+                    </svg>
                   </div>
-                ))}
-              </div>
-              {/* Por hora */}
-              <div>
-                <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:10}}>Visitas por hora del día</div>
-                {Array.from({length:24},(_,h)=>`${h}:00`).filter(h=>porHora[h]).map(hora=>(
-                  <div key={hora} style={{marginBottom:6}}>
-                    <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:2}}>
-                      <span style={{color:"#555"}}>{hora}</span>
-                      <span style={{fontWeight:700,color:"#F47B20"}}>{porHora[hora]||0}</span>
-                    </div>
-                    <div style={{height:5,background:"#f0f0f0",borderRadius:3}}>
-                      <div style={{width:`${((porHora[hora]||0)/maxHora)*100}%`,height:"100%",background:"#F47B20",borderRadius:3}}/>
-                    </div>
+                </div>
+
+                {/* Gráfico línea por hora */}
+                <div>
+                  <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:8}}>Distribución por hora del día</div>
+                  <div style={{overflowX:"auto"}}>
+                    <svg width={500} height={svgH+30} style={{display:"block",minWidth:300}}>
+                      {/* Área rellena */}
+                      <defs>
+                        <linearGradient id="gradHora" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#F47B20" stopOpacity="0.3"/>
+                          <stop offset="100%" stopColor="#F47B20" stopOpacity="0.02"/>
+                        </linearGradient>
+                      </defs>
+                      <polygon
+                        points={`0,${svgH-20} ${ptsLinea} 460,${svgH-20}`}
+                        fill="url(#gradHora)" stroke="none"/>
+                      <polyline points={ptsLinea} fill="none" stroke="#F47B20" strokeWidth={2} strokeLinejoin="round"/>
+                      {/* Puntos */}
+                      {horasArr.map((x,i)=>x.n>0&&(
+                        <g key={i}>
+                          <circle cx={(i/23)*460} cy={svgH-20-(x.n/maxH)*(svgH-30)} r={x.n===horaMayor?.[1]?5:3}
+                            fill={x.n===horaMayor?.[1]?"#c2410c":"#F47B20"}/>
+                          {x.n===horaMayor?.[1]&&(
+                            <text x={(i/23)*460} y={svgH-26-(x.n/maxH)*(svgH-30)} textAnchor="middle" fontSize={10} fill="#c2410c" fontWeight="700">{x.n}</text>
+                          )}
+                        </g>
+                      ))}
+                      {/* Etiquetas horas cada 3h */}
+                      {[0,3,6,9,12,15,18,21,23].map(h=>(
+                        <text key={h} x={(h/23)*460} y={svgH+12} textAnchor="middle" fontSize={9} fill="#888">{h}:00</text>
+                      ))}
+                      {/* Eje X */}
+                      <line x1={0} y1={svgH-20} x2={460} y2={svgH-20} stroke="#d0d5dd" strokeWidth={1}/>
+                    </svg>
                   </div>
-                ))}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
 
