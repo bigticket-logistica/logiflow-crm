@@ -2972,7 +2972,6 @@ function CanalesView({ postulaciones, onLoad }) {
           {visitasFiltradas.length === 0 ? (
             <div style={{textAlign:"center",padding:"20px",color:"#888",fontSize:13}}>Sin visitas registradas aún para este canal</div>
           ) : (()=>{
-            // Calcular insights
             const diaMayor = Object.entries(porDia).sort((a,b)=>b[1]-a[1])[0];
             const horaMayor = Object.entries(porHora).sort((a,b)=>b[1]-a[1])[0];
             const totalVisitas = visitasFiltradas.length;
@@ -2981,26 +2980,38 @@ function CanalesView({ postulaciones, onLoad }) {
             const diasEntradas = Object.keys(porDia).length;
             const promDia = diasEntradas ? (totalVisitas/diasEntradas).toFixed(1) : 0;
 
-            // Gráfico de barras SVG por día
-            const diasArr = Object.entries(porDia).slice(-14);
-            const barW = Math.max(20, Math.min(40, 500/Math.max(diasArr.length,1)));
-            const svgW = diasArr.length * (barW + 6);
-            const svgH = 120;
+            // Heatmap: filas=horas(0-23), columnas=días únicos (últimos 14)
+            const diasUnicos = [...new Set(visitasFiltradas.map(v=>{
+              const d = new Date(v.created_at);
+              return d.toLocaleDateString("es-CL",{weekday:"short",day:"numeric",month:"short"});
+            }))].slice(-14);
+            const heatData = {};
+            visitasFiltradas.forEach(v=>{
+              const d = new Date(v.created_at);
+              const dia = d.toLocaleDateString("es-CL",{weekday:"short",day:"numeric",month:"short"});
+              const hora = d.getHours();
+              if(!heatData[hora]) heatData[hora]={};
+              heatData[hora][dia] = (heatData[hora][dia]||0)+1;
+            });
+            const maxVal = Math.max(...Object.values(heatData).flatMap(h=>Object.values(h)),1);
 
-            // Gráfico de línea por hora
-            const horasArr = Array.from({length:24},(_,h)=>({h:`${h}:00`, n:porHora[`${h}:00`]||0}));
-            const maxH = Math.max(...horasArr.map(x=>x.n),1);
-            const ptsLinea = horasArr.map((x,i)=>`${(i/23)*460},${svgH-20-(x.n/maxH)*(svgH-30)}`).join(" ");
+            const getColor = (n) => {
+              if(!n) return "#f0f0f0";
+              const intensity = n/maxVal;
+              if(intensity>0.75) return "#1a3a6b";
+              if(intensity>0.5)  return "#2563eb";
+              if(intensity>0.25) return "#60a5fa";
+              return "#bfdbfe";
+            };
+
+            const cellW = Math.max(28, Math.min(50, Math.floor(520/Math.max(diasUnicos.length,1))));
 
             return (
               <div>
-                {/* Panel de insights */}
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:10,marginBottom:20}}>
-                  {[
-                    ["Total visitas", totalVisitas, "#1a3a6b"],
-                    ["Visitas únicas", unicasCanal, "#7c3aed"],
-                    ["Revisitas", retorno, "#F47B20"],
-                    ["Prom. por día", promDia, "#0369a1"],
+                {/* Insights */}
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:10,marginBottom:20}}>
+                  {[["Total visitas",totalVisitas,"#1a3a6b"],["Visitas únicas",unicasCanal,"#7c3aed"],
+                    ["Revisitas",retorno,"#F47B20"],["Prom. por día",promDia,"#0369a1"]
                   ].map(([l,v,c])=>(
                     <div key={l} style={{background:"#f8f9fa",borderRadius:10,padding:"12px",textAlign:"center",border:"0.5px solid #e4e7ec"}}>
                       <div style={{fontSize:22,fontWeight:800,color:c}}>{v}</div>
@@ -3008,83 +3019,65 @@ function CanalesView({ postulaciones, onLoad }) {
                     </div>
                   ))}
                   {diaMayor&&(
-                    <div style={{background:"#fff7ed",borderRadius:10,padding:"12px",textAlign:"center",border:"1px solid #fed7aa",gridColumn:"span 1"}}>
-                      <div style={{fontSize:11,color:"#c2410c",fontWeight:700,marginBottom:4}}>📅 Día pico</div>
-                      <div style={{fontSize:12,fontWeight:700,color:"#92400e"}}>{diaMayor[0]}</div>
-                      <div style={{fontSize:18,fontWeight:800,color:"#c2410c"}}>{diaMayor[1]} visitas</div>
+                    <div style={{background:"#fff7ed",borderRadius:10,padding:"12px",textAlign:"center",border:"1px solid #fed7aa"}}>
+                      <div style={{fontSize:10,color:"#c2410c",fontWeight:700,marginBottom:3}}>📅 Día pico</div>
+                      <div style={{fontSize:11,fontWeight:700,color:"#92400e",marginBottom:2}}>{diaMayor[0]}</div>
+                      <div style={{fontSize:18,fontWeight:800,color:"#c2410c"}}>{diaMayor[1]} vis.</div>
                     </div>
                   )}
                   {horaMayor&&(
-                    <div style={{background:"#f0fdf4",borderRadius:10,padding:"12px",textAlign:"center",border:"1px solid #86efac",gridColumn:"span 1"}}>
-                      <div style={{fontSize:11,color:"#166534",fontWeight:700,marginBottom:4}}>🕐 Hora pico</div>
+                    <div style={{background:"#f0fdf4",borderRadius:10,padding:"12px",textAlign:"center",border:"1px solid #86efac"}}>
+                      <div style={{fontSize:10,color:"#166534",fontWeight:700,marginBottom:3}}>🕐 Hora pico</div>
                       <div style={{fontSize:18,fontWeight:800,color:"#166534"}}>{horaMayor[0]}</div>
                       <div style={{fontSize:11,color:"#166534"}}>{horaMayor[1]} visitas</div>
                     </div>
                   )}
                 </div>
 
-                {/* Gráfico barras por día */}
-                <div style={{marginBottom:20}}>
-                  <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:8}}>Visitas por día (últimos 14 días)</div>
-                  <div style={{overflowX:"auto"}}>
-                    <svg width={Math.max(svgW+40,300)} height={svgH+40} style={{display:"block"}}>
-                      {/* Líneas guía */}
-                      {[0.25,0.5,0.75,1].map(p=>(
-                        <line key={p} x1={20} y1={svgH-20-(p*(svgH-30))} x2={svgW+20} y2={svgH-20-(p*(svgH-30))} stroke="#e4e7ec" strokeWidth={0.5} strokeDasharray="3,3"/>
+                {/* Heatmap */}
+                <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:10}}>
+                  Mapa de calor — Hora vs Día
+                  <span style={{fontSize:10,fontWeight:400,color:"#888",marginLeft:8}}>Más oscuro = más visitas</span>
+                </div>
+                <div style={{overflowX:"auto"}}>
+                  <table style={{borderCollapse:"separate",borderSpacing:3,fontSize:10}}>
+                    <thead>
+                      <tr>
+                        <td style={{width:32,padding:"2px 4px",color:"#888",fontSize:9}}></td>
+                        {diasUnicos.map(d=>(
+                          <td key={d} style={{width:cellW,textAlign:"center",color:"#555",fontWeight:600,padding:"2px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:cellW}}>
+                            {d.split(" ").slice(0,2).join(" ")}
+                          </td>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.from({length:24},(_,h)=>(
+                        <tr key={h}>
+                          <td style={{fontSize:9,color:"#888",paddingRight:4,textAlign:"right",whiteSpace:"nowrap"}}>{h}:00</td>
+                          {diasUnicos.map(d=>{
+                            const n = heatData[h]?.[d]||0;
+                            return (
+                              <td key={d} title={`${d} ${h}:00 — ${n} visitas`}
+                                style={{width:cellW,height:20,background:getColor(n),borderRadius:4,textAlign:"center",
+                                  fontSize:9,color:n>maxVal*0.5?"#fff":"transparent",fontWeight:700,cursor:n?"default":"default"}}>
+                                {n||""}
+                              </td>
+                            );
+                          })}
+                        </tr>
                       ))}
-                      {diasArr.map(([dia,n],i)=>{
-                        const x = 20 + i*(barW+6);
-                        const h = (n/maxDia)*(svgH-30);
-                        const isMax = n === diaMayor?.[1];
-                        return (
-                          <g key={dia}>
-                            <rect x={x} y={svgH-20-h} width={barW} height={h} rx={4}
-                              fill={isMax?"#F47B20":"#1a3a6b"} opacity={0.85}/>
-                            <text x={x+barW/2} y={svgH-24-h} textAnchor="middle" fontSize={10} fill={isMax?"#c2410c":"#1a3a6b"} fontWeight="700">{n}</text>
-                            <text x={x+barW/2} y={svgH+12} textAnchor="middle" fontSize={9} fill="#888">{dia.split(" ").slice(0,2).join(" ")}</text>
-                          </g>
-                        );
-                      })}
-                      {/* Eje X */}
-                      <line x1={20} y1={svgH-20} x2={svgW+20} y2={svgH-20} stroke="#d0d5dd" strokeWidth={1}/>
-                    </svg>
-                  </div>
+                    </tbody>
+                  </table>
                 </div>
 
-                {/* Gráfico línea por hora */}
-                <div>
-                  <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:8}}>Distribución por hora del día</div>
-                  <div style={{overflowX:"auto"}}>
-                    <svg width={500} height={svgH+30} style={{display:"block",minWidth:300}}>
-                      {/* Área rellena */}
-                      <defs>
-                        <linearGradient id="gradHora" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#F47B20" stopOpacity="0.3"/>
-                          <stop offset="100%" stopColor="#F47B20" stopOpacity="0.02"/>
-                        </linearGradient>
-                      </defs>
-                      <polygon
-                        points={`0,${svgH-20} ${ptsLinea} 460,${svgH-20}`}
-                        fill="url(#gradHora)" stroke="none"/>
-                      <polyline points={ptsLinea} fill="none" stroke="#F47B20" strokeWidth={2} strokeLinejoin="round"/>
-                      {/* Puntos */}
-                      {horasArr.map((x,i)=>x.n>0&&(
-                        <g key={i}>
-                          <circle cx={(i/23)*460} cy={svgH-20-(x.n/maxH)*(svgH-30)} r={x.n===horaMayor?.[1]?5:3}
-                            fill={x.n===horaMayor?.[1]?"#c2410c":"#F47B20"}/>
-                          {x.n===horaMayor?.[1]&&(
-                            <text x={(i/23)*460} y={svgH-26-(x.n/maxH)*(svgH-30)} textAnchor="middle" fontSize={10} fill="#c2410c" fontWeight="700">{x.n}</text>
-                          )}
-                        </g>
-                      ))}
-                      {/* Etiquetas horas cada 3h */}
-                      {[0,3,6,9,12,15,18,21,23].map(h=>(
-                        <text key={h} x={(h/23)*460} y={svgH+12} textAnchor="middle" fontSize={9} fill="#888">{h}:00</text>
-                      ))}
-                      {/* Eje X */}
-                      <line x1={0} y1={svgH-20} x2={460} y2={svgH-20} stroke="#d0d5dd" strokeWidth={1}/>
-                    </svg>
-                  </div>
+                {/* Leyenda */}
+                <div style={{display:"flex",alignItems:"center",gap:6,marginTop:10}}>
+                  <span style={{fontSize:10,color:"#888"}}>Menos</span>
+                  {["#f0f0f0","#bfdbfe","#60a5fa","#2563eb","#1a3a6b"].map(c=>(
+                    <div key={c} style={{width:16,height:16,background:c,borderRadius:3}}/>
+                  ))}
+                  <span style={{fontSize:10,color:"#888"}}>Más</span>
                 </div>
               </div>
             );
@@ -4084,7 +4077,7 @@ function ViewPropuesta() {
                   ["🗓","Devolución",campana.propuesta_devolucion],
                 ].filter(([,,v]) => v).map(([ic,l,v])=>(
                   <div key={l}>
-                    <div style={{fontSize:10,color:"#1a1a1a",fontWeight:700,textTransform:"uppercase",marginBottom:4,display:"flex",alignItems:"center",gap:4}}>
+                    <div style={{fontSize:10,color:"#1a1a1a",fontWeight:800,textTransform:"uppercase",marginBottom:4,display:"flex",alignItems:"center",gap:4}}>
                       <span>{ic}</span> {l}
                     </div>
                     <div style={{fontSize:14,fontWeight:700,color:"#1a1a1a"}}>{v}</div>
@@ -4100,14 +4093,14 @@ function ViewPropuesta() {
                   <div style={{width:4,height:18,background:"#F47B20",borderRadius:2}}/>
                   Tarifas por Jornada
                 </div>
-                {/* Tabla en móvil: layout de cards por categoría */}
-                <div style={{display:"none"}} className="tarifas-mobile">
+                {/* En móvil: cards por categoría */}
+                <div style={{display:"block"}} className="tarifas-cards">
                   {campana.propuesta_tarifas.map((t,i)=>(
                     <div key={i} style={{background:i%2===0?"#f8f9fa":"#fff",borderRadius:8,padding:"12px",marginBottom:8,border:"0.5px solid #e4e7ec"}}>
-                      <div style={{fontWeight:700,color:"#1a3a6b",marginBottom:8,fontSize:14}}>{t.categoria}</div>
-                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                      <div style={{fontWeight:700,color:"#1a3a6b",marginBottom:8,fontSize:13}}>{t.categoria}</div>
+                      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
                         {["0-100","101-150","151-200","201-250","251+"].map(k=>t.tramos?.[k]&&(
-                          <div key={k} style={{background:"#fff",borderRadius:6,padding:"6px 8px",border:"0.5px solid #e4e7ec"}}>
+                          <div key={k} style={{background:"#fff",borderRadius:6,padding:"6px 8px",border:"0.5px solid #e4e7ec",textAlign:"center"}}>
                             <div style={{fontSize:9,color:"#888",fontWeight:600,marginBottom:2}}>{k} km</div>
                             <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a"}}>$ {t.tramos[k]}</div>
                           </div>
@@ -4115,31 +4108,6 @@ function ViewPropuesta() {
                       </div>
                     </div>
                   ))}
-                </div>
-                {/* Tabla normal en desktop */}
-                <div className="tarifas-desktop" style={{overflowX:"auto",borderRadius:10,border:"0.5px solid #e4e7ec"}}>
-                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:400}}>
-                    <thead>
-                      <tr style={{background:"#1a3a6b",color:"#fff"}}>
-                        <th style={{padding:"9px 12px",textAlign:"left",fontWeight:600,whiteSpace:"nowrap"}}>Categoría</th>
-                        {["0-100","101-150","151-200","201-250","251+"].map(h=>(
-                          <th key={h} style={{padding:"9px 8px",textAlign:"center",fontWeight:600,whiteSpace:"nowrap"}}>{h} km</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {campana.propuesta_tarifas.map((t,i)=>(
-                        <tr key={i} style={{background:i%2===0?"#f8f9fa":"#fff",borderBottom:"0.5px solid #e4e7ec"}}>
-                          <td style={{padding:"9px 12px",fontWeight:700,color:"#1a1a1a",whiteSpace:"nowrap"}}>{t.categoria}</td>
-                          {["0-100","101-150","151-200","201-250","251+"].map(k=>(
-                            <td key={k} style={{padding:"9px 8px",textAlign:"center",fontWeight:600,color:"#1a1a1a",whiteSpace:"nowrap"}}>
-                              {t.tramos?.[k]?`$${t.tramos[k]}`:"—"}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
                 </div>
                 <div style={{fontSize:11,color:"#888",marginTop:8}}>
                   *Valores netos + IVA{campana.propuesta_auxiliar?<span> | <strong>Auxiliar: {campana.propuesta_auxiliar}</strong></span>:""}
