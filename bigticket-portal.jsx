@@ -1144,6 +1144,8 @@ function ViewPostulacion({ data, onVolver }) {
   const {lead,historial}=data;
   const ETAPA_COLOR={"Nuevo Lead":"#3B82F6","Nuevo":"#3B82F6","Contactado":"#8B5CF6","Reunión Agendada":"#F59E0B","Propuesta Enviada":"#F97316","Negociación":"#EC4899","Propuesta Aceptada":"#10B981","Propuesta Rechazada":"#EF4444","Contrato Firmado":"#10B981","Base Datos Leads":"#6B7280","Ganado":"#10B981","Perdido":"#EF4444"};
   const ETAPA_ICON={"Nuevo Lead":"🎯","Nuevo":"🎯","Contactado":"📞","Reunión Agendada":"📅","Propuesta Enviada":"📄","Negociación":"🤝","Propuesta Aceptada":"✅","Propuesta Rechazada":"❌","Contrato Firmado":"📝","Base Datos Leads":"🗃️","Ganado":"✅","Perdido":"❌"};
+  const ETAPA_DISPLAY={"Entrevistas y Validaciones":"Validaciones","Postulante Aprobado":"Aprobado","Postulante No Calificado":"No Calificado","Onboarding Pendiente":"Onboarding Pendiente","Contrato No Firmado":"Contrato No Firmado"};
+  const etapaLabel=(e)=>ETAPA_DISPLAY[e]||e;
   const etapaColor=ETAPA_COLOR[lead.etapa]||"#888";
   // Construir historial completo incluyendo etapa inicial
   const historialCompleto=[
@@ -1182,7 +1184,7 @@ function ViewPostulacion({ data, onVolver }) {
               {historialCompleto.map((h,i)=>(
                 <div key={i} style={{marginBottom:16,position:"relative"}}>
                   <div style={{position:"absolute",left:-24,top:2,width:10,height:10,borderRadius:"50%",background:ETAPA_COLOR[h.etapa_nueva]||"#F47B20",border:"2px solid #fff",boxShadow:i===historialCompleto.length-1?"0 0 0 3px "+((ETAPA_COLOR[h.etapa_nueva]||"#F47B20")+"33"):"none"}}/>
-                  <div style={{fontSize:13,fontWeight:700,color:ETAPA_COLOR[h.etapa_nueva]||"#1a1a1a"}}>{ETAPA_ICON[h.etapa_nueva]||"📋"} {h.etapa_nueva}{i===historialCompleto.length-1&&<span style={{fontSize:10,background:"#F47B20",color:"#fff",borderRadius:10,padding:"1px 7px",marginLeft:6,fontWeight:600}}>Actual</span>}</div>
+                  <div style={{fontSize:13,fontWeight:700,color:ETAPA_COLOR[h.etapa_nueva]||"#1a1a1a"}}>{ETAPA_ICON[h.etapa_nueva]||"📋"} {etapaLabel(h.etapa_nueva)}{i===historialCompleto.length-1&&<span style={{fontSize:10,background:"#F47B20",color:"#fff",borderRadius:10,padding:"1px 7px",marginLeft:6,fontWeight:600}}>Actual</span>}</div>
                   <div style={{fontSize:11,color:"#888",marginTop:2}}>{new Date(h.created_at).toLocaleDateString("es-CL",{day:"2-digit",month:"short",year:"numeric"})} · {new Date(h.created_at).toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})}</div>
                 </div>
               ))}
@@ -1484,7 +1486,7 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
                   ].filter(([,,,])=>true).map(([ic,l,v,c])=>v&&(
                     <div key={l}>
                       <div style={{fontSize:10,color:"#1a1a1a",fontWeight:700,textTransform:"uppercase",marginBottom:3}}>{ic} {l}</div>
-                      <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a"}}>{v}</div>
+                      <div style={{fontSize:13,fontWeight:400,color:"#1a1a1a"}}>{v}</div>
                     </div>
                   ))}
                 </div>
@@ -4080,7 +4082,7 @@ function ViewPropuesta() {
                     <div style={{fontSize:10,color:"#1a1a1a",fontWeight:800,textTransform:"uppercase",marginBottom:4,display:"flex",alignItems:"center",gap:4}}>
                       <span>{ic}</span> {l}
                     </div>
-                    <div style={{fontSize:14,fontWeight:700,color:"#1a1a1a"}}>{v}</div>
+                    <div style={{fontSize:14,fontWeight:400,color:"#1a1a1a"}}>{v}</div>
                   </div>
                 ))}
               </div>
