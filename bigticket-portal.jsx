@@ -8,10 +8,12 @@ const SUPERADMIN_KEY = "PortalTerceros2026";
 const DONB_URL = "https://psvdtgjvognbmxfvqbaa.supabase.co/storage/v1/object/public/assets/Don_B1.jpeg";
 
 const CANALES = {
-  whatsapp: { label: "WhatsApp", color: "#25D366", initial: "W" },
-  facebook: { label: "Facebook", color: "#1877F2", initial: "f" },
-  instagram: { label: "Instagram", color: "#E1306C", initial: "I" },
-  portal:    { label: "Portal web", color: "#1a3a6b", initial: "P" },
+  whatsapp:  { label: "WhatsApp",       color: "#25D366", initial: "W" },
+  facebook:  { label: "Facebook",       color: "#1877F2", initial: "f" },
+  instagram: { label: "Instagram",      color: "#E1306C", initial: "I" },
+  referidos: { label: "Referidos",      color: "#F59E0B", initial: "R" },
+  web:       { label: "Formulario Web", color: "#7c3aed", initial: "W" },
+  portal:    { label: "Portal web",     color: "#1a3a6b", initial: "P" },
 };
 
 const PAISES = {
