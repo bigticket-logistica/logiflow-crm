@@ -1825,12 +1825,13 @@ export default function App() {
           {NAV.map(item=>(
             <button key={item.id} onClick={()=>setSeccion(item.id)}
               style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:8,
-                background:seccion===item.id?"#1a3a6b":"none",border:seccion===item.id?"1px solid #e4e7ec":"1px solid transparent",
-                color:seccion===item.id?"#f1f5f9":"#475569",cursor:"pointer",fontSize:12,
-                fontWeight:seccion===item.id?700:500,marginBottom:3,transition:"all .2s",textAlign:"left",fontFamily:"'Outfit',sans-serif"}}>
-              <span style={{fontSize:14,color:seccion===item.id?"#ffffff":"#aac3e8"}}>{item.icon}</span>
+                background:seccion===item.id?"rgba(255,255,255,0.15)":"none",border:seccion===item.id?"1px solid rgba(255,255,255,0.3)":"1px solid transparent",
+                color:"#ffffff",cursor:"pointer",fontSize:12,
+                fontWeight:seccion===item.id?700:500,marginBottom:3,transition:"all .2s",textAlign:"left",fontFamily:"'Outfit',sans-serif",
+                textShadow:"0 1px 2px rgba(0,0,0,0.3)"}}>
+              <span style={{fontSize:14,color:"#ffffff"}}>{item.icon}</span>
               {item.label}
-              {item.count!==undefined&&<span style={{marginLeft:"auto",background:"#3B82F622",color:"#3B82F6",fontSize:9,fontWeight:800,padding:"1px 6px",borderRadius:20}}>{item.count}</span>}
+              {item.count!==undefined&&<span style={{marginLeft:"auto",background:"#3B82F622",color:"#93c5fd",fontSize:9,fontWeight:800,padding:"1px 6px",borderRadius:20}}>{item.count}</span>}
             </button>
           ))}
         </nav>
