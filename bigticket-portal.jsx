@@ -330,7 +330,7 @@ function ScoreFieldBuilder({ field, onUpdate, onRemove, usedVariables }) {
   );
 }
 
-function ViewCountry({ onSelect, busquedaCodigo, setBusquedaCodigo, buscarPostulacion, buscando, errorBusqueda, onAdmin }) {
+function ViewCountry({ onSelect, busqCorreo, setBusqCorreo, busqDoc, setBusqDoc, buscarPostulacion, buscando, errorBusqueda, onAdmin }) {
   return (
     <div>
       <div className="topbar">
@@ -349,29 +349,36 @@ function ViewCountry({ onSelect, busquedaCodigo, setBusquedaCodigo, buscarPostul
             </div>
           ))}
         </div>
-        <div style={{background:"#f8f9fa",border:"1px solid #e4e7ec",borderRadius:14,padding:"20px 20px",marginBottom:16}}>
+
+        {/* Consultar estado */}
+        <div style={{background:"#f8f9fa",border:"1px solid #e4e7ec",borderRadius:14,padding:"20px",marginBottom:16}}>
           <div style={{fontSize:14,fontWeight:700,color:"#1a1a1a",marginBottom:4}}>🔍 Consultar estado de postulación</div>
-          <div style={{fontSize:12,color:"#888",marginBottom:14}}>Ingresa tu código para ver el estado e historial de tu postulación</div>
-          <div style={{display:"flex",gap:8}}>
-            <input
-              value={busquedaCodigo}
-              onChange={e=>setBusquedaCodigo(e.target.value.toUpperCase())}
+          <div style={{fontSize:12,color:"#888",marginBottom:14}}>Ingresa tu correo y RUT (Chile) o CURP (México)</div>
+          <div style={{marginBottom:10}}>
+            <input value={busqCorreo} onChange={e=>setBusqCorreo(e.target.value)}
               onKeyDown={e=>e.key==="Enter"&&buscarPostulacion()}
-              placeholder="Ej: BT-K7M2X3"
-              style={{flex:1,padding:"10px 14px",borderRadius:8,border:"1px solid #e4e7ec",fontSize:14,fontFamily:"monospace",fontWeight:700,letterSpacing:1,background:"#fff"}}
-            />
+              placeholder="Tu correo electrónico" type="email"
+              style={{width:"100%",padding:"10px 14px",borderRadius:8,border:"1px solid #e4e7ec",fontSize:13,background:"#fff",fontFamily:"'Geist',sans-serif",boxSizing:"border-box"}}/>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <input value={busqDoc} onChange={e=>setBusqDoc(e.target.value.toUpperCase())}
+              onKeyDown={e=>e.key==="Enter"&&buscarPostulacion()}
+              placeholder="RUT (ej: 12345678K) o CURP"
+              style={{flex:1,padding:"10px 14px",borderRadius:8,border:"1px solid #e4e7ec",fontSize:13,background:"#fff",fontFamily:"'Geist',sans-serif"}}/>
             <button onClick={buscarPostulacion} disabled={buscando}
-              style={{background:"#F47B20",color:"#fff",border:"none",borderRadius:8,padding:"10px 18px",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
+              style={{background:"#F47B20",color:"#fff",border:"none",borderRadius:8,padding:"10px 18px",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",fontFamily:"'Geist',sans-serif"}}>
               {buscando?"...":"Consultar"}
             </button>
           </div>
           {errorBusqueda&&<div style={{fontSize:12,color:"#EF4444",marginTop:8}}>{errorBusqueda}</div>}
         </div>
-        <div style={{background:"#eef2ff",border:"1px solid #c7d7f9",borderRadius:14,padding:"20px 20px"}}>
+
+        {/* Onboarding */}
+        <div style={{background:"#eef2ff",border:"1px solid #c7d7f9",borderRadius:14,padding:"20px"}}>
           <div style={{fontSize:14,fontWeight:700,color:"#1a3a6b",marginBottom:4}}>📋 Formulario de incorporación</div>
           <div style={{fontSize:12,color:"#555",marginBottom:14}}>¿Tu propuesta fue aceptada? Completa tu formulario de incorporación a Bigticket</div>
           <button onClick={e=>{e.currentTarget.textContent="Cargando...";e.currentTarget.disabled=true;window.location.href="?onboarding=1";}}
-            style={{background:"#1a3a6b",color:"#fff",border:"none",borderRadius:8,padding:"10px 18px",fontSize:13,fontWeight:700,cursor:"pointer",width:"100%"}}>
+            style={{background:"#1a3a6b",color:"#fff",border:"none",borderRadius:8,padding:"10px 18px",fontSize:13,fontWeight:700,cursor:"pointer",width:"100%",fontFamily:"'Geist',sans-serif"}}>
             Completar formulario →
           </button>
         </div>
