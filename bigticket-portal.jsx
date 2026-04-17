@@ -1114,9 +1114,9 @@ function BiggiBubble({ paginaPrincipal=false }) {
 }
 
 
-function ViewSuccess({ codigo, onVolver }) {
-  const [copiado,setCopiado]=useState(false);
-  const copiar=()=>{navigator.clipboard?.writeText(codigo||"");setCopiado(true);setTimeout(()=>setCopiado(false),2000);};
+function ViewSuccess({ pais, onVolver }) {
+  const esMexico = pais === "México";
+  const docLabel = esMexico ? "CURP" : "RUT";
   return (
     <div>
       <div className="topbar"><span className="logo">Big<span>ticket</span></span></div>
@@ -1125,16 +1125,15 @@ function ViewSuccess({ codigo, onVolver }) {
           <div style={{width:56,height:56,background:"#dcfce7",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px",fontSize:24,color:"#166534"}}>✓</div>
           <div style={{fontSize:17,fontWeight:700,color:"#166534",marginBottom:8}}>¡Postulación enviada!</div>
           <div style={{fontSize:13,color:"#555",marginBottom:20}}>Tus datos fueron recibidos. Te contactaremos por WhatsApp a la brevedad.</div>
-          {codigo&&(
-            <div style={{background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:12,padding:"16px 20px",marginBottom:20}}>
-              <div style={{fontSize:11,color:"#0369a1",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>Tu código de postulación</div>
-              <div style={{fontSize:28,fontWeight:900,color:"#0369a1",letterSpacing:3,fontFamily:"monospace",marginBottom:10}}>{codigo}</div>
-              <div style={{fontSize:12,color:"#555",marginBottom:12}}>Guarda este código — con él puedes consultar el estado de tu postulación en cualquier momento.</div>
-              <button onClick={copiar} style={{background:copiado?"#dcfce7":"#e0f2fe",color:copiado?"#166534":"#0369a1",border:"none",borderRadius:8,padding:"8px 16px",fontSize:12,fontWeight:700,cursor:"pointer",width:"100%"}}>
-                {copiado?"✓ Código copiado":"Copiar código"}
-              </button>
+          <div style={{background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:12,padding:"16px 20px",marginBottom:20,textAlign:"left"}}>
+            <div style={{fontSize:12,color:"#0369a1",fontWeight:700,marginBottom:8}}>📋 ¿Cómo consultar tu postulación?</div>
+            <div style={{fontSize:13,color:"#555",lineHeight:1.7}}>
+              Puedes revisar el estado de tu postulación en cualquier momento ingresando al portal con tu:
+              <br/><br/>
+              <strong>✉️ Correo electrónico</strong><br/>
+              <strong>🪪 {docLabel}</strong>
             </div>
-          )}
+          </div>
           <button className="btn-orange" style={{maxWidth:200,margin:"0 auto"}} onClick={onVolver}>Volver al inicio</button>
         </div>
       </div>
@@ -3190,42 +3189,36 @@ const COMUNAS_CL = [
 ];
 
 function OnboardingLogin({ onIngresar, onVolver }) {
-  const [codigo,setCodigo]=useState("");
+  const [correo,setCorreo]=useState("");
   const [documento,setDocumento]=useState("");
   const [error,setError]=useState("");
   const [cargando,setCargando]=useState(false);
-  const [leadParcial,setLeadParcial]=useState(null); // guardamos el lead tras validar código
-  const [paso,setPaso]=useState(1); // paso 1: código, paso 2: RUT o CURP
 
-  const validarCodigo=async()=>{
-    if(!codigo.trim()){setError("Ingresa tu código de postulación.");return;}
-    setCargando(true);setError("");
-    const {data,error:e}=await sb.from("leads").select("*")
-      .eq("codigo_postulacion",codigo.trim().toUpperCase())
-      .single();
-    if(e||!data){setError("Código no encontrado. Verifica tus datos.");setCargando(false);return;}
-    if(!["Propuesta Aceptada","Contrato Firmado","Contrato No Firmado","Onboarding Pendiente","Entrevistas y Validaciones","Postulante Aprobado","Postulante No Calificado"].includes(data.etapa)){
-      setError(`Tu postulación está en etapa "${data.etapa}". El formulario de incorporación se habilitará cuando el equipo Bigticket te lo indique.`);setCargando(false);return;}
-    setLeadParcial(data);
-    setPaso(2);
-    setCargando(false);
-  };
-
-  const validarDocumento=async()=>{
-    if(!documento.trim()){setError(`Ingresa tu ${leadParcial?.pais==="México"?"CURP":"RUT"}.`);return;}
+  const ingresar=async()=>{
+    if(!correo.trim()||!documento.trim()){setError("Ingresa tu correo y RUT o CURP.");return;}
     setCargando(true);setError("");
     const docLimpio=documento.trim().replace(/[.\-]/g,"").toUpperCase();
-    const campoDoc=leadParcial?.pais==="México"?"curp":"rut";
+
+    // Buscar por correo + rut O correo + curp
     const {data,error:e}=await sb.from("leads").select("*")
-      .eq("codigo_postulacion",codigo.trim().toUpperCase())
-      .eq(campoDoc,docLimpio)
-      .single();
-    if(e||!data){setError(`${leadParcial?.pais==="México"?"CURP":"RUT"} incorrecto. Verifica tus datos.`);setCargando(false);return;}
-    onIngresar(data);
+      .eq("email",correo.trim().toLowerCase())
+      .or(`rut.eq.${docLimpio},curp.eq.${docLimpio}`)
+      .order("created_at",{ascending:false});
+
+    if(e||!data||data.length===0){
+      setError("No encontramos una postulación con esos datos. Verifica tu correo y RUT/CURP.");
+      setCargando(false);return;
+    }
+
+    // Buscar leads con etapa válida para onboarding
+    const validos=data.filter(d=>["Propuesta Aceptada","Contrato Firmado","Contrato No Firmado","Onboarding Pendiente","Entrevistas y Validaciones","Postulante Aprobado","Postulante No Calificado"].includes(d.etapa));
+    if(validos.length===0){
+      setError(`Tu postulación está en etapa "${data[0].etapa}". El formulario se habilitará cuando el equipo Bigticket te lo indique.`);
+      setCargando(false);return;
+    }
+    onIngresar(validos[0]);
     setCargando(false);
   };
-
-  const esMexico=leadParcial?.pais==="México";
 
   return(
     <div>
@@ -3235,42 +3228,27 @@ function OnboardingLogin({ onIngresar, onVolver }) {
           <div style={{textAlign:"center",marginBottom:24}}>
             <div style={{fontSize:32,marginBottom:8}}>📋</div>
             <div style={{fontSize:18,fontWeight:700,color:"#1a1a1a",marginBottom:6}}>Formulario de incorporación</div>
-            <div style={{fontSize:13,color:"#666"}}>
-              {paso===1?"Ingresa tu código de postulación para continuar":`Ingresa tu ${esMexico?"CURP":"RUT"} para verificar tu identidad`}
-            </div>
+            <div style={{fontSize:13,color:"#666"}}>Ingresa tu correo y RUT (Chile) o CURP (México)</div>
           </div>
-          {paso===1&&(
-            <>
-              <div className="field-row">
-                <span className="field-label">Código de postulación</span>
-                <input value={codigo} onChange={e=>setCodigo(e.target.value.toUpperCase())}
-                  placeholder="Ej: BT-K7M2X3" style={{fontFamily:"monospace",fontWeight:700,letterSpacing:1}}/>
-              </div>
-              {error&&<div style={{background:"#fee2e2",borderRadius:8,padding:"10px 14px",fontSize:13,color:"#c0392b",marginBottom:14}}>{error}</div>}
-              <button className="btn-orange" onClick={validarCodigo} disabled={cargando}>
-                {cargando?"Verificando...":"Continuar →"}
-              </button>
-            </>
-          )}
-          {paso===2&&(
-            <>
-              <div className="field-row">
-                <span className="field-label">{esMexico?"CURP":"RUT (sin puntos ni guión)"}</span>
-                <input value={documento} onChange={e=>setDocumento(e.target.value)}
-                  placeholder={esMexico?"Ej: ABCD123456HDFXXX00":"Ej: 12345678k"}/>
-              </div>
-              {error&&<div style={{background:"#fee2e2",borderRadius:8,padding:"10px 14px",fontSize:13,color:"#c0392b",marginBottom:14}}>{error}</div>}
-              <button className="btn-orange" onClick={validarDocumento} disabled={cargando}>
-                {cargando?"Verificando...":"Ingresar →"}
-              </button>
-              <button onClick={()=>{setPaso(1);setError("");setDocumento("");}} style={{width:"100%",marginTop:10,background:"none",border:"0.5px solid #d0d5dd",borderRadius:10,padding:"10px",fontSize:13,color:"#555",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>
-                ← Volver
-              </button>
-            </>
-          )}
-          {paso===1&&<button onClick={onVolver} style={{width:"100%",marginTop:10,background:"none",border:"0.5px solid #d0d5dd",borderRadius:10,padding:"10px",fontSize:13,color:"#555",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>
+          <div className="field-row">
+            <span className="field-label">Correo electrónico</span>
+            <input value={correo} onChange={e=>setCorreo(e.target.value)}
+              type="email" placeholder="tucorreo@ejemplo.com"
+              onKeyDown={e=>e.key==="Enter"&&ingresar()}/>
+          </div>
+          <div className="field-row">
+            <span className="field-label">RUT (Chile) o CURP (México)</span>
+            <input value={documento} onChange={e=>setDocumento(e.target.value.toUpperCase())}
+              placeholder="Ej: 12345678K o ABCD123456HDFXXX00"
+              onKeyDown={e=>e.key==="Enter"&&ingresar()}/>
+          </div>
+          {error&&<div style={{background:"#fee2e2",borderRadius:8,padding:"10px 14px",fontSize:13,color:"#c0392b",marginBottom:14}}>{error}</div>}
+          <button className="btn-orange" onClick={ingresar} disabled={cargando} style={{width:"100%"}}>
+            {cargando?"Verificando...":"Ingresar →"}
+          </button>
+          <button onClick={onVolver} style={{width:"100%",marginTop:10,background:"none",border:"0.5px solid #d0d5dd",borderRadius:10,padding:"10px",fontSize:13,color:"#555",cursor:"pointer",fontFamily:"'Geist',sans-serif"}}>
             ← Volver al portal
-          </button>}
+          </button>
         </div>
       </div>
     </div>
@@ -4293,7 +4271,7 @@ export default function App() {
       {view==="portal"&&op&&<ViewPortal op={op} canal={canal} campaigns={campaigns} loading={loading} onChangePais={()=>setView("country")} onDetail={c=>{setSelectedCamp(c);setView("detail");}} onLibre={()=>{setFormCamp(null);setView("form");}}/>}
       {view==="detail"&&selectedCamp&&<ViewDetail camp={selectedCamp} canal={canal} onBack={()=>setView("portal")} onPostular={()=>{setFormCamp(selectedCamp);setView("form");}}/>}
       {view==="form"&&<ViewForm camp={formCamp} canal={canal} op={op} onBack={()=>setView(formCamp?"detail":"portal")} onSuccess={(codigo)=>{setSuccessCodigo(codigo);setView("success");}}/>}
-      {view==="success"&&<ViewSuccess codigo={successCodigo} onVolver={()=>{setView("portal");loadCampaigns();}}/>}
+      {view==="success"&&<ViewSuccess pais={op} onVolver={()=>{setView("portal");loadCampaigns();}}/>}
       <BiggiBubble paginaPrincipal={view==="country"}/>
     </>
   );
