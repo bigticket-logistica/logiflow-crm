@@ -4242,12 +4242,14 @@ export default function App() {
   const [showAdmin,setShowAdmin]=useState(false);
   const [adminAuth,setAdminAuth]=useState(!!sessionStorage.getItem("admin_auth"));
   const [successCodigo,setSuccessCodigo]=useState(null);
-  const [busquedaCodigo,setBusquedaCodigo]=useState("");
-
-  useEffect(()=>{ registrarVisita(canal); },[]);
+  const [busqCorreo,setBusqCorreo]=useState("");
+  const [busqDoc,setBusqDoc]=useState("");
   const [resultadoBusqueda,setResultadoBusqueda]=useState(null);
+  const [listaPostulaciones,setListaPostulaciones]=useState(null);
   const [buscando,setBuscando]=useState(false);
   const [errorBusqueda,setErrorBusqueda]=useState("");
+
+  useEffect(()=>{ registrarVisita(canal); },[]);
 
   useEffect(()=>{loadCampaigns();},[]);
 
@@ -4258,13 +4260,29 @@ export default function App() {
   }
 
   async function buscarPostulacion() {
-    const codigo=busquedaCodigo.trim().toUpperCase();
-    if(!codigo){setErrorBusqueda("Ingresa tu código de postulación.");return;}
-    setBuscando(true);setErrorBusqueda("");setResultadoBusqueda(null);
-    const {data,error}=await sb.from("leads").select("*").eq("codigo_postulacion",codigo).single();
-    if(error||!data){setErrorBusqueda("No encontramos una postulación con ese código.");setBuscando(false);return;}
-    const {data:hist}=await sb.from("lead_historial").select("*").eq("lead_id",data.id).order("created_at",{ascending:true});
-    setResultadoBusqueda({lead:data,historial:hist||[]});
+    const correo = busqCorreo.trim().toLowerCase();
+    const doc = busqDoc.trim().replace(/[.\-]/g,"").toUpperCase();
+    if(!correo||!doc){setErrorBusqueda("Ingresa tu correo y RUT o CURP.");return;}
+    setBuscando(true);setErrorBusqueda("");setResultadoBusqueda(null);setListaPostulaciones(null);
+    const {data,error}=await sb.from("leads").select("*")
+      .eq("email",correo)
+      .or(`rut.eq.${doc},curp.eq.${doc}`)
+      .order("created_at",{ascending:false});
+    if(error||!data||data.length===0){setErrorBusqueda("No encontramos postulaciones con esos datos.");setBuscando(false);return;}
+    if(data.length===1){
+      const {data:hist}=await sb.from("lead_historial").select("*").eq("lead_id",data[0].id).order("created_at",{ascending:true});
+      setResultadoBusqueda({lead:data[0],historial:hist||[]});
+    } else {
+      setListaPostulaciones(data);
+    }
+    setBuscando(false);
+  }
+
+  async function seleccionarPostulacion(lead) {
+    setBuscando(true);
+    const {data:hist}=await sb.from("lead_historial").select("*").eq("lead_id",lead.id).order("created_at",{ascending:true});
+    setResultadoBusqueda({lead,historial:hist||[]});
+    setListaPostulaciones(null);
     setBuscando(false);
   }
 
@@ -4272,9 +4290,46 @@ export default function App() {
   if(showAdmin&&adminAuth) return <><style>{css}</style><AdminPanel onClose={()=>setShowAdmin(false)} campaigns={campaigns} setCampaigns={setCampaigns}/></>;
   if(resultadoBusqueda) return <><style>{css}</style><ViewPostulacion data={resultadoBusqueda} onVolver={()=>setResultadoBusqueda(null)}/><BiggiBubble/></>;
 
+  if(listaPostulaciones) return (
+    <><style>{css}</style>
+    <div>
+      <div className="topbar"><span className="logo">Big<span>ticket</span></span><button className="btn-gw" onClick={()=>setListaPostulaciones(null)}>← Volver</button></div>
+      <div className="pg" style={{maxWidth:480,paddingTop:32}}>
+        <div className="sec-title" style={{marginBottom:4}}>Tus postulaciones</div>
+        <div className="sec-sub" style={{marginBottom:20}}>Selecciona la campaña que quieres consultar</div>
+        {listaPostulaciones.map((l)=>{
+          const camp=campaigns.find(c=>c.id===l.campana_id);
+          const esPos=["Propuesta Aceptada","Contrato Firmado","Postulante Aprobado"].includes(l.etapa);
+          const esNeg=["Propuesta Rechazada","Postulante No Calificado"].includes(l.etapa);
+          const etapaTexto={"Entrevistas y Validaciones":"Validaciones","Postulante Aprobado":"Aprobado","Postulante No Calificado":"No Calificado"}[l.etapa]||l.etapa;
+          return(
+            <div key={l.id} onClick={()=>seleccionarPostulacion(l)}
+              style={{background:"#fff",border:"0.5px solid #e4e7ec",borderRadius:12,padding:"16px 18px",marginBottom:10,cursor:"pointer"}}
+              onMouseEnter={e=>e.currentTarget.style.boxShadow="0 4px 12px rgba(0,0,0,0.08)"}
+              onMouseLeave={e=>e.currentTarget.style.boxShadow="none"}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:14,fontWeight:700,color:"#1a1a1a",marginBottom:3}}>🚛 {camp?.nombre||"Campaña"}</div>
+                  <div style={{fontSize:12,color:"#888"}}>{l.pais} · {new Date(l.created_at).toLocaleDateString("es-CL",{day:"2-digit",month:"short",year:"numeric"})}</div>
+                </div>
+                <div style={{textAlign:"right",flexShrink:0}}>
+                  <span style={{fontSize:11,padding:"3px 10px",borderRadius:20,fontWeight:600,
+                    background:esPos?"#dcfce7":esNeg?"#fee2e2":"#eef2ff",
+                    color:esPos?"#166534":esNeg?"#c0392b":"#1a3a6b"}}>{etapaTexto}</span>
+                  <div style={{fontSize:11,color:"#888",marginTop:4}}>Ver detalle →</div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+    </>
+  );
+
   return (
     <><style>{css}</ style>
-      {view==="country"&&<ViewCountry onSelect={c=>{setOp(c);setView("portal");}} busquedaCodigo={busquedaCodigo} setBusquedaCodigo={setBusquedaCodigo} buscarPostulacion={buscarPostulacion} buscando={buscando} errorBusqueda={errorBusqueda} onAdmin={()=>setShowAdmin(true)}/>}
+      {view==="country"&&<ViewCountry onSelect={c=>{setOp(c);setView("portal");}} busqCorreo={busqCorreo} setBusqCorreo={setBusqCorreo} busqDoc={busqDoc} setBusqDoc={setBusqDoc} buscarPostulacion={buscarPostulacion} buscando={buscando} errorBusqueda={errorBusqueda} onAdmin={()=>setShowAdmin(true)}/>}
       {view==="portal"&&op&&<ViewPortal op={op} canal={canal} campaigns={campaigns} loading={loading} onChangePais={()=>setView("country")} onDetail={c=>{setSelectedCamp(c);setView("detail");}} onLibre={()=>{setFormCamp(null);setView("form");}}/>}
       {view==="detail"&&selectedCamp&&<ViewDetail camp={selectedCamp} canal={canal} onBack={()=>setView("portal")} onPostular={()=>{setFormCamp(selectedCamp);setView("form");}}/>}
       {view==="form"&&<ViewForm camp={formCamp} canal={canal} op={op} onBack={()=>setView(formCamp?"detail":"portal")} onSuccess={(codigo)=>{setSuccessCodigo(codigo);setView("success");}}/>}
