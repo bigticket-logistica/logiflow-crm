@@ -955,8 +955,8 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
       <div style={{padding:"18px 20px",background:"linear-gradient(135deg,#0f1f3d,#1a3a6b)",borderBottom:"1px solid #e4e7ec",flexShrink:0}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
           <div style={{flex:1}}>
-            <div style={{fontSize:18,fontWeight:800,color:"#1a1a1a"}}>{lead.nombre||"Sin nombre"}</div>
-            <div style={{fontSize:12,color:"#888888",marginTop:2}}>{lead.cargo?`${lead.cargo} · `:""}{lead.empresa||"Sin empresa"}</div>
+            <div style={{fontSize:18,fontWeight:800,color:"#ffffff"}}>{lead.nombre||"Sin nombre"}</div>
+            <div style={{fontSize:12,color:"#aac3e8",marginTop:2}}>{lead.cargo?`${lead.cargo} · `:""}{lead.empresa||"Sin empresa"}</div>
             <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
               <CanalTag canal={lead.fuente_contacto||lead.canal}/>
               {lead.pais&&<div style={{display:"flex",alignItems:"center",gap:4,background:"#f0f2f5",borderRadius:20,padding:"2px 8px"}}><PaisFlag pais={lead.pais}/><span style={{fontSize:10,fontWeight:700,color:"#555"}}>{lead.pais}</span></div>}
