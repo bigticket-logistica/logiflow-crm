@@ -947,7 +947,8 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
 
   useEffect(()=>{
     const fetchResp=async()=>{
-      const data=await lfSb.from("lead_respuestas").select("*").eq("lead_id",lead.id).order("created_at");
+      const {data,error}=await supabase.from("lead_respuestas").select("*").eq("lead_id",lead.id).order("created_at");
+      if(error) console.log("Error lead_respuestas:", error.message);
       if(Array.isArray(data)) setRespuestas(data);
     };
     fetchResp();
