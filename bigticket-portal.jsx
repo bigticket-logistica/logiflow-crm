@@ -123,6 +123,9 @@ const css = `
   .tags{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;}
   .ctag{font-size:11px;padding:3px 8px;border-radius:6px;background:#f4f5f7;color:#555;}
   .libre-card{background:#fff;border:1.5px dashed #d0d5dd;border-radius:14px;padding:24px;text-align:center;margin-bottom:28px;}
+  .campo-error input,.campo-error select,.campo-error textarea{border:1.5px solid #ef4444!important;background:#fff5f5!important;}
+  .error-msg{font-size:11px;color:#ef4444;margin-top:3px;font-weight:600;}
+  .campo-error .field-label{color:#ef4444!important;}
   .btn-orange{background:#F47B20;color:#fff;border:none;border-radius:10px;padding:11px 20px;font-size:13px;font-weight:600;cursor:pointer;width:100%;margin-top:14px;font-family:'Geist',sans-serif;transition:background 0.15s;}
   .btn-orange:hover{background:#d96a10;}.btn-orange:disabled{background:#ccc;cursor:not-allowed;}
   .btn-blue{background:#1a3a6b;color:#fff;border:none;border-radius:10px;padding:11px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Geist',sans-serif;}
@@ -506,6 +509,8 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
   const [respuestas,setRespuestas]=useState({});
   const [vars,setVars]=useState([]);
   const [loading,setLoading]=useState(false);
+  const [errores,setErrores]=useState({});
+  const [showConfirm,setShowConfirm]=useState(false);
   const isLibre=!camp;
 
   const handlePaisChange=(nuevoPais)=>{
@@ -526,9 +531,39 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
     setVars(parsed);
   }
 
+  function validarCampos() {
+    const errs={};
+    if(!form.nombre.trim())          errs.nombre="Campo obligatorio";
+    if(!form.telefono.trim()||form.telefono===PREFIJOS[form.pais_form]||form.telefono===PREFIJOS[op]) errs.telefono="Campo obligatorio";
+    if(!form.email.trim())           errs.email="Campo obligatorio";
+    if(!form.region_estado)          errs.region_estado="Campo obligatorio";
+    if(!form.fuente_contacto)        errs.fuente_contacto="Campo obligatorio";
+    if(!form.rut.trim())             errs.rut="Campo obligatorio";
+    if(!isLibre && vars.length>0) {
+      vars.forEach(v=>{ if(!respuestas[v.id]) errs[`var_${v.id}`]="Campo obligatorio"; });
+    }
+    if(isLibre) {
+      if(!respuestas.vehiculo)       errs.vehiculo="Campo obligatorio";
+      if(!respuestas.zona_horaria)   errs.zona_horaria="Campo obligatorio";
+    }
+    setErrores(errs);
+    return Object.keys(errs).length===0;
+  }
+
+  function handleEnviar() {
+    if(!validarCampos()) {
+      // Scroll al primer error
+      setTimeout(()=>{
+        const el=document.querySelector(".campo-error");
+        if(el) el.scrollIntoView({behavior:"smooth",block:"center"});
+      },100);
+      return;
+    }
+    setShowConfirm(true);
+  }
+
   async function submit() {
-    if(!form.nombre||!form.telefono){alert("Completa nombre y teléfono.");return;}
-    if(!form.fuente_contacto){alert("Indica cómo nos conociste.");return;}
+    setShowConfirm(false);
     setLoading(true);
     try {
       const score=isLibre?0:calcScoreRespuestas(vars,respuestas);
@@ -581,6 +616,60 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
         tipo:isLibre?"libre":"campaña",canal,pais:op,
         score_calculado:score,respuestas,
       });
+
+      // Guardar respuestas detalladas en lead_respuestas
+      if(!isLibre && vars.length>0) {
+        const respuestasDetalle = vars.map(v => {
+          const respuesta = respuestas[v.id] || "";
+          const opts = v.opciones || [];
+          let puntaje = 0;
+          if(v.tipo==="sino") puntaje = respuesta==="si" ? (opts[0]?.puntos||0) : 0;
+          else if(v.tipo==="escala"||v.tipo==="seleccion") {
+            const opt = opts.find(o=>o.valor===respuesta);
+            puntaje = opt?.puntos||0;
+          } else if(v.tipo==="texto") puntaje = respuesta.trim() ? (opts[0]?.puntos||0) : 0;
+          return {
+            lead_id: lead.id,
+            campana_id: camp?.id||null,
+            campana_nombre: camp?.nombre||null,
+            pregunta_id: v.id,
+            pregunta: v.pregunta,
+            tipo_pregunta: v.tipo,
+            respuesta: String(respuesta),
+            puntaje,
+            puntaje_maximo: Math.max(0,...(opts.map(o=>o.puntos||0))),
+          };
+        });
+        await sb.from("lead_respuestas").insert(respuestasDetalle);
+      }
+      // Postulación libre — guardar campos como respuestas
+      if(isLibre) {
+        const camposLibre = [
+          {campo:"vehiculo",     pregunta:"Tipo de vehículo"},
+          {campo:"volumen",      pregunta:"Volumen del vehículo"},
+          {campo:"zona",         pregunta:"Zona donde opera"},
+          {campo:"zona_horaria", pregunta:"Zona horaria disponible"},
+          {campo:"disp",         pregunta:"Disponibilidad"},
+          {campo:"propio",       pregunta:"¿Vehículo propio?"},
+          {campo:"factura",      pregunta:"¿Puede facturar?"},
+          {campo:"exp",          pregunta:"Experiencia en reparto"},
+          {campo:"comentario",   pregunta:"Comentario adicional"},
+        ];
+        const respLibre = camposLibre
+          .filter(c=>respuestas[c.campo])
+          .map(c=>({
+            lead_id: lead.id,
+            campana_id: null,
+            campana_nombre: "Postulación libre",
+            pregunta_id: c.campo,
+            pregunta: c.pregunta,
+            tipo_pregunta: "texto",
+            respuesta: String(respuestas[c.campo]),
+            puntaje: 0,
+            puntaje_maximo: 0,
+          }));
+        if(respLibre.length>0) await sb.from("lead_respuestas").insert(respLibre);
+      }
 
       // 2. Llamar a N8N para enviar WhatsApp + correo
       try {
@@ -653,6 +742,45 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
 
   return (
     <div>
+      {showConfirm&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div style={{background:"#fff",borderRadius:16,padding:28,maxWidth:480,width:"100%",maxHeight:"80vh",overflowY:"auto"}}>
+            <div style={{fontSize:18,fontWeight:800,color:"#1a1a1a",marginBottom:4}}>Confirmar postulación</div>
+            <div style={{fontSize:13,color:"#888",marginBottom:20}}>Revisa tu información antes de enviar</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:20}}>
+              {[
+                ["Nombre",        form.nombre],
+                ["Teléfono",      form.telefono],
+                ["Email",         form.email],
+                [form.pais_form==="México"?"CURP":"RUT", form.rut],
+                [form.pais_form==="México"?"CEDIS":"Región", form.region_estado],
+                ["Empresa",       form.empresa],
+                ["¿Cómo nos conociste?", form.fuente_contacto],
+                ...(isLibre?[
+                  ["Vehículo",    respuestas.vehiculo||"—"],
+                  ["Zona horaria",respuestas.zona_horaria||"—"],
+                ]:[]),
+                ...(!isLibre?vars.map(v=>([v.pregunta, respuestas[v.id]||"—"])):[] ),
+              ].filter(([,v])=>v).map(([k,v])=>(
+                <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #f4f5f7"}}>
+                  <span style={{fontSize:12,color:"#555",fontWeight:500}}>{k}</span>
+                  <span style={{fontSize:12,color:"#1a1a1a",fontWeight:700,textAlign:"right",maxWidth:260}}>{v}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>setShowConfirm(false)}
+                style={{flex:1,padding:"11px",borderRadius:10,border:"1px solid #e4e7ec",background:"#f8f9fa",fontSize:13,fontWeight:600,cursor:"pointer",color:"#555"}}>
+                ← Editar
+              </button>
+              <button onClick={submit} disabled={loading}
+                style={{flex:2,padding:"11px",borderRadius:10,border:"none",background:"#F47B20",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+                {loading?"Enviando...":"✅ Confirmar y enviar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="detail-header">
         <button className="btn-back" onClick={onBack}>← Volver</button>
         <span style={{fontSize:15,fontWeight:600,color:"#1a1a1a"}}>{isLibre?"Postulación abierta":`Postular: ${camp.nombre}`}</span>
@@ -664,17 +792,18 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
 
           {/* Fila 1: Nombre + Empresa */}
           <div className="two-col">
-            <div className="field-row"><span className="field-label">Nombre completo *</span><input value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})} placeholder="Tu nombre"/></div>
+            <div className={`field-row${errores.nombre?" campo-error":""}`}><span className="field-label">Nombre completo *</span><input value={form.nombre} onChange={e=>{setForm({...form,nombre:e.target.value});setErrores(p=>({...p,nombre:""}));}} placeholder="Tu nombre"/>{errores.nombre&&<div className="error-msg">{errores.nombre}</div>}</div>
             <div className="field-row"><span className="field-label">Empresa / Razón social</span><input value={form.empresa} onChange={e=>setForm({...form,empresa:e.target.value})} placeholder="Nombre de tu empresa (opcional)"/></div>
           </div>
 
           {/* Fila 2: RUT (Chile) / CURP (México) + Correo */}
           <div className="two-col">
-            <div className="field-row">
-              <span className="field-label">{form.pais_form==="México"?"CURP":"RUT"}</span>
-              <input value={form.rut} onChange={e=>setForm({...form,rut:e.target.value})} placeholder={form.pais_form==="México"?"Ej: ABCD123456HDFXXX00":"Ej: 12345678k"}/>
+            <div className={`field-row${errores.rut?" campo-error":""}`}>
+              <span className="field-label">{form.pais_form==="México"?"CURP *":"RUT *"}</span>
+              <input value={form.rut} onChange={e=>{setForm({...form,rut:e.target.value});setErrores(p=>({...p,rut:""}));}} placeholder={form.pais_form==="México"?"Ej: ABCD123456HDFXXX00":"Ej: 12345678k"}/>
+              {errores.rut&&<div className="error-msg">{errores.rut}</div>}
             </div>
-            <div className="field-row"><span className="field-label">Correo electrónico</span><input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="correo@..."/></div>
+            <div className={`field-row${errores.email?" campo-error":""}`}><span className="field-label">Correo electrónico *</span><input type="email" value={form.email} onChange={e=>{setForm({...form,email:e.target.value});setErrores(p=>({...p,email:""}));}} placeholder="correo@..."/>{errores.email&&<div className="error-msg">{errores.email}</div>}</div>
           </div>
 
           {/* Fila 3: País + Región (postulación libre) */}
@@ -689,12 +818,13 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
                 </select>
               </div>
               <div className="field-row">
-                <span className="field-label">{form.pais_form==="México"?"Estado *":"Región *"}</span>
-                <select value={form.region_estado} onChange={e=>setForm({...form,region_estado:e.target.value})}
-                  style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #e4e7ec",background:"#f8f9fa",fontSize:14,cursor:"pointer",color:form.region_estado?"#1a1a1a":"#888888"}}>
+                <span className="field-label">{form.pais_form==="México"?"CEDIS *":"Región *"}</span>
+                <select value={form.region_estado} onChange={e=>{setForm({...form,region_estado:e.target.value});setErrores(p=>({...p,region_estado:""}));}}
+                  style={{width:"100%",padding:"10px 12px",borderRadius:8,border:errores.region_estado?"1.5px solid #ef4444":"1px solid #e4e7ec",background:errores.region_estado?"#fff5f5":"#f8f9fa",fontSize:14,cursor:"pointer",color:form.region_estado?"#1a1a1a":"#888888"}}>
                   <option value="">-- Seleccionar --</option>
                   {regionesOpciones.map(r=><option key={r} value={r}>{r}</option>)}
                 </select>
+                {errores.region_estado&&<div className="error-msg">{errores.region_estado}</div>}
               </div>
             </div>
           )}
@@ -703,17 +833,19 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
           {!isLibre&&(
             <div className="two-col">
               <div className="field-row">
-                <span className="field-label">{op==="México"?"Estado *":"Región *"}</span>
-                <select value={form.region_estado} onChange={e=>setForm({...form,region_estado:e.target.value})}
-                  style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #e4e7ec",background:"#f8f9fa",fontSize:14,cursor:"pointer",color:form.region_estado?"#1a1a1a":"#888888"}}>
+                <span className="field-label">{op==="México"?"CEDIS *":"Región *"}</span>
+                <select value={form.region_estado} onChange={e=>{setForm({...form,region_estado:e.target.value});setErrores(p=>({...p,region_estado:""}));}}
+                  style={{width:"100%",padding:"10px 12px",borderRadius:8,border:errores.region_estado?"1.5px solid #ef4444":"1px solid #e4e7ec",background:errores.region_estado?"#fff5f5":"#f8f9fa",fontSize:14,cursor:"pointer",color:form.region_estado?"#1a1a1a":"#888888"}}>
                   <option value="">-- Seleccionar --</option>
                   {(op==="México"?ESTADOS_MEXICO:REGIONES_CHILE).map(r=><option key={r} value={r}>{r}</option>)}
                 </select>
+                {errores.region_estado&&<div className="error-msg">{errores.region_estado}</div>}
               </div>
-              <div className="field-row">
+              <div className={`field-row${errores.telefono?" campo-error":""}`}>
                 <span className="field-label">Teléfono WhatsApp *</span>
-                <input value={form.telefono} onChange={e=>setForm({...form,telefono:e.target.value})}
+                <input value={form.telefono} onChange={e=>{setForm({...form,telefono:e.target.value});setErrores(p=>({...p,telefono:""}));}}
                   placeholder={op==="México"?"+521 ...":"+569 ..."}/>
+                {errores.telefono&&<div className="error-msg">{errores.telefono}</div>}
               </div>
             </div>
           )}
@@ -721,15 +853,16 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
           {/* Fila 4 libre: Teléfono + ¿Cómo nos conociste? */}
           {isLibre&&(
             <div className="two-col">
-              <div className="field-row">
+              <div className={`field-row${errores.telefono?" campo-error":""}`}>
                 <span className="field-label">Teléfono WhatsApp *</span>
-                <input value={form.telefono} onChange={e=>setForm({...form,telefono:e.target.value})}
+                <input value={form.telefono} onChange={e=>{setForm({...form,telefono:e.target.value});setErrores(p=>({...p,telefono:""}));}}
                   placeholder={form.pais_form==="México"?"+521 ...":"+569 ..."}/>
+                {errores.telefono&&<div className="error-msg">{errores.telefono}</div>}
               </div>
               <div className="field-row">
                 <span className="field-label">¿Cómo nos conociste? *</span>
-                <select value={form.fuente_contacto} onChange={e=>setForm({...form,fuente_contacto:e.target.value})}
-                  style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #e4e7ec",background:"#f8f9fa",fontSize:14,color:form.fuente_contacto?"#1a1a1a":"#888888",cursor:"pointer"}}>
+                <select value={form.fuente_contacto} onChange={e=>{setForm({...form,fuente_contacto:e.target.value});setErrores(p=>({...p,fuente_contacto:""}));}}
+                  style={{width:"100%",padding:"10px 12px",borderRadius:8,border:errores.fuente_contacto?"1.5px solid #ef4444":"1px solid #e4e7ec",background:errores.fuente_contacto?"#fff5f5":"#f8f9fa",fontSize:14,color:form.fuente_contacto?"#1a1a1a":"#888888",cursor:"pointer"}}>
                   <option value="">Selecciona una opción...</option>
                   <option value="Instagram">📸 Instagram</option>
                   <option value="Facebook">📘 Facebook</option>
@@ -739,6 +872,7 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
                   <option value="Portal web">🌐 Entré directo al portal</option>
                   <option value="Otro">💬 Otro</option>
                 </select>
+                {errores.fuente_contacto&&<div className="error-msg">{errores.fuente_contacto}</div>}
               </div>
             </div>
           )}
@@ -747,8 +881,8 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
           {!isLibre&&(
             <div className="field-row">
               <span className="field-label">¿Cómo nos conociste? *</span>
-              <select value={form.fuente_contacto} onChange={e=>setForm({...form,fuente_contacto:e.target.value})}
-                style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #e4e7ec",background:"#f8f9fa",fontSize:14,color:form.fuente_contacto?"#1a1a1a":"#888888",cursor:"pointer"}}>
+              <select value={form.fuente_contacto} onChange={e=>{setForm({...form,fuente_contacto:e.target.value});setErrores(p=>({...p,fuente_contacto:""}));}}
+                style={{width:"100%",padding:"10px 12px",borderRadius:8,border:errores.fuente_contacto?"1.5px solid #ef4444":"1px solid #e4e7ec",background:errores.fuente_contacto?"#fff5f5":"#f8f9fa",fontSize:14,color:form.fuente_contacto?"#1a1a1a":"#888888",cursor:"pointer"}}>
                 <option value="">Selecciona una opción...</option>
                 <option value="Instagram">📸 Instagram</option>
                 <option value="Facebook">📘 Facebook</option>
@@ -758,6 +892,7 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
                 <option value="Portal web">🌐 Entré directo al portal</option>
                 <option value="Otro">💬 Otro</option>
               </select>
+              {errores.fuente_contacto&&<div className="error-msg">{errores.fuente_contacto}</div>}
             </div>
           )}
         </div>
@@ -827,7 +962,7 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
             </div>
           </div>
         )}
-        <button className="btn-orange" onClick={submit} disabled={loading}>{loading?"Enviando...":"Enviar postulación"}</button>
+        <button className="btn-orange" onClick={handleEnviar} disabled={loading}>{loading?"Enviando...":"Enviar postulación"}</button>
       </div>
     </div>
   );
