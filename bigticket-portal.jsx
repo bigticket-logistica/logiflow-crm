@@ -543,8 +543,8 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
       vars.forEach(v=>{ if(!respuestas[v.id]) errs[`var_${v.id}`]="Campo obligatorio"; });
     }
     if(isLibre) {
-      if(!respuestas.vehiculo)       errs.vehiculo="Campo obligatorio";
-      if(!respuestas.zona_horaria)   errs.zona_horaria="Campo obligatorio";
+      if(!respuestas.vehiculo)  errs.vehiculo="Campo obligatorio";
+      if(!respuestas.disp)      errs.disp="Campo obligatorio";
     }
     setErrores(errs);
     return Object.keys(errs).length===0;
@@ -757,8 +757,9 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
                 ["Empresa",       form.empresa],
                 ["¿Cómo nos conociste?", form.fuente_contacto],
                 ...(isLibre?[
-                  ["Vehículo",    respuestas.vehiculo||"—"],
-                  ["Zona horaria",respuestas.zona_horaria||"—"],
+                  ["Vehículo",      respuestas.vehiculo||"—"],
+                  ["Disponibilidad",respuestas.disp||"—"],
+                  ["Zona de operación",respuestas.zona||"—"],
                 ]:[]),
                 ...(!isLibre?vars.map(v=>([v.pregunta, respuestas[v.id]||"—"])):[] ),
               ].filter(([,v])=>v).map(([k,v])=>(
@@ -908,17 +909,19 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
           <div className="form-card">
             <div className="form-title">Tu vehículo y disponibilidad</div>
             <div className="two-col">
-              <div className="field-row"><span className="field-label">Tipo de vehículo</span>
+              <div className={`field-row${errores.vehiculo?" campo-error":""}`}><span className="field-label">Tipo de vehículo *</span>
                 <select value={respuestas.vehiculo||""} onChange={e=>{
                   const tv=e.target.value;
                   const volAuto="1,9 m³"; const volSmall="2,3 - 5,4 m³"; const volLarge="5,5 - 12,9 m³";
                   const volAuto_v="1,9"; const volSmall_v="2,3 - 5,4"; const volLarge_v="5,5 - 12,9";
                   const autoVol=tv==="Auto"?volAuto_v:tv==="Small Van"?volSmall_v:tv==="Large Van"?volLarge_v:"";
                   setRespuestas({...respuestas,vehiculo:tv,volumen:autoVol});
+                  setErrores(p=>({...p,vehiculo:""}));
                 }}>
                   <option value="">-- Seleccionar --</option>
                   {["Auto","Small Van","Large Van"].map(v=><option key={v}>{v}</option>)}
                 </select>
+                {errores.vehiculo&&<div className="error-msg">{errores.vehiculo}</div>}
               </div>
               <div className="field-row"><span className="field-label">Volumen (m³)</span>
                 <input value={respuestas.volumen||""} onChange={e=>setRespuestas({...respuestas,volumen:e.target.value})}
@@ -930,11 +933,12 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
             </div>
             <div className="two-col">
               <div className="field-row"><span className="field-label">Zona donde opera</span><input value={respuestas.zona||""} onChange={e=>setRespuestas({...respuestas,zona:e.target.value})} placeholder="Ej: Santiago Norte"/></div>
-              <div className="field-row"><span className="field-label">Disponibilidad</span>
-                <select value={respuestas.disp||""} onChange={e=>setRespuestas({...respuestas,disp:e.target.value})}>
+              <div className={`field-row${errores.disp?" campo-error":""}`}><span className="field-label">Disponibilidad *</span>
+                <select value={respuestas.disp||""} onChange={e=>{setRespuestas({...respuestas,disp:e.target.value});setErrores(p=>({...p,disp:""}));}}>
                   <option value="">-- Seleccionar --</option>
                   {["Diurno","Nocturno","Mixto"].map(v=><option key={v}>{v}</option>)}
                 </select>
+                {errores.disp&&<div className="error-msg">{errores.disp}</div>}
               </div>
             </div>
             <div className="two-col">
