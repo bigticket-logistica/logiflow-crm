@@ -1009,7 +1009,7 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
       </div>
       <div style={{display:"flex",background:"#1a3a6b",borderBottom:"1px solid #e4e7ec",flexShrink:0}}>
         {[["info","📋 Datos"],["score","⭐ Score"],["timeline","🕐 Historial"],["postulacion","📝 Información"],["comentarios","💬 Comentarios"]].map(([id,label])=>(
-          <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:tab===id?"2px solid #3B82F6":"2px solid transparent",color:tab===id?"#3B82F6":"#1a1a1a",fontSize:11,fontWeight:700,cursor:"pointer",letterSpacing:.5}}>{label}</button>
+          <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:tab===id?"2px solid #3B82F6":"2px solid transparent",color:tab===id?"#FFFFFF":"#E8EAED",fontSize:11,fontWeight:700,cursor:"pointer",letterSpacing:.5}}>{label}</button>
         ))}
       </div>
       <div style={{flex:1,overflow:"auto",padding:16}}>
