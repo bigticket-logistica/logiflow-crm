@@ -942,8 +942,28 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
   const [saving,setSaving]=useState(false);
   const [saved,setSaved]=useState(false);
   const [respuestas,setRespuestas]=useState([]);
+  // Comentarios CRM (analista)
+  const [comentarios,setComentarios]=useState(lead.comentarios_crm||"");
+  const [savingComentarios,setSavingComentarios]=useState(false);
+  const [savedComentarios,setSavedComentarios]=useState(false);
 
   useEffect(()=>{ setEtapa(lead.etapa||"Nuevo Lead"); },[lead.etapa]);
+  useEffect(()=>{ setComentarios(lead.comentarios_crm||""); },[lead.id, lead.comentarios_crm]);
+
+  const handleGuardarComentarios=async()=>{
+    setSavingComentarios(true);
+    setSavedComentarios(false);
+    const {error}=await supabase.from("leads").update({comentarios_crm:comentarios, updated_at:new Date().toISOString()}).eq("id",lead.id);
+    setSavingComentarios(false);
+    if(error){
+      console.log("Error guardando comentarios:", error.message);
+      alert("Error al guardar comentarios: "+error.message);
+      return;
+    }
+    setSavedComentarios(true);
+    onUpdate&&onUpdate({...lead, comentarios_crm:comentarios});
+    setTimeout(()=>setSavedComentarios(false), 2500);
+  };
 
   useEffect(()=>{
     const fetchResp=async()=>{
@@ -988,8 +1008,8 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
         </div>
       </div>
       <div style={{display:"flex",background:"#1a3a6b",borderBottom:"1px solid #e4e7ec",flexShrink:0}}>
-        {[["info","📋 Datos"],["score","⭐ Score"],["timeline","🕐 Historial"],["postulacion","📝 Información"]].map(([id,label])=>(
-          <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:tab===id?"2px solid #3B82F6":"2px solid transparent",color:tab===id?"#3B82F6":"#475569",fontSize:11,fontWeight:700,cursor:"pointer",letterSpacing:.5}}>{label}</button>
+        {[["info","📋 Datos"],["score","⭐ Score"],["timeline","🕐 Historial"],["postulacion","📝 Información"],["comentarios","💬 Comentarios"]].map(([id,label])=>(
+          <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:tab===id?"2px solid #3B82F6":"2px solid transparent",color:tab===id?"#3B82F6":"#1a1a1a",fontSize:11,fontWeight:700,cursor:"pointer",letterSpacing:.5}}>{label}</button>
         ))}
       </div>
       <div style={{flex:1,overflow:"auto",padding:16}}>
@@ -1198,6 +1218,64 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
                 </div>
               </div>
             )}
+          </div>
+        )}
+        {tab==="comentarios"&&(
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            <div style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:10,padding:14}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                <div style={{fontSize:10,fontWeight:800,color:"#555555",letterSpacing:1,textTransform:"uppercase"}}>💬 Comentarios del analista</div>
+                {comentarios&&<span style={{fontSize:9,color:"#888"}}>{comentarios.length} caracteres</span>}
+              </div>
+              <textarea
+                value={comentarios}
+                onChange={e=>setComentarios(e.target.value)}
+                placeholder="Escribe aquí tus comentarios sobre este lead… seguimiento de llamadas, observaciones, próximos pasos, etc."
+                style={{
+                  width:"100%",
+                  minHeight:200,
+                  padding:"12px 14px",
+                  border:"1px solid #e4e7ec",
+                  borderRadius:8,
+                  fontSize:13,
+                  color:"#1a1a1a",
+                  fontFamily:"inherit",
+                  lineHeight:1.6,
+                  resize:"vertical",
+                  outline:"none",
+                  background:"#fafbfc",
+                  boxSizing:"border-box"
+                }}
+                onFocus={e=>e.target.style.borderColor="#3B82F6"}
+                onBlur={e=>e.target.style.borderColor="#e4e7ec"}
+              />
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:12,gap:10}}>
+                <div style={{fontSize:10,color:"#888"}}>
+                  {savingComentarios&&<span style={{color:"#3B82F6"}}>Guardando…</span>}
+                  {savedComentarios&&<span style={{color:"#10B981",fontWeight:700}}>✓ Guardado correctamente</span>}
+                  {!savingComentarios&&!savedComentarios&&comentarios!==(lead.comentarios_crm||"")&&<span style={{color:"#F59E0B"}}>● Cambios sin guardar</span>}
+                </div>
+                <button
+                  onClick={handleGuardarComentarios}
+                  disabled={savingComentarios||comentarios===(lead.comentarios_crm||"")}
+                  style={{
+                    background: (savingComentarios||comentarios===(lead.comentarios_crm||"")) ? "#cbd5e1" : "#3B82F6",
+                    color:"#ffffff",
+                    border:"none",
+                    borderRadius:8,
+                    padding:"8px 18px",
+                    fontSize:12,
+                    fontWeight:700,
+                    cursor: (savingComentarios||comentarios===(lead.comentarios_crm||"")) ? "not-allowed" : "pointer",
+                    letterSpacing:.5
+                  }}>
+                  {savingComentarios?"Guardando...":"Guardar comentario"}
+                </button>
+              </div>
+            </div>
+            <div style={{background:"#fef3c7",border:"1px solid #fcd34d",borderRadius:8,padding:"10px 12px",fontSize:11,color:"#92400e",lineHeight:1.5}}>
+              💡 <strong>Tip:</strong> Estos comentarios son internos del CRM y no son visibles para el postulante. Úsalos para registrar interacciones, contexto de llamadas, notas de validación o próximos pasos.
+            </div>
           </div>
         )}
       </div>
