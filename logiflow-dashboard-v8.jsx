@@ -1008,8 +1008,8 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
         </div>
       </div>
       <div style={{display:"flex",background:"#1a3a6b",borderBottom:"1px solid #e4e7ec",flexShrink:0}}>
-        {[["info","📋 Datos"],["score","⭐ Score"],["timeline","🕐 Historial"],["postulacion","📝 Información"],["comentarios","💬 Comentarios"]].map(([id,label])=>(
-          <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"10px 0",background:"none",border:"none",borderBottom:tab===id?"2px solid #3B82F6":"2px solid transparent",color:tab===id?"#FFFFFF":"#E8EAED",fontSize:11,fontWeight:700,cursor:"pointer",letterSpacing:.5}}>{label}</button>
+        {[["info","📋 Datos"],["score","⭐ Score"],["timeline","🕐 Historial"],["postulacion","📝 Información"],["comentarios","💬 Comentarios"],["preguntas","❓ Preguntas Prospecto"]].map(([id,label])=>(
+          <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"10px 4px",background:"none",border:"none",borderBottom:tab===id?"2px solid #3B82F6":"2px solid transparent",color:tab===id?"#FFFFFF":"#E8EAED",fontSize:10,fontWeight:700,cursor:"pointer",letterSpacing:.3,lineHeight:1.2}}>{label}</button>
         ))}
       </div>
       <div style={{flex:1,overflow:"auto",padding:16}}>
@@ -1276,6 +1276,52 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
             <div style={{background:"#fef3c7",border:"1px solid #fcd34d",borderRadius:8,padding:"10px 12px",fontSize:11,color:"#92400e",lineHeight:1.5}}>
               💡 <strong>Tip:</strong> Estos comentarios son internos del CRM y no son visibles para el postulante. Úsalos para registrar interacciones, contexto de llamadas, notas de validación o próximos pasos.
             </div>
+          </div>
+        )}
+        {tab==="preguntas"&&(
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            <div style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:10,padding:14}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                <div style={{fontSize:10,fontWeight:800,color:"#555555",letterSpacing:1,textTransform:"uppercase"}}>❓ Preguntas del prospecto</div>
+                {lead.preguntas_prospecto_fecha&&(
+                  <span style={{fontSize:9,color:"#888"}}>
+                    📅 {new Date(lead.preguntas_prospecto_fecha).toLocaleDateString("es-MX",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}
+                  </span>
+                )}
+              </div>
+              {lead.preguntas_prospecto?(
+                <>
+                  <div style={{background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:10,padding:"14px 16px",fontSize:13,color:"#1a1a1a",lineHeight:1.7,whiteSpace:"pre-wrap",fontFamily:"inherit"}}>
+                    {lead.preguntas_prospecto}
+                  </div>
+                  <div style={{marginTop:12,display:"flex",gap:8,flexWrap:"wrap"}}>
+                    <button
+                      onClick={()=>navigator.clipboard?.writeText(lead.preguntas_prospecto)}
+                      style={{background:"#eef2ff",color:"#1a3a6b",border:"1px solid #c7d2fe",borderRadius:8,padding:"6px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+                      📋 Copiar texto
+                    </button>
+                    {lead.telefono&&(
+                      <a href={`https://wa.me/${lead.telefono.replace(/\D/g,"")}?text=${encodeURIComponent("Hola "+(lead.nombre||"")+", recibimos tus preguntas sobre la propuesta. Te respondo: ")}`}
+                        target="_blank" rel="noreferrer"
+                        style={{background:"#25D366",color:"#fff",border:"none",borderRadius:8,padding:"6px 12px",fontSize:11,fontWeight:700,cursor:"pointer",textDecoration:"none",display:"inline-block"}}>
+                        💬 Responder por WhatsApp
+                      </a>
+                    )}
+                  </div>
+                </>
+              ):(
+                <div style={{textAlign:"center",padding:"30px 16px",color:"#aaa",fontSize:12}}>
+                  <div style={{fontSize:32,marginBottom:8,opacity:.4}}>📭</div>
+                  <div style={{fontWeight:600,color:"#888"}}>El prospecto no ha enviado preguntas</div>
+                  <div style={{fontSize:11,marginTop:4,color:"#aaa"}}>Si envía preguntas desde el portal de propuesta, aparecerán aquí.</div>
+                </div>
+              )}
+            </div>
+            {lead.preguntas_prospecto&&(
+              <div style={{background:"#fef3c7",border:"1px solid #fcd34d",borderRadius:8,padding:"10px 12px",fontSize:11,color:"#92400e",lineHeight:1.5}}>
+                ⚠️ <strong>Importante:</strong> El prospecto envió estas preguntas <strong>antes</strong> de aceptar o rechazar la propuesta. Resuélvelas pronto para no perder el lead.
+              </div>
+            )}
           </div>
         )}
       </div>
