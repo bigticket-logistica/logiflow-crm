@@ -972,10 +972,10 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
     setEnviandoRespuesta(true);
     try{
       // 1) Normalizar teléfono al formato E.164 sin "+"
-      let tel=String(lead.telefono).replace(/\D/g,"");
-      const prefijos={Chile:"56",México:"52",Mexico:"52",Colombia:"57",Perú:"51",Peru:"51",Argentina:"54",Ecuador:"593",España:"34",Espana:"34"};
-      const prefijoEsperado=prefijos[lead.pais]||"56";
-      if(!tel.startsWith(prefijoEsperado)) tel=prefijoEsperado+tel;
+      // Usar el teléfono tal cual viene de Supabase. Solo limpiamos caracteres no numéricos
+      // (espacios, guiones, paréntesis y "+"). El número ya trae su código de país desde origen,
+      // igual que en el flujo de envío de propuesta.
+      const tel=String(lead.telefono).replace(/\D/g,"");
 
       // 2) Obtener nombre de campaña si tiene
       let campanaNombre="Postulación libre";
