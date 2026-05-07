@@ -946,9 +946,87 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
   const [comentarios,setComentarios]=useState(lead.comentarios_crm||"");
   const [savingComentarios,setSavingComentarios]=useState(false);
   const [savedComentarios,setSavedComentarios]=useState(false);
+  // Respuesta del analista a las preguntas del prospecto (envío por WhatsApp via N8N)
+  const [respuestaAnalista,setRespuestaAnalista]=useState(lead.respuesta_analista_preguntas||"");
+  const [enviandoRespuesta,setEnviandoRespuesta]=useState(false);
+  const [respuestaEnviada,setRespuestaEnviada]=useState(!!lead.respuesta_analista_preguntas);
 
   useEffect(()=>{ setEtapa(lead.etapa||"Nuevo Lead"); },[lead.etapa]);
   useEffect(()=>{ setComentarios(lead.comentarios_crm||""); },[lead.id, lead.comentarios_crm]);
+  useEffect(()=>{
+    setRespuestaAnalista(lead.respuesta_analista_preguntas||"");
+    setRespuestaEnviada(!!lead.respuesta_analista_preguntas);
+  },[lead.id, lead.respuesta_analista_preguntas]);
+
+  const handleEnviarRespuestaWhatsApp=async()=>{
+    if(!respuestaAnalista.trim()){
+      alert("Escribe una respuesta antes de enviar");
+      return;
+    }
+    if(!lead.telefono){
+      alert("Este lead no tiene teléfono registrado");
+      return;
+    }
+    if(!confirm("¿Confirmas el envío de esta respuesta por WhatsApp al lead?\n\nLlegará desde el número oficial de Bigticket usando una plantilla aprobada por Meta.")) return;
+
+    setEnviandoRespuesta(true);
+    try{
+      // 1) Normalizar teléfono al formato E.164 sin "+"
+      let tel=String(lead.telefono).replace(/\D/g,"");
+      const prefijos={Chile:"56",México:"52",Mexico:"52",Colombia:"57",Perú:"51",Peru:"51",Argentina:"54",Ecuador:"593",España:"34",Espana:"34"};
+      const prefijoEsperado=prefijos[lead.pais]||"56";
+      if(!tel.startsWith(prefijoEsperado)) tel=prefijoEsperado+tel;
+
+      // 2) Obtener nombre de campaña si tiene
+      let campanaNombre="Postulación libre";
+      if(lead.campana_id){
+        const {data:c}=await supabase.from("campanas").select("nombre").eq("id",lead.campana_id).single();
+        if(c?.nombre) campanaNombre=c.nombre;
+      }
+
+      // 3) Disparar webhook N8N (envía por WhatsApp con plantilla)
+      const webhookUrl="https://bigticket2026.app.n8n.cloud/webhook/respuesta-pregunta-lead";
+      await fetch(webhookUrl,{
+        method:"POST",
+        mode:"no-cors",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          lead_id: lead.id,
+          telefono: tel,
+          nombre: lead.nombre||"",
+          campana_nombre: campanaNombre,
+          preguntas: lead.preguntas_prospecto||"",
+          respuesta: respuestaAnalista.trim()
+        })
+      });
+
+      // 4) Guardar en Supabase para trazabilidad
+      const ahora=new Date().toISOString();
+      const {error}=await supabase.from("leads").update({
+        respuesta_analista_preguntas: respuestaAnalista.trim(),
+        respuesta_analista_fecha: ahora,
+        updated_at: ahora
+      }).eq("id",lead.id);
+      if(error) throw error;
+
+      // 5) Registrar en historial
+      await supabase.from("lead_historial").insert({
+        lead_id: lead.id,
+        etapa_anterior: lead.etapa,
+        etapa_nueva: lead.etapa,
+        comentario: "📨 Respuesta enviada por WhatsApp al prospecto"
+      });
+
+      setRespuestaEnviada(true);
+      onUpdate&&onUpdate({...lead, respuesta_analista_preguntas: respuestaAnalista.trim(), respuesta_analista_fecha: ahora});
+      alert("✅ Respuesta enviada por WhatsApp\n\nEl mensaje fue disparado al webhook de N8N usando la plantilla oficial de Meta.");
+    }catch(e){
+      console.error("Error enviando respuesta:",e);
+      alert("⚠️ Error al enviar: "+(e.message||"webhook no disponible"));
+    }finally{
+      setEnviandoRespuesta(false);
+    }
+  };
 
   const handleGuardarComentarios=async()=>{
     setSavingComentarios(true);
@@ -1291,21 +1369,103 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
               </div>
               {lead.preguntas_prospecto?(
                 <>
+                  {/* Las preguntas del lead */}
                   <div style={{background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:10,padding:"14px 16px",fontSize:13,color:"#1a1a1a",lineHeight:1.7,whiteSpace:"pre-wrap",fontFamily:"inherit"}}>
                     {lead.preguntas_prospecto}
                   </div>
-                  <div style={{marginTop:12,display:"flex",gap:8,flexWrap:"wrap"}}>
+                  <div style={{marginTop:10,display:"flex",gap:8,flexWrap:"wrap"}}>
                     <button
-                      onClick={()=>navigator.clipboard?.writeText(lead.preguntas_prospecto)}
+                      onClick={()=>{
+                        navigator.clipboard?.writeText(lead.preguntas_prospecto);
+                        alert("✓ Preguntas copiadas al portapapeles");
+                      }}
                       style={{background:"#eef2ff",color:"#1a3a6b",border:"1px solid #c7d2fe",borderRadius:8,padding:"6px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
-                      📋 Copiar texto
+                      📋 Copiar preguntas
                     </button>
-                    {lead.telefono&&(
-                      <a href={`https://wa.me/${lead.telefono.replace(/\D/g,"")}?text=${encodeURIComponent("Hola "+(lead.nombre||"")+", recibimos tus preguntas sobre la propuesta. Te respondo: ")}`}
-                        target="_blank" rel="noreferrer"
-                        style={{background:"#25D366",color:"#fff",border:"none",borderRadius:8,padding:"6px 12px",fontSize:11,fontWeight:700,cursor:"pointer",textDecoration:"none",display:"inline-block"}}>
-                        💬 Responder por WhatsApp
-                      </a>
+                  </div>
+
+                  {/* Bloque de respuesta del analista — envío automático por WhatsApp */}
+                  <div style={{marginTop:18,paddingTop:14,borderTop:"1px solid #e4e7ec"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                      <div style={{fontSize:10,fontWeight:800,color:"#555555",letterSpacing:1,textTransform:"uppercase"}}>✉️ Tu respuesta al prospecto</div>
+                      {respuestaEnviada&&lead.respuesta_analista_fecha&&(
+                        <span style={{fontSize:9,color:"#10B981",fontWeight:700}}>
+                          ✓ Enviada {new Date(lead.respuesta_analista_fecha).toLocaleDateString("es-MX",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}
+                        </span>
+                      )}
+                    </div>
+
+                    {respuestaEnviada?(
+                      <>
+                        <div style={{background:"#f0fdf4",border:"1px solid #86efac",borderRadius:10,padding:"14px 16px",fontSize:13,color:"#1a1a1a",lineHeight:1.7,whiteSpace:"pre-wrap"}}>
+                          {lead.respuesta_analista_preguntas}
+                        </div>
+                        <div style={{marginTop:10,fontSize:11,color:"#16a34a",display:"flex",alignItems:"center",gap:6}}>
+                          <span>📲</span>
+                          <span>Enviada al WhatsApp del lead vía Meta Business API · plantilla <code style={{background:"#dcfce7",padding:"1px 6px",borderRadius:4,fontSize:10}}>respuesta_pregunta_lead</code></span>
+                        </div>
+                        <button
+                          onClick={()=>{
+                            if(confirm("¿Quieres editar y reenviar una nueva respuesta? La anterior quedará registrada en el historial.")){
+                              setRespuestaEnviada(false);
+                            }
+                          }}
+                          style={{marginTop:10,background:"transparent",color:"#1a3a6b",border:"1px solid #c7d2fe",borderRadius:8,padding:"6px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+                          ✏️ Enviar respuesta adicional
+                        </button>
+                      </>
+                    ):(
+                      <>
+                        <textarea
+                          value={respuestaAnalista}
+                          onChange={e=>setRespuestaAnalista(e.target.value)}
+                          placeholder="Escribe aquí tu respuesta al prospecto. Será enviada automáticamente por WhatsApp desde el número oficial de Bigticket..."
+                          maxLength={600}
+                          style={{
+                            width:"100%",
+                            minHeight:140,
+                            padding:"12px 14px",
+                            border:"1px solid #e4e7ec",
+                            borderRadius:8,
+                            fontSize:13,
+                            color:"#1a1a1a",
+                            fontFamily:"inherit",
+                            lineHeight:1.6,
+                            resize:"vertical",
+                            outline:"none",
+                            background:"#fafbfc",
+                            boxSizing:"border-box"
+                          }}
+                          onFocus={e=>e.target.style.borderColor="#3B82F6"}
+                          onBlur={e=>e.target.style.borderColor="#e4e7ec"}
+                        />
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10,gap:10,flexWrap:"wrap"}}>
+                          <div style={{fontSize:10,color:"#888"}}>
+                            {respuestaAnalista.length}/600 caracteres · {!lead.telefono && <span style={{color:"#dc2626",fontWeight:700}}>⚠️ Sin teléfono</span>}
+                          </div>
+                          <div style={{display:"flex",gap:6}}>
+                            <button
+                              onClick={handleEnviarRespuestaWhatsApp}
+                              disabled={enviandoRespuesta||!respuestaAnalista.trim()||!lead.telefono}
+                              style={{
+                                background: (enviandoRespuesta||!respuestaAnalista.trim()||!lead.telefono) ? "#cbd5e1" : "#25D366",
+                                color:"#fff",
+                                border:"none",
+                                borderRadius:8,
+                                padding:"8px 16px",
+                                fontSize:12,
+                                fontWeight:700,
+                                cursor: (enviandoRespuesta||!respuestaAnalista.trim()||!lead.telefono) ? "not-allowed" : "pointer",
+                                letterSpacing:.3
+                              }}>
+                              {enviandoRespuesta?"Enviando...":"📨 Enviar respuesta por WhatsApp"}
+                            </button>
+                          </div>
+                        </div>
+                        <div style={{marginTop:8,fontSize:10,color:"#888",lineHeight:1.5}}>
+                          ℹ️ La respuesta se enviará desde el número oficial Bigticket vía Meta Business API usando la plantilla aprobada <code style={{background:"#f4f4f5",padding:"1px 5px",borderRadius:3,fontSize:10}}>respuesta_pregunta_lead</code>. Quedará registrada en este lead y en el historial.
+                        </div>
+                      </>
                     )}
                   </div>
                 </>
