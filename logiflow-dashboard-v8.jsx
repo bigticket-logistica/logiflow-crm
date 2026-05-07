@@ -1889,6 +1889,227 @@ const EmbudoView = ({ leads }) => {
   );
 };
 
+// ─── REPORTE POR CAMPAÑA ──────────────────────────────────────────────────────
+const ReporteCampanaView = ({ leads }) => {
+  const [campanaFiltro, setCampanaFiltro] = useState("todas");
+  const [busqueda, setBusqueda] = useState("");
+  const [descargandoXLS, setDescargandoXLS] = useState(false);
+
+  // Lista de campañas únicas (mismo patrón que EmbudoView)
+  const campanas = [...new Set(leads.filter(l => l.campana_id && l.origen).map(l => l.origen.replace("Campaña: ", "")))].filter(Boolean).sort();
+
+  // Filtrar leads según campaña seleccionada
+  const leadsFiltered = (campanaFiltro === "todas"
+    ? leads.filter(l => l.campana_id)
+    : leads.filter(l => (l.origen || "").includes(campanaFiltro))
+  ).filter(l => {
+    if (!busqueda) return true;
+    const q = busqueda.toLowerCase();
+    return (l.nombre || "").toLowerCase().includes(q) ||
+           (l.empresa || "").toLowerCase().includes(q) ||
+           (l.email || "").toLowerCase().includes(q) ||
+           (l.telefono || "").toLowerCase().includes(q);
+  });
+
+  // Helper: formatear fecha como "2026-05-02 22:31"
+  const formatFechaExcel = (iso) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    const pad = n => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  // Mapear lead → fila del Excel (mismas 12 columnas)
+  const leadToRow = (l) => ({
+    "Operación":           l.origen ? l.origen.replace("Campaña: ", "") : "",
+    "Nombre del Prospecto": l.nombre || "",
+    "Empresa":             l.empresa || "",
+    "Fono":                l.telefono || "",
+    "Email":               l.email || "",
+    "Fuente":              l.fuente_contacto || l.canal || "",
+    "Fecha de Registro":   formatFechaExcel(l.created_at),
+    "Estado/Temperatura":  l.clasificacion || "",
+    "Score":               l.score || 0,
+    "Etapa del Proceso":   (l.etapa || "").toUpperCase(),
+    "Tipo de Unidad":      l.tipo_vehiculo || "",
+    "Comentarios":         l.comentarios_crm || ""
+  });
+
+  const COLUMNAS = ["Operación","Nombre del Prospecto","Empresa","Fono","Email","Fuente","Fecha de Registro","Estado/Temperatura","Score","Etapa del Proceso","Tipo de Unidad","Comentarios"];
+
+  const descargarExcel = async () => {
+    setDescargandoXLS(true);
+    try {
+      // Cargar SheetJS dinámicamente si no está disponible
+      if (!window.XLSX) {
+        const s = document.createElement("script");
+        s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+        document.head.appendChild(s);
+        await new Promise(r => s.onload = r);
+      }
+
+      const wb = window.XLSX.utils.book_new();
+      const filas = leadsFiltered.map(leadToRow);
+      // Construir array of arrays con header
+      const aoa = [COLUMNAS, ...filas.map(f => COLUMNAS.map(c => f[c]))];
+      const ws = window.XLSX.utils.aoa_to_sheet(aoa);
+
+      // Anchos de columna (aproximados para que se vea bien)
+      ws["!cols"] = [
+        { wch: 18 }, // Operación
+        { wch: 28 }, // Nombre
+        { wch: 25 }, // Empresa
+        { wch: 18 }, // Fono
+        { wch: 30 }, // Email
+        { wch: 12 }, // Fuente
+        { wch: 18 }, // Fecha
+        { wch: 14 }, // Estado
+        { wch: 8 },  // Score
+        { wch: 22 }, // Etapa
+        { wch: 18 }, // Tipo Unidad
+        { wch: 40 }  // Comentarios
+      ];
+
+      window.XLSX.utils.book_append_sheet(wb, ws, "Prospectos");
+
+      const nombre = campanaFiltro === "todas" ? "Todas_las_campanas" : campanaFiltro.replace(/[\s|]+/g, "_");
+      const fecha = new Date().toLocaleDateString("es-CL").replace(/\//g, "-");
+      window.XLSX.writeFile(wb, `BigTicket_Reporte_${nombre}_${fecha}.xlsx`);
+    } catch(e) {
+      alert("Error generando Excel: " + e.message);
+    } finally {
+      setDescargandoXLS(false);
+    }
+  };
+
+  // Color por estado/temperatura para visualización
+  const colorTemp = (clas) => {
+    const c = (clas || "").toLowerCase();
+    if (c.includes("caliente")) return { bg: "#fee2e2", color: "#c0392b" };
+    if (c.includes("tibio"))    return { bg: "#fef3c7", color: "#92400e" };
+    if (c.includes("candidato")) return { bg: "#fef3c7", color: "#92400e" };
+    if (c.includes("frío") || c.includes("frio")) return { bg: "#dbeafe", color: "#1e40af" };
+    return { bg: "#f4f5f7", color: "#666" };
+  };
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+      {/* Header del reporte */}
+      <div style={{ background: "#1a3a6b", borderRadius: 12, padding: "20px 24px", marginBottom: 16, color: "#fff" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 900, fontFamily: "'Outfit',sans-serif" }}>📑 Reporte por Campaña</div>
+            <div style={{ fontSize: 11, color: "#aac3e8", marginTop: 4 }}>Exporta a Excel los prospectos por campaña con todas sus columnas oficiales</div>
+          </div>
+          <button
+            onClick={descargarExcel}
+            disabled={descargandoXLS || leadsFiltered.length === 0}
+            style={{
+              background: descargandoXLS || leadsFiltered.length === 0 ? "#94a3b8" : "#10B981",
+              color: "#fff",
+              border: "none",
+              borderRadius: 10,
+              padding: "10px 22px",
+              fontSize: 13,
+              fontWeight: 800,
+              cursor: descargandoXLS || leadsFiltered.length === 0 ? "not-allowed" : "pointer",
+              fontFamily: "'Outfit',sans-serif",
+              letterSpacing: .3
+            }}>
+            {descargandoXLS ? "⏳ Generando..." : `📥 Descargar Excel (${leadsFiltered.length})`}
+          </button>
+        </div>
+      </div>
+
+      {/* Filtros */}
+      <div style={{ background: "#fff", borderRadius: 12, padding: 16, marginBottom: 16, border: "1px solid #e4e7ec", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: "1 1 240px" }}>
+          <label style={{ fontSize: 10, fontWeight: 800, color: "#555", letterSpacing: 1, textTransform: "uppercase" }}>Campaña</label>
+          <select
+            value={campanaFiltro}
+            onChange={e => setCampanaFiltro(e.target.value)}
+            style={{ padding: "8px 12px", border: "1px solid #e4e7ec", borderRadius: 8, fontSize: 13, color: "#1a1a1a", background: "#fff", cursor: "pointer" }}>
+            <option value="todas">📊 Todas las campañas ({leads.filter(l => l.campana_id).length})</option>
+            {campanas.map(c => {
+              const n = leads.filter(l => (l.origen || "").includes(c)).length;
+              return <option key={c} value={c}>{c} ({n})</option>;
+            })}
+          </select>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: "2 1 280px" }}>
+          <label style={{ fontSize: 10, fontWeight: 800, color: "#555", letterSpacing: 1, textTransform: "uppercase" }}>Buscar</label>
+          <input
+            value={busqueda}
+            onChange={e => setBusqueda(e.target.value)}
+            placeholder="🔍 Nombre, empresa, email o teléfono..."
+            style={{ padding: "8px 12px", border: "1px solid #e4e7ec", borderRadius: 8, fontSize: 13, color: "#1a1a1a", background: "#fff" }}/>
+        </div>
+        <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, padding: "8px 14px", fontSize: 12, color: "#0369a1", fontWeight: 700 }}>
+          {leadsFiltered.length} prospectos encontrados
+        </div>
+      </div>
+
+      {/* Vista previa de la tabla (mismas columnas que el Excel) */}
+      <div style={{ flex: 1, background: "#fff", borderRadius: 12, border: "1px solid #e4e7ec", overflow: "hidden", display: "flex", flexDirection: "column", minHeight: 0 }}>
+        <div style={{ padding: "12px 16px", borderBottom: "1px solid #e4e7ec", background: "#f8f9fa", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: "#555", letterSpacing: 1, textTransform: "uppercase" }}>👁️ Vista previa del Excel</div>
+          <div style={{ fontSize: 10, color: "#888" }}>Mismas columnas que el archivo descargado</div>
+        </div>
+        <div style={{ flex: 1, overflow: "auto" }}>
+          {leadsFiltered.length === 0 ? (
+            <div style={{ padding: 60, textAlign: "center", color: "#aaa" }}>
+              <div style={{ fontSize: 48, marginBottom: 12, opacity: .3 }}>📭</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#888" }}>Sin prospectos para mostrar</div>
+              <div style={{ fontSize: 12, marginTop: 6 }}>Cambia los filtros o selecciona otra campaña</div>
+            </div>
+          ) : (
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+              <thead>
+                <tr style={{ background: "#1a3a6b", color: "#fff", position: "sticky", top: 0, zIndex: 1 }}>
+                  {COLUMNAS.map(c => (
+                    <th key={c} style={{ padding: "10px 8px", textAlign: "left", fontSize: 10, fontWeight: 700, letterSpacing: .3, textTransform: "uppercase", whiteSpace: "nowrap", borderRight: "1px solid #ffffff20" }}>
+                      {c}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {leadsFiltered.map((l, i) => {
+                  const row = leadToRow(l);
+                  const tempColors = colorTemp(l.clasificacion);
+                  return (
+                    <tr key={l.id} style={{ background: i % 2 === 0 ? "#fff" : "#fafbfc", borderBottom: "1px solid #f1f3f5" }}>
+                      <td style={{ padding: "8px", color: "#1a3a6b", fontWeight: 600, whiteSpace: "nowrap" }}>{row["Operación"]}</td>
+                      <td style={{ padding: "8px", color: "#1a1a1a", fontWeight: 600 }}>{row["Nombre del Prospecto"]}</td>
+                      <td style={{ padding: "8px", color: "#555" }}>{row["Empresa"]}</td>
+                      <td style={{ padding: "8px", color: "#555", whiteSpace: "nowrap" }}>{row["Fono"]}</td>
+                      <td style={{ padding: "8px", color: "#555", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={row["Email"]}>{row["Email"]}</td>
+                      <td style={{ padding: "8px", color: "#555" }}>{row["Fuente"]}</td>
+                      <td style={{ padding: "8px", color: "#555", whiteSpace: "nowrap", fontFamily: "monospace", fontSize: 10 }}>{row["Fecha de Registro"]}</td>
+                      <td style={{ padding: "8px" }}>
+                        {row["Estado/Temperatura"] && (
+                          <span style={{ background: tempColors.bg, color: tempColors.color, padding: "2px 8px", borderRadius: 10, fontSize: 10, fontWeight: 700 }}>
+                            {row["Estado/Temperatura"]}
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ padding: "8px", textAlign: "center", fontWeight: 800, color: "#1a3a6b" }}>{row["Score"]}</td>
+                      <td style={{ padding: "8px", color: "#555", fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>{row["Etapa del Proceso"]}</td>
+                      <td style={{ padding: "8px", color: "#555" }}>{row["Tipo de Unidad"]}</td>
+                      <td style={{ padding: "8px", color: "#555", maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={row["Comentarios"]}>{row["Comentarios"]}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 const DashboardMetrics = ({ leads }) => {
   const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
@@ -2184,6 +2405,7 @@ export default function App() {
     {id:"kpis",        icon:"📊",label:"KPIs Generales"},
     {id:"kpiscampana", icon:"🎯",label:"KPIs por Campaña"},
     {id:"embudo",      icon:"🔻",label:"Embudo Conversión"},
+    {id:"reportecampana",icon:"📑",label:"Reporte por Campaña"},
   ];
 
   return (
@@ -2259,6 +2481,8 @@ export default function App() {
               {seccion==="basedatos"  &&`🗄️ ${leadsBaseDatos.length} leads · tibios, fríos, rechazados y no calificados`}
               {seccion==="kpis"       &&"📊 KPIs Generales"}
               {seccion==="kpiscampana"&&"🎯 KPIs por Campaña"}
+              {seccion==="embudo"     &&"🔻 Embudo de Conversión"}
+              {seccion==="reportecampana"&&"📑 Reporte por Campaña — exportable a Excel"}
             </div>
           </div>
           <div style={{background:"#dcfce7",border:"1px solid #86efac",borderRadius:7,padding:"5px 10px",fontSize:10,color:"#166534",fontWeight:700}}>⚡ N8N Activo</div>
@@ -2286,6 +2510,7 @@ export default function App() {
               {seccion==="kpis"       &&<KPIsView leads={leads}/>}
               {seccion==="kpiscampana"&&<KPIsCampanaView leads={leads}/>}
               {seccion==="embudo"     &&<EmbudoView leads={leads}/>}
+              {seccion==="reportecampana"&&<ReporteCampanaView leads={leads}/>}
             </div>
           )}
         </div>
