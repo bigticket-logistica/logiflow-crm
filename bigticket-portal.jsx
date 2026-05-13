@@ -1053,7 +1053,7 @@ Período de trabajo con cliente específico. Tiene fechas, zona, tipo de vehícu
 - Bigticket cubre las mercancías transportadas
 
 ## REGLAS
-- Si no sabes algo → "Para más detalles: +56957730804"
+- Si no sabes algo → "Déjame consultarlo con el equipo y te respondemos por WhatsApp 📲. ¿Me confirmas tu número?"
 - Siempre invita a postular si es prospecto nuevo
 - Siempre lleva al portal: https://bigticket-portal.vercel.app
 - No inventes información fuera de este prompt
@@ -1118,7 +1118,7 @@ function BiggiBubble({ paginaPrincipal=false }) {
           data.respuesta ||
           data.content?.[0]?.text ||
           data.text ||
-          "Lo siento, no pude procesar tu consulta. Contacta al equipo: +56957730804";
+          "Lo siento, no pude procesar tu consulta en este momento. Intenta nuevamente en unos segundos.";
       } else {
         respuesta = await res.text();
       }
@@ -1126,7 +1126,7 @@ function BiggiBubble({ paginaPrincipal=false }) {
       setMensajes(p=>[...p,{rol:"biggi",texto:respuesta}]);
     } catch(e){
       console.error("Error Biggy:", e);
-      setMensajes(p=>[...p,{rol:"biggi",texto:"Tuve un problema técnico. Por favor contacta al equipo: +56957730804 📞"}]);
+      setMensajes(p=>[...p,{rol:"biggi",texto:"Tuve un problema técnico. Por favor intenta nuevamente en unos segundos 🙏"}]);
     } finally {
       setCargando(false);
     }
