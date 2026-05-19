@@ -694,12 +694,28 @@ const ConfigScoreView = () => {
 // ─── LEAD CARD ────────────────────────────────────────────────────────────────
 const LeadCard = ({ lead, onSelect, onDragStart }) => {
   const cfg=ETAPA_CFG[lead.etapa]||{color:"#888888"};
+  // Tiene pregunta sin responder si llegó pregunta del prospecto pero el analista aún no contestó
+  const tienePreguntaPendiente = !!(lead.preguntas_prospecto && lead.preguntas_prospecto.trim()) && !lead.respuesta_analista_preguntas;
   return (
     <div draggable onDragStart={(e)=>onDragStart(e,lead)} onClick={()=>onSelect(lead)}
-      style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:10,
-        padding:12,cursor:"grab",transition:"all .2s",userSelect:"none"}}
-      onMouseEnter={e=>{e.currentTarget.style.borderColor=cfg.color;e.currentTarget.style.transform="translateY(-2px)";}}
-      onMouseLeave={e=>{e.currentTarget.style.borderColor="#e4e7ec";e.currentTarget.style.transform="translateY(0)";}}>
+      style={{
+        background: tienePreguntaPendiente ? "#fffbeb" : "#ffffff",
+        border:"1px solid #e4e7ec",
+        borderLeft: tienePreguntaPendiente ? "4px solid #F47B20" : "1px solid #e4e7ec",
+        borderRadius:10,
+        padding:12,
+        cursor:"grab",
+        transition:"all .2s",
+        userSelect:"none",
+        boxShadow: tienePreguntaPendiente ? "0 0 0 1px #fde6c8" : "none"
+      }}
+      onMouseEnter={e=>{e.currentTarget.style.borderTopColor=cfg.color;e.currentTarget.style.borderRightColor=cfg.color;e.currentTarget.style.borderBottomColor=cfg.color;e.currentTarget.style.transform="translateY(-2px)";}}
+      onMouseLeave={e=>{e.currentTarget.style.borderTopColor="#e4e7ec";e.currentTarget.style.borderRightColor="#e4e7ec";e.currentTarget.style.borderBottomColor="#e4e7ec";e.currentTarget.style.transform="translateY(0)";}}>
+      {tienePreguntaPendiente&&(
+        <div style={{display:"flex",alignItems:"center",gap:4,marginBottom:8,padding:"3px 8px",background:"#F47B20",borderRadius:6,fontSize:9,fontWeight:800,color:"#ffffff",letterSpacing:.5,textTransform:"uppercase",width:"fit-content"}}>
+          <span>❓</span><span>Pregunta pendiente</span>
+        </div>
+      )}
       <div style={{display:"flex",justifyContent:"space-between",marginBottom:7}}>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:12,fontWeight:700,color:"#1a1a1a",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{lead.nombre||"Sin nombre"}</div>
@@ -971,10 +987,7 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
 
     setEnviandoRespuesta(true);
     try{
-      // 1) Normalizar teléfono al formato E.164 sin "+"
       // Usar el teléfono tal cual viene de Supabase. Solo limpiamos caracteres no numéricos
-      // (espacios, guiones, paréntesis y "+"). El número ya trae su código de país desde origen,
-      // igual que en el flujo de envío de propuesta.
       const tel=String(lead.telefono).replace(/\D/g,"");
 
       // 2) Obtener nombre de campaña si tiene
@@ -986,18 +999,20 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
 
       // 3) Disparar webhook N8N (envía por WhatsApp con plantilla)
       const webhookUrl="https://bigticket2026.app.n8n.cloud/webhook/respuesta-pregunta-lead";
+      const payload={
+        lead_id: lead.id,
+        telefono: tel,
+        nombre: lead.nombre||"",
+        campana_nombre: campanaNombre,
+        preguntas: lead.preguntas_prospecto||"",
+        respuesta: respuestaAnalista.trim()
+      };
+
       await fetch(webhookUrl,{
         method:"POST",
         mode:"no-cors",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-          lead_id: lead.id,
-          telefono: tel,
-          nombre: lead.nombre||"",
-          campana_nombre: campanaNombre,
-          preguntas: lead.preguntas_prospecto||"",
-          respuesta: respuestaAnalista.trim()
-        })
+        body:JSON.stringify(payload)
       });
 
       // 4) Guardar en Supabase para trazabilidad
@@ -1069,6 +1084,8 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
               <CanalTag canal={lead.fuente_contacto||lead.canal}/>
               {lead.pais&&<div style={{display:"flex",alignItems:"center",gap:4,background:"#f0f2f5",borderRadius:20,padding:"2px 8px"}}><PaisFlag pais={lead.pais}/><span style={{fontSize:10,fontWeight:700,color:"#555"}}>{lead.pais}</span></div>}
               {lead.clasificacion&&<Tag label={`${lead.emoji||""} ${lead.clasificacion}`} color={lead.clasificacion?.includes("Caliente")?"#EF4444":lead.clasificacion?.includes("Candidato")?"#F59E0B":"#F97316"}/>}
+              {lead.tag_reactivacion&&<Tag label={`⏸️ ${lead.tag_reactivacion.replace("pausado_","Pausado: ").replace("_"," ")}`} color="#6B7280"/>}
+              {lead.ultimo_recontacto_momento&&!lead.tag_reactivacion&&<Tag label={`🔄 ${lead.ultimo_recontacto_momento}`} color="#8B5CF6"/>}
             </div>
           </div>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
@@ -2181,10 +2198,22 @@ const TablaLeads = ({ leads, onSelect }) => (
   <div style={{background:"#ffffff",borderRadius:12,border:"1px solid #e4e7ec",overflow:"hidden"}}>
     <table style={{width:"100%",borderCollapse:"collapse"}}>
       <thead><tr style={{background:"#f0f2f5"}}>{["Prospecto","Empresa","Canal","País","Etapa","Score","Clasificación","Actualizado",""].map(h=><th key={h} style={{padding:"10px 14px",textAlign:"left",fontSize:9,fontWeight:800,color:"#aaaaaa",textTransform:"uppercase",letterSpacing:1}}>{h}</th>)}</tr></thead>
-      <tbody>{leads.map((lead,i)=>{const cfg=ETAPA_CFG[lead.etapa]||{color:"#888888",icon:"•"};return(
-        <tr key={lead.id} style={{borderTop:"1px solid #f0f2f5",background:i%2===0?"#ffffff":"#f8f9fa",cursor:"pointer"}}
-          onClick={()=>onSelect(lead)} onMouseEnter={e=>e.currentTarget.style.background="#eef2ff"} onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"#ffffff":"#f8f9fa"}>
-          <td style={{padding:"10px 14px"}}><div style={{fontSize:12,fontWeight:700,color:"#1a1a1a"}}>{lead.nombre||"—"}</div><div style={{fontSize:10,color:"#aaaaaa"}}>{lead.email||"—"}</div></td>
+      <tbody>{leads.map((lead,i)=>{
+        const cfg=ETAPA_CFG[lead.etapa]||{color:"#888888",icon:"•"};
+        const tienePreguntaPendiente = !!(lead.preguntas_prospecto && lead.preguntas_prospecto.trim()) && !lead.respuesta_analista_preguntas;
+        const baseBg = tienePreguntaPendiente ? "#fffbeb" : (i%2===0?"#ffffff":"#f8f9fa");
+        return(
+        <tr key={lead.id} style={{borderTop:"1px solid #f0f2f5",background:baseBg,cursor:"pointer",borderLeft:tienePreguntaPendiente?"3px solid #F47B20":"3px solid transparent"}}
+          onClick={()=>onSelect(lead)} onMouseEnter={e=>e.currentTarget.style.background="#eef2ff"} onMouseLeave={e=>e.currentTarget.style.background=baseBg}>
+          <td style={{padding:"10px 14px"}}>
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              {tienePreguntaPendiente&&<span title="Tiene pregunta pendiente sin responder" style={{background:"#F47B20",color:"#fff",fontSize:9,fontWeight:800,padding:"2px 5px",borderRadius:4,letterSpacing:.3}}>❓</span>}
+              <div>
+                <div style={{fontSize:12,fontWeight:700,color:"#1a1a1a"}}>{lead.nombre||"—"}</div>
+                <div style={{fontSize:10,color:"#aaaaaa"}}>{lead.email||"—"}</div>
+              </div>
+            </div>
+          </td>
           <td style={{padding:"10px 14px",fontSize:12,color:"#888888"}}>{lead.empresa||"—"}</td>
           <td style={{padding:"10px 14px"}}><CanalTag canal={lead.fuente_contacto||lead.canal}/></td>
           <td style={{padding:"10px 14px"}}><div style={{display:"flex",alignItems:"center",gap:6}}><PaisFlag pais={lead.pais}/><span style={{fontSize:12,color:"#888"}}>{lead.pais||"—"}</span></div></td>
