@@ -1053,7 +1053,7 @@ Período de trabajo con cliente específico. Tiene fechas, zona, tipo de vehícu
 - Bigticket cubre las mercancías transportadas
 
 ## REGLAS
-- Si no sabes algo → "Déjame consultarlo con el equipo y te respondemos por WhatsApp 📲. ¿Me confirmas tu número?"
+- Si no sabes algo → "Para más detalles: +56957730804"
 - Siempre invita a postular si es prospecto nuevo
 - Siempre lleva al portal: https://bigticket-portal.vercel.app
 - No inventes información fuera de este prompt
@@ -1118,7 +1118,7 @@ function BiggiBubble({ paginaPrincipal=false }) {
           data.respuesta ||
           data.content?.[0]?.text ||
           data.text ||
-          "Lo siento, no pude procesar tu consulta en este momento. Intenta nuevamente en unos segundos.";
+          "Lo siento, no pude procesar tu consulta. Contacta al equipo: +56957730804";
       } else {
         respuesta = await res.text();
       }
@@ -1126,7 +1126,7 @@ function BiggiBubble({ paginaPrincipal=false }) {
       setMensajes(p=>[...p,{rol:"biggi",texto:respuesta}]);
     } catch(e){
       console.error("Error Biggy:", e);
-      setMensajes(p=>[...p,{rol:"biggi",texto:"Tuve un problema técnico. Por favor intenta nuevamente en unos segundos 🙏"}]);
+      setMensajes(p=>[...p,{rol:"biggi",texto:"Tuve un problema técnico. Por favor contacta al equipo: +56957730804 📞"}]);
     } finally {
       setCargando(false);
     }
@@ -4158,6 +4158,27 @@ function ViewPropuesta() {
     }
     setPreguntasEnviadas(true);
     setLead({...lead, preguntas_prospecto: preguntas.trim(), preguntas_prospecto_fecha: ahora});
+
+    // Disparar webhook de notificación por correo a N8N (fire-and-forget)
+    // Si falla, no afecta al lead — las preguntas ya quedaron guardadas
+    try{
+      fetch("https://bigticket2026.app.n8n.cloud/webhook/notificacion-pregunta-lead",{
+        method:"POST",
+        mode:"no-cors",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          lead_id: lead.id,
+          nombre: lead.nombre||"",
+          telefono: lead.telefono||"",
+          pais: lead.pais||"",
+          empresa: lead.empresa||"",
+          campana_nombre: campana?.nombre||"Postulación libre",
+          preguntas: preguntas.trim()
+        })
+      }).catch(e=>console.log("Notificación email no disponible:",e));
+    }catch(e){
+      console.log("Notificación email no disponible:",e);
+    }
   };
 
   const responder=async(decision)=>{
