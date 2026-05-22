@@ -500,6 +500,7 @@ const ESTADOS_MEXICO = [
   "SVR1 Veracruz",
   "SVH1 Villahermosa",
   "SQR1 Querétaro",
+  "SPY1 Playa del Carmen",
 ];
 
 const PREFIJOS = { "Chile": "+569", "México": "+521" };
