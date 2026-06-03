@@ -952,7 +952,7 @@ const IMAGENES_VEHICULO_CRM = {
   "Furgón":            "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=320&h=213&fit=crop&auto=format",
 };
 
-const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
+const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest, onDeleteRequest }) => {
   const [tab,setTab]=useState("info");
   const [etapa,setEtapa]=useState(lead.etapa||"Nuevo Lead");
   const [saving,setSaving]=useState(false);
@@ -1090,6 +1090,7 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest }) => {
           </div>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
             <ScoreDot score={lead.score} clasificacion={lead.clasificacion}/>
+            <button onClick={()=>onDeleteRequest&&onDeleteRequest(lead)} title="Eliminar tarjeta" style={{background:"#fee2e2",border:"1px solid #fecaca",color:"#DC2626",borderRadius:8,width:32,height:32,cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center"}}>🗑</button>
             <button onClick={onClose} style={{background:"#eef2ff",border:"1px solid #dbeafe",color:"#666666",borderRadius:8,width:32,height:32,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
           </div>
         </div>
@@ -2367,6 +2368,7 @@ export default function App() {
   const NORM=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
 
   const [confirmModal,setConfirmModal]=useState(null); // {lead, nuevaEtapa}
+  const [deleteModal,setDeleteModal]=useState(null);   // {lead}
 
   const handleEtapaChange=(lead,nuevaEtapa)=>{
     const etapaActual=NORM(lead.etapa);
@@ -2389,6 +2391,32 @@ export default function App() {
   const handleLeadUpdate=(updated)=>{
     setLeads(prev=>prev.map(l=>l.id===updated.id?updated:l));
     if(selectedLead?.id===updated.id)setSelectedLead(updated);
+  };
+
+  // ─── Eliminar lead (tarjeta) ──────────────────────────────────────────────
+  const handleEliminarLead=(lead)=>{ setDeleteModal({lead}); };
+
+  const confirmarEliminarLead=async()=>{
+    if(!deleteModal) return;
+    const {lead}=deleteModal;
+    setDeleteModal(null);
+    try{
+      // 1) Borrar registros relacionados (tolerante: si una tabla no tiene filas, sigue)
+      const tablasHijas=["lead_historial","lead_respuestas","postulaciones","onboarding_terceros"];
+      for(const t of tablasHijas){
+        const {error}=await supabase.from(t).delete().eq("lead_id",lead.id);
+        if(error) console.warn(`Aviso: no se borraron dependencias en ${t}:`, error.message);
+      }
+      // 2) Borrar el lead
+      const {error}=await supabase.from("leads").delete().eq("id",lead.id);
+      if(error) throw error;
+      // 3) Actualizar UI
+      setLeads(prev=>prev.filter(l=>l.id!==lead.id));
+      if(selectedLead?.id===lead.id) setSelectedLead(null);
+    }catch(e){
+      console.error("Error eliminando lead:",e);
+      alert("⚠️ No se pudo eliminar la tarjeta: "+(e.message||"error desconocido"));
+    }
   };
 
   const esCaliente=(l)=>(l.clasificacion||"").toLowerCase().includes("caliente");
@@ -2545,7 +2573,7 @@ export default function App() {
         </div>
       </div>
 
-      {selectedLead&&<LeadPanel lead={selectedLead} onClose={()=>setSelectedLead(null)} onUpdate={handleLeadUpdate} onEtapaChangeRequest={handleEtapaChange}/>}
+      {selectedLead&&<LeadPanel lead={selectedLead} onClose={()=>setSelectedLead(null)} onUpdate={handleLeadUpdate} onEtapaChangeRequest={handleEtapaChange} onDeleteRequest={handleEliminarLead}/>}
       {showAlertas&&<AlertasPopup leads={leads} onClose={()=>setShowAlertas(false)} onVerLead={(lead)=>{setSelectedLead(lead);setSeccion(lead.tipo_postulacion==="libre"?"libre":"campana");}}/>}
       {confirmModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:400}}>
@@ -2566,6 +2594,21 @@ export default function App() {
             <div style={{display:"flex",gap:10}}>
               <button onClick={()=>setConfirmModal(null)} style={{flex:1,background:"#f0f2f5",color:"#475569",border:"none",borderRadius:8,padding:"10px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>Cancelar</button>
               <button onClick={confirmarCambioEtapa} style={{flex:1,background:"#1a3a6b",color:"white",border:"none",borderRadius:8,padding:"10px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>✓ Confirmar cambio</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {deleteModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:400}}>
+          <div style={{background:"#ffffff",borderRadius:14,padding:28,width:400,boxShadow:"0 20px 60px rgba(0,0,0,.3)"}}>
+            <div style={{fontSize:16,fontWeight:900,color:"#DC2626",fontFamily:"'Outfit',sans-serif",marginBottom:6}}>🗑 ¿Eliminar tarjeta?</div>
+            <div style={{fontSize:12,color:"#555555",marginBottom:14}}>Lead: <strong>{deleteModal.lead.nombre||"Sin nombre"}</strong></div>
+            <div style={{fontSize:12,color:"#991B1B",background:"#fee2e2",border:"1px solid #fecaca",borderRadius:10,padding:"12px 14px",marginBottom:20}}>
+              Esta acción es <strong>permanente</strong>. Se borrará el lead y sus registros relacionados (historial, respuestas, postulaciones y onboarding) de Supabase. No se puede deshacer.
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>setDeleteModal(null)} style={{flex:1,background:"#f0f2f5",color:"#475569",border:"none",borderRadius:8,padding:"10px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>Cancelar</button>
+              <button onClick={confirmarEliminarLead} style={{flex:1,background:"#DC2626",color:"white",border:"none",borderRadius:8,padding:"10px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>🗑 Eliminar definitivamente</button>
             </div>
           </div>
         </div>
