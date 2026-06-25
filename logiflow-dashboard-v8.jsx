@@ -2343,6 +2343,7 @@ export default function App() {
   const [vista,setVista]=useState("pipeline");
   const [lastUpdate,setLastUpdate]=useState(null);
   const [showAlertas,setShowAlertas]=useState(false);
+  const [descargandoXLS,setDescargandoXLS]=useState(false);
   const refreshInterval=useRef(null);
   const alertasMostradas=useRef(false);
 
@@ -2416,6 +2417,86 @@ export default function App() {
     }catch(e){
       console.error("Error eliminando lead:",e);
       alert("⚠️ No se pudo eliminar la tarjeta: "+(e.message||"error desconocido"));
+    }
+  };
+
+  // ─── Descargar Excel con TODA la info de las tarjetas de la pestaña ─────────
+  const descargarLeadsExcel = async (lista, etiqueta, nombreHoja) => {
+    if (!lista || lista.length === 0) { alert("No hay leads para exportar en esta pestaña."); return; }
+    setDescargandoXLS(true);
+    try {
+      // Cargar SheetJS dinámicamente si aún no está disponible
+      if (!window.XLSX) {
+        const s = document.createElement("script");
+        s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+        document.head.appendChild(s);
+        await new Promise(r => s.onload = r);
+      }
+
+      // Formatea timestamps a "AAAA-MM-DD HH:MM". Si no es fecha válida, devuelve el valor crudo.
+      const fmt = (v) => {
+        if (v === null || v === undefined || v === "") return "";
+        const d = new Date(v);
+        if (isNaN(d.getTime())) return String(v);
+        const pad = n => String(n).padStart(2, "0");
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      };
+      const si_no = (v) => v === true ? "Sí" : v === false ? "No" : (v ?? "");
+
+      // Registro COMPLETO del lead: [Encabezado, función de valor, ancho de columna]
+      // El analista filtra/oculta lo que no necesite. La columna "Etapa del Proceso" siempre va incluida.
+      const CAMPOS = [
+        ["ID",                       l => l.id ?? "",                                                    12],
+        ["Pipefy Card ID",           l => l.pipefy_card_id ?? "",                                        16],
+        ["Código Postulación",       l => l.codigo_postulacion ?? "",                                    16],
+        ["Tipo de Postulación",      l => l.tipo_postulacion ?? "",                                      16],
+        ["Operación / Campaña",      l => l.origen ? l.origen.replace("Campaña: ", "") : (l.campana_id ?? ""), 22],
+        ["Etapa del Proceso",        l => (l.etapa || "").toUpperCase(),                                 24],
+        ["Nombre del Prospecto",     l => l.nombre ?? "",                                                26],
+        ["Empresa",                  l => l.empresa ?? "",                                               24],
+        ["Cargo",                    l => l.cargo ?? "",                                                 18],
+        ["Teléfono",                 l => l.telefono ?? "",                                              16],
+        ["Email",                    l => l.email ?? "",                                                 28],
+        ["País",                     l => l.pais ?? "",                                                  12],
+        ["Región / Estado",          l => l.region_estado ?? "",                                         18],
+        ["Zona",                     l => l.zona ?? "",                                                  14],
+        ["Canal / Fuente",           l => l.fuente_contacto || l.canal || "",                            16],
+        ["Score",                    l => l.score ?? "",                                                  8],
+        ["Razones del Score",        l => l.razones_score ?? "",                                         36],
+        ["Clasificación",            l => l.clasificacion ?? "",                                         16],
+        ["Volumen",                  l => l.volumen ?? "",                                               14],
+        ["Tipo de Unidad",           l => l.tipo_vehiculo ?? "",                                         16],
+        ["Veredicto Vehículo",       l => l.vehiculo_veredicto ?? "",                                    16],
+        ["Score Vehículo",           l => l.vehiculo_score ?? "",                                        12],
+        ["Comentario Vehículo",      l => l.vehiculo_comentario ?? "",                                   36],
+        ["URL Vehículo",             l => l.url_vehiculo ?? "",                                          30],
+        ["Preguntas del Prospecto",  l => l.preguntas_prospecto ?? "",                                   40],
+        ["Fecha Preguntas",          l => fmt(l.preguntas_prospecto_fecha),                              18],
+        ["Respuesta del Analista",   l => l.respuesta_analista_preguntas ?? "",                          40],
+        ["Fecha Respuesta Analista", l => fmt(l.respuesta_analista_fecha),                               18],
+        ["Notas",                    l => l.notas ?? "",                                                 36],
+        ["Comentarios CRM",          l => l.comentarios_crm ?? "",                                       40],
+        ["Tag Reactivación",         l => l.tag_reactivacion ?? "",                                      16],
+        ["Último Recontacto",        l => fmt(l.ultimo_recontacto_momento),                              18],
+        ["Onboarding Completado",    l => si_no(l.onboarding_completado),                                16],
+        ["Fecha de Registro",        l => fmt(l.created_at),                                             18],
+        ["Última Actualización",     l => fmt(l.updated_at),                                             18],
+      ];
+
+      const headers = CAMPOS.map(c => c[0]);
+      const wb = window.XLSX.utils.book_new();
+      const aoa = [headers, ...lista.map(l => CAMPOS.map(c => c[1](l)))];
+      const ws = window.XLSX.utils.aoa_to_sheet(aoa);
+      ws["!cols"] = CAMPOS.map(c => ({ wch: c[2] }));
+      ws["!autofilter"] = { ref: window.XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: lista.length, c: CAMPOS.length - 1 } }) };
+      window.XLSX.utils.book_append_sheet(wb, ws, nombreHoja || "Leads");
+
+      const fecha = new Date().toLocaleDateString("es-CL").replace(/\//g, "-");
+      window.XLSX.writeFile(wb, `BigTicket_LogiFlow_${etiqueta}_${fecha}.xlsx`);
+    } catch (e) {
+      alert("Error generando Excel: " + e.message);
+    } finally {
+      setDescargandoXLS(false);
     }
   };
 
@@ -2525,11 +2606,25 @@ export default function App() {
                     <button key={v} onClick={()=>setVista(v)} style={{padding:"6px 12px",background:vista===v?"#F47B20":"none",border:"none",color:vista===v?"#ffffff":"#ffffffaa",cursor:"pointer",fontSize:11,fontWeight:vista===v?700:400}}>{label}</button>
                   ))}
                 </div>
+                {seccion==="campana"&&(
+                  <button onClick={()=>descargarLeadsExcel(leadsCampana,"Leads_Campana","Leads Campaña")}
+                    disabled={descargandoXLS||leadsCampana.length===0}
+                    style={{background:descargandoXLS||leadsCampana.length===0?"#94a3b8":"#10B981",color:"#ffffff",border:"none",borderRadius:7,padding:"6px 14px",fontSize:11,fontWeight:700,cursor:descargandoXLS||leadsCampana.length===0?"not-allowed":"pointer",fontFamily:"'Outfit',sans-serif",whiteSpace:"nowrap"}}>
+                    {descargandoXLS?"⏳ Generando...":`📥 Descargar Excel (${leadsCampana.length})`}
+                  </button>
+                )}
               </>
             )}
             {seccion==="basedatos"&&(
-              <input value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="🔍 Buscar leads..."
-                style={{background:"#ffffff",color:"#1a1a1a",border:"1px solid #e4e7ec",borderRadius:7,padding:"6px 12px",fontSize:12,width:220}}/>
+              <>
+                <input value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="🔍 Buscar leads..."
+                  style={{background:"#ffffff",color:"#1a1a1a",border:"1px solid #e4e7ec",borderRadius:7,padding:"6px 12px",fontSize:12,width:220}}/>
+                <button onClick={()=>descargarLeadsExcel(leadsBaseDatos,"Base_Datos_Leads","Base Datos Leads")}
+                  disabled={descargandoXLS||leadsBaseDatos.length===0}
+                  style={{background:descargandoXLS||leadsBaseDatos.length===0?"#94a3b8":"#10B981",color:"#ffffff",border:"none",borderRadius:7,padding:"6px 14px",fontSize:11,fontWeight:700,cursor:descargandoXLS||leadsBaseDatos.length===0?"not-allowed":"pointer",fontFamily:"'Outfit',sans-serif",whiteSpace:"nowrap"}}>
+                  {descargandoXLS?"⏳ Generando...":`📥 Descargar Excel (${leadsBaseDatos.length})`}
+                </button>
+              </>
             )}
             <div style={{fontSize:11,color:"#888888"}}>
               {seccion==="dashboard"  &&"📊 Resumen en tiempo real"}
