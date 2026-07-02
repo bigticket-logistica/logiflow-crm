@@ -5,6 +5,10 @@ const SUPABASE_URL = "https://psvdtgjvognbmxfvqbaa.supabase.co";
 const SUPABASE_KEY = "sb_publishable_RayW0wqgesNI6FYZ6i0CFQ_6YHaHELP";
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 const SUPERADMIN_KEY = "PortalTerceros2026";
+// Usuarios del panel admin (correo -> clave). El acceso maestro con SUPERADMIN_KEY sigue vigente.
+const USUARIOS_ADMIN = {
+  "jorge.arellano@bigticket.mx": "jorge.2026",
+};
 const DONB_URL = "https://psvdtgjvognbmxfvqbaa.supabase.co/storage/v1/object/public/assets/Don_B1.jpeg";
 
 const CANALES = {
@@ -1344,12 +1348,23 @@ function ViewPostulacion({ data, onVolver }) {
 }
 
 function AdminLogin({ onSuccess, onClose }) {
+  const [correo,setCorreo]=useState("");
   const [clave,setClave]=useState("");
   const [error,setError]=useState("");
   const [show,setShow]=useState(false);
   function login() {
-    if(clave===SUPERADMIN_KEY){sessionStorage.setItem("admin_auth","1");onSuccess();}
-    else{setError("Clave incorrecta.");setClave("");}
+    const email=correo.trim().toLowerCase();
+    if(clave===SUPERADMIN_KEY){
+      sessionStorage.setItem("admin_auth","1");
+      sessionStorage.setItem("admin_user","superadmin");
+      onSuccess();
+    } else if(USUARIOS_ADMIN[email] && USUARIOS_ADMIN[email]===clave){
+      sessionStorage.setItem("admin_auth","1");
+      sessionStorage.setItem("admin_user",email);
+      onSuccess();
+    } else {
+      setError("Correo o clave incorrectos.");setClave("");
+    }
   }
   return (
     <div className="login-wrap">
@@ -1364,9 +1379,13 @@ function AdminLogin({ onSuccess, onClose }) {
         <div style={{fontSize:13,color:"#888",textAlign:"center",marginBottom:24}}>Solo para personal autorizado Bigticket</div>
         {error&&<div className="login-error">{error}</div>}
         <div className="field-row">
+          <span className="field-label">Correo</span>
+          <input type="email" value={correo} onChange={e=>{setCorreo(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&login()} placeholder="tucorreo@bigticket.mx" autoFocus/>
+        </div>
+        <div className="field-row">
           <span className="field-label">Clave de acceso</span>
           <div className="input-wrap">
-            <input type={show?"text":"password"} value={clave} onChange={e=>{setClave(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&login()} placeholder="Ingresa tu clave" autoFocus/>
+            <input type={show?"text":"password"} value={clave} onChange={e=>{setClave(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&login()} placeholder="Ingresa tu clave"/>
             <button className="eye-btn" onClick={()=>setShow(!show)}>{show?"🙈":"👁"}</button>
           </div>
         </div>
