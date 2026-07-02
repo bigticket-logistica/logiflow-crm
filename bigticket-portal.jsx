@@ -1398,7 +1398,7 @@ function AdminLogin({ onSuccess, onClose }) {
   );
 }
 
-function AdminPanel({ onClose, campaigns, setCampaigns }) {
+function AdminPanel({ onClose, onLogout, campaigns, setCampaigns }) {
   const [tab,setTab]=useState("camps");
   const [postulaciones,setPostulaciones]=useState([]);
   const [loadingPost,setLoadingPost]=useState(false);
@@ -1851,7 +1851,10 @@ function AdminPanel({ onClose, campaigns, setCampaigns }) {
           <div style={{color:"#fff",fontSize:15,fontWeight:600}}>Panel administrador</div>
           <div style={{color:"#aac3e8",fontSize:12}}>Bigticket — Gestión de campañas</div>
         </div>
-        <button className="btn-gw" onClick={onClose}>Ver portal →</button>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <button className="btn-gw" onClick={onClose}>Ver portal →</button>
+          <button className="btn-gw" onClick={onLogout} style={{borderColor:"rgba(255,150,150,0.45)",color:"#ffd7d7"}}>Salir</button>
+        </div>
       </div>
       <div className="admin-nav">
         {[["camps","Campañas"],["nueva","Nueva campaña"],["postulaciones","Postulaciones"],["vehiculos","🚗 Vehículos"],["canales","Canales"],["centros_mx","Centros México"],["biggy","🤖 Biggy"],["feedback","📋 Feedback"]].map(([k,l])=>(
@@ -4572,7 +4575,7 @@ export default function App() {
   }
 
   if(showAdmin&&!adminAuth) return <><style>{css}</style><AdminLogin onSuccess={()=>setAdminAuth(true)} onClose={()=>setShowAdmin(false)}/></>;
-  if(showAdmin&&adminAuth) return <><style>{css}</style><AdminPanel onClose={()=>setShowAdmin(false)} campaigns={campaigns} setCampaigns={setCampaigns}/></>;
+  if(showAdmin&&adminAuth) return <><style>{css}</style><AdminPanel onClose={()=>setShowAdmin(false)} onLogout={()=>{sessionStorage.removeItem("admin_auth");sessionStorage.removeItem("admin_user");setAdminAuth(false);setShowAdmin(false);}} campaigns={campaigns} setCampaigns={setCampaigns}/></>;
   if(resultadoBusqueda) return <><style>{css}</style><ViewPostulacion data={resultadoBusqueda} onVolver={()=>setResultadoBusqueda(null)}/><BiggiBubble/></>;
 
   if(listaPostulaciones) return (
