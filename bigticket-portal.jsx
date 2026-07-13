@@ -3456,17 +3456,19 @@ async function subirDocumento(file, leadId, nombre) {
   return data.publicUrl;
 }
 
-function UploadField({ label, valor, onChange, uploading }) {
+function UploadField({ label, valor, onChange, uploading, errores, campo }) {
+  const err = errores && campo && errores[campo];
   return (
     <div className="field-row">
       <span className="field-label">{label}</span>
       <label style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:8,
-        border:"0.5px solid #d0d5dd",background:"#f8f9fa",cursor:"pointer",fontSize:13}}>
+        border: err ? "1px solid #EF4444" : "0.5px solid #d0d5dd", background: err ? "#fff5f5" : "#f8f9fa", cursor:"pointer",fontSize:13}}>
         <span style={{fontSize:16}}>📎</span>
         <span style={{color:valor?"#10B981":"#888",flex:1}}>{uploading?"Subiendo...":valor?"✅ Archivo cargado":"Seleccionar archivo"}</span>
         <input type="file" accept="image/*,.pdf" style={{display:"none"}} onChange={onChange} disabled={uploading}/>
       </label>
       {valor&&<a href={valor} target="_blank" style={{fontSize:11,color:"#1a3a6b",marginTop:3,display:"block"}}>Ver archivo →</a>}
+      {err && <span style={{ fontSize: 11, color: "#EF4444", marginTop: 3, display: "block" }}>⚠ {err}</span>}
     </div>
   );
 }
@@ -3554,9 +3556,14 @@ function ViewOnboarding({ lead, onVolver }) {
     colonia: "",
     acepta_privacidad: false,
     url_ine: "",
+    url_ine_2: "",
     url_curp: "",
     url_rfc: "",
     url_licencia: "",
+    url_veh_trasera: "",
+    url_veh_lado_izq: "",
+    url_veh_lado_der: "",
+    url_tarjeta_circulacion: "",
   });
 
   const [guardadoAvance, setGuardadoAvance] = useState(false);
@@ -3574,9 +3581,11 @@ function ViewOnboarding({ lead, onVolver }) {
         nombre: formMX.nombre, apellidos: formMX.apellidos, rut: formMX.ine,
         curp: formMX.curp, rfc: formMX.rfc, licencia: formMX.licencia,
         telefono: formMX.telefono, email: formMX.email, localidad: formMX.localidad,
-        colonia: formMX.colonia, url_ine: formMX.url_ine, url_curp: formMX.url_curp,
+        colonia: formMX.colonia, url_ine: formMX.url_ine, url_ine_2: formMX.url_ine_2, url_curp: formMX.url_curp,
         url_rfc: formMX.url_rfc, url_licencia: formMX.url_licencia,
-        url_vehiculo: formMX.url_vehiculo,
+        url_vehiculo: formMX.url_vehiculo, url_veh_trasera: formMX.url_veh_trasera,
+        url_veh_lado_izq: formMX.url_veh_lado_izq, url_veh_lado_der: formMX.url_veh_lado_der,
+        url_tarjeta_circulacion: formMX.url_tarjeta_circulacion,
         acepta_privacidad: formMX.acepta_privacidad, completado: false,
         updated_at: new Date().toISOString(),
       } : {
@@ -3630,10 +3639,15 @@ function ViewOnboarding({ lead, onVolver }) {
                 localidad: saved.localidad || f.localidad,
                 colonia: saved.colonia || f.colonia,
                 url_ine: saved.url_ine || "",
+                url_ine_2: saved.url_ine_2 || "",
                 url_curp: saved.url_curp || "",
                 url_rfc: saved.url_rfc || "",
                 url_licencia: saved.url_licencia || "",
                 url_vehiculo: saved.url_vehiculo || "",
+                url_veh_trasera: saved.url_veh_trasera || "",
+                url_veh_lado_izq: saved.url_veh_lado_izq || "",
+                url_veh_lado_der: saved.url_veh_lado_der || "",
+                url_tarjeta_circulacion: saved.url_tarjeta_circulacion || "",
                 acepta_privacidad: saved.acepta_privacidad || false,
               }));
             } else {
@@ -3693,10 +3707,15 @@ function ViewOnboarding({ lead, onVolver }) {
       localidad: formMX.localidad,
       colonia: formMX.colonia,
       url_ine: formMX.url_ine,
+      url_ine_2: formMX.url_ine_2,
       url_curp: formMX.url_curp,
       url_rfc: formMX.url_rfc,
       url_licencia: formMX.url_licencia,
       url_vehiculo: formMX.url_vehiculo,
+      url_veh_trasera: formMX.url_veh_trasera,
+      url_veh_lado_izq: formMX.url_veh_lado_izq,
+      url_veh_lado_der: formMX.url_veh_lado_der,
+      url_tarjeta_circulacion: formMX.url_tarjeta_circulacion,
       acepta_privacidad: formMX.acepta_privacidad,
       completado: true,
       completado_at: new Date().toISOString(),
@@ -3741,15 +3760,21 @@ function ViewOnboarding({ lead, onVolver }) {
       if (!formMX.rfc?.trim()) nuevosErrores.rfc = "Campo obligatorio";
       if (!formMX.telefono?.trim()) nuevosErrores.telefono = "Campo obligatorio";
       if (!formMX.localidad) nuevosErrores.localidad = "Campo obligatorio";
-      if (!formMX.url_ine) nuevosErrores.url_ine = "Debes adjuntar tu INE";
+      if (!formMX.url_ine) nuevosErrores.url_ine = "Debes adjuntar el frente de tu INE";
+      if (!formMX.url_ine_2) nuevosErrores.url_ine_2 = "Debes adjuntar el reverso de tu INE";
       if (!formMX.url_curp) nuevosErrores.url_curp = "Debes adjuntar tu CURP";
       if (!formMX.url_rfc) nuevosErrores.url_rfc = "Debes adjuntar tu RFC";
-      if (!formMX.url_vehiculo) nuevosErrores.url_vehiculo = "Debes adjuntar una foto de tu vehículo";
       if (!formMX.email?.trim()) nuevosErrores.email = "Campo obligatorio";
       if (!formMX.colonia?.trim()) {}
-      if (formMX.puesto !== 'Ayudante') {
+      const conVehiculo = formMX.puesto === 'Driver' || formMX.puesto === 'Propietario';
+      if (conVehiculo) {
         if (!formMX.licencia?.trim()) nuevosErrores.licencia = "Campo obligatorio";
         if (!formMX.url_licencia) nuevosErrores.url_licencia = "Debes adjuntar tu licencia";
+        if (!formMX.url_vehiculo)            nuevosErrores.url_vehiculo            = "Foto del vehículo: frente con placas";
+        if (!formMX.url_veh_trasera)         nuevosErrores.url_veh_trasera         = "Foto del vehículo: trasera";
+        if (!formMX.url_veh_lado_izq)        nuevosErrores.url_veh_lado_izq        = "Foto del vehículo: lado izquierdo";
+        if (!formMX.url_veh_lado_der)        nuevosErrores.url_veh_lado_der        = "Foto del vehículo: lado derecho";
+        if (!formMX.url_tarjeta_circulacion) nuevosErrores.url_tarjeta_circulacion = "Adjunta la tarjeta de circulación";
       }
     } else {
       if (!formCL.tipo_certificacion) nuevosErrores.tipo_certificacion = "Campo obligatorio";
@@ -3972,22 +3997,40 @@ function ViewOnboarding({ lead, onVolver }) {
 
             <div style={{ marginTop: 8, padding: "12px 14px", background: "#f8f9fa", borderRadius: 10, marginBottom: 8 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", marginBottom: 10 }}>📎 Documentos requeridos</div>
-              <UploadField label="📷 Foto de tu vehículo (frente con placas visibles) *" valor={formMX.url_vehiculo}
-                uploading={uploading.vehiculo}
-                onChange={e => handleUpload("vehiculo", e.target.files[0], setFormMX, lead.id)} />
-              <UploadField label="Adjuntar INE (ambos lados)" valor={formMX.url_ine}
+              <UploadField label="Adjuntar INE (frente) *" valor={formMX.url_ine} errores={errores} campo="url_ine"
                 uploading={uploading.ine}
                 onChange={e => handleUpload("ine", e.target.files[0], setFormMX, lead.id)} />
-              <UploadField label="Adjuntar CURP" valor={formMX.url_curp}
+              <UploadField label="Adjuntar INE (reverso) *" valor={formMX.url_ine_2} errores={errores} campo="url_ine_2"
+                uploading={uploading.ine_2}
+                onChange={e => handleUpload("ine_2", e.target.files[0], setFormMX, lead.id)} />
+              <UploadField label="Adjuntar CURP *" valor={formMX.url_curp} errores={errores} campo="url_curp"
                 uploading={uploading.curp}
                 onChange={e => handleUpload("curp", e.target.files[0], setFormMX, lead.id)} />
-              <UploadField label="Adjuntar RFC" valor={formMX.url_rfc}
+              <UploadField label="Adjuntar RFC *" valor={formMX.url_rfc} errores={errores} campo="url_rfc"
                 uploading={uploading.rfc}
                 onChange={e => handleUpload("rfc", e.target.files[0], setFormMX, lead.id)} />
               {(formMX.puesto === "Driver" || formMX.puesto === "Propietario") && (
-                <UploadField label="Adjuntar Licencia de Conducir" valor={formMX.url_licencia}
-                  uploading={uploading.licencia}
-                  onChange={e => handleUpload("licencia", e.target.files[0], setFormMX, lead.id)} />
+                <>
+                  <UploadField label="Adjuntar Licencia de Conducir *" valor={formMX.url_licencia} errores={errores} campo="url_licencia"
+                    uploading={uploading.licencia}
+                    onChange={e => handleUpload("licencia", e.target.files[0], setFormMX, lead.id)} />
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#1a3a6b", margin: "12px 0 6px" }}>🚚 Fotos del vehículo (todos los lados)</div>
+                  <UploadField label="Frente (con placas visibles) *" valor={formMX.url_vehiculo} errores={errores} campo="url_vehiculo"
+                    uploading={uploading.vehiculo}
+                    onChange={e => handleUpload("vehiculo", e.target.files[0], setFormMX, lead.id)} />
+                  <UploadField label="Trasera *" valor={formMX.url_veh_trasera} errores={errores} campo="url_veh_trasera"
+                    uploading={uploading.veh_trasera}
+                    onChange={e => handleUpload("veh_trasera", e.target.files[0], setFormMX, lead.id)} />
+                  <UploadField label="Lado izquierdo *" valor={formMX.url_veh_lado_izq} errores={errores} campo="url_veh_lado_izq"
+                    uploading={uploading.veh_lado_izq}
+                    onChange={e => handleUpload("veh_lado_izq", e.target.files[0], setFormMX, lead.id)} />
+                  <UploadField label="Lado derecho *" valor={formMX.url_veh_lado_der} errores={errores} campo="url_veh_lado_der"
+                    uploading={uploading.veh_lado_der}
+                    onChange={e => handleUpload("veh_lado_der", e.target.files[0], setFormMX, lead.id)} />
+                  <UploadField label="Tarjeta de circulación *" valor={formMX.url_tarjeta_circulacion} errores={errores} campo="url_tarjeta_circulacion"
+                    uploading={uploading.tarjeta_circulacion}
+                    onChange={e => handleUpload("tarjeta_circulacion", e.target.files[0], setFormMX, lead.id)} />
+                </>
               )}
             </div>
           </div>
