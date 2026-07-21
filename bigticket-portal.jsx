@@ -359,8 +359,8 @@ function ViewCountry({ onSelect, busqCorreo, setBusqCorreo, busqDoc, setBusqDoc,
 
         {/* Consultar estado */}
         <div style={{background:"#f8f9fa",border:"1px solid #e4e7ec",borderRadius:14,padding:"20px",marginBottom:16}}>
-          <div style={{fontSize:14,fontWeight:700,color:"#1a1a1a",marginBottom:4}}>🔍 Consultar estado de postulación</div>
-          <div style={{fontSize:12,color:"#888",marginBottom:14}}>Ingresa tu correo y RUT (Chile) o CURP (México)</div>
+          <div style={{fontSize:14,fontWeight:700,color:"#1a1a1a",marginBottom:4}}>🔍 Consultar estado de postulación, cargar y editar documentos e información</div>
+          <div style={{fontSize:12,color:"#888",marginBottom:14}}>Ingresa tu correo y RUT (Chile) o CURP (México). Verás tu avance en el proceso, tus documentos y datos — y podrás reponerlos o corregirlos si fueron observados.</div>
           <div style={{marginBottom:10}}>
             <input value={busqCorreo} onChange={e=>setBusqCorreo(e.target.value)}
               onKeyDown={e=>e.key==="Enter"&&buscarPostulacion()}
@@ -1292,8 +1292,160 @@ function ViewSuccess({ pais, onVolver }) {
   );
 }
 
+
+// ─── Mi proceso de Certificación (Kanban MX): estado, documentos y datos editables ───
+const CERT_ETAPAS_ORDEN = ["recepcion","llamada_supervisor","prevalidacion_biggy","validacion_meli","validacion_nubarium","entrevista_operaciones","solicitud_alta","firma_contrato"];
+const CERT_ETAPAS_LABEL = {
+  recepcion:"Recepción documental", llamada_supervisor:"Llamada del supervisor", prevalidacion_biggy:"Pre-validación Biggy",
+  validacion_meli:"Validación Mercado Libre", validacion_nubarium:"Validación Nubarium", entrevista_operaciones:"Entrevista de operaciones",
+  solicitud_alta:"Solicitud de alta", firma_contrato:"Firma de contrato", aceptado:"✅ Aceptado", rechazado:"❌ No continuado",
+};
+const CERT_DOCS = [
+  { k:"url_ine", l:"INE (frente)" }, { k:"url_ine_2", l:"INE (reverso)" },
+  { k:"url_curp", l:"CURP" }, { k:"url_rfc", l:"Constancia RFC" }, { k:"url_licencia", l:"Licencia de conducir" },
+];
+const CERT_CAMPOS_EDIT = [
+  { k:"nombre", l:"Nombre completo" }, { k:"telefono", l:"Teléfono" },
+  { k:"rfc", l:"RFC", mono:true }, { k:"ine", l:"No. INE / Clave elector", mono:true },
+  { k:"licencia", l:"No. Licencia", mono:true }, { k:"puesto", l:"Puesto" },
+];
+
+function SeccionCertificacion({ cert: certInicial }) {
+  const [cert,setCert]=useState(certInicial);
+  const [form,setForm]=useState(()=>Object.fromEntries(CERT_CAMPOS_EDIT.map(c=>[c.k,certInicial[c.k]||""])));
+  const [subiendo,setSubiendo]=useState(null);
+  const [guardando,setGuardando]=useState(false);
+  const [msg,setMsg]=useState("");
+
+  // Registra el cambio y enciende el warning en la tarjeta del Kanban del Brain
+  const registrarCambios = async (entradas, patchExtra={}) => {
+    const log=[...(cert.cambios_prospecto||[]), ...entradas.map(e=>({...e, at:new Date().toISOString()}))];
+    const patch={...patchExtra, cambios_prospecto:log, cambios_pendientes:true};
+    const {error}=await sb.from("certificaciones_mx").update(patch).eq("id",cert.id);
+    if(error) throw new Error(error.message);
+    setCert(c=>({...c,...patch}));
+  };
+
+  const reemplazarDoc = async (d, file) => {
+    if(!file) return;
+    setSubiendo(d.k); setMsg("");
+    try{
+      const url=await subirDocumento(file, cert.id, d.k.replace("url_",""));
+      if(!url) throw new Error("no se pudo subir el archivo");
+      await registrarCambios([{tipo:"documento",campo:d.l,accion:cert[d.k]?"reemplazado":"cargado"}],{[d.k]:url});
+      setMsg(`✅ ${d.l} actualizado. El equipo de certificación fue notificado.`);
+    }catch(e){ setMsg("⚠️ No se pudo actualizar: "+e.message); }
+    finally{ setSubiendo(null); }
+  };
+
+  const eliminarDoc = async (d) => {
+    if(!cert[d.k]) return;
+    if(!confirm(`¿Eliminar ${d.l}? Deberás cargar uno nuevo para continuar tu proceso.`)) return;
+    setSubiendo(d.k); setMsg("");
+    try{
+      await registrarCambios([{tipo:"documento",campo:d.l,accion:"eliminado"}],{[d.k]:""});
+      setMsg(`🗑 ${d.l} eliminado. Recuerda cargar el documento corregido.`);
+    }catch(e){ setMsg("⚠️ No se pudo eliminar: "+e.message); }
+    finally{ setSubiendo(null); }
+  };
+
+  const guardarDatos = async () => {
+    const cambios=CERT_CAMPOS_EDIT
+      .filter(c=>String(form[c.k]||"").trim()!==String(cert[c.k]||"").trim())
+      .map(c=>({tipo:"dato",campo:c.l,antes:cert[c.k]||"—",despues:String(form[c.k]).trim(),k:c.k}));
+    if(!cambios.length){ setMsg("No hay cambios que guardar."); return; }
+    setGuardando(true); setMsg("");
+    try{
+      const patch=Object.fromEntries(cambios.map(c=>[c.k, c.despues]));
+      await registrarCambios(cambios.map(({k,...resto})=>resto), patch);
+      setForm(f=>({...f,...patch}));
+      setMsg("✅ Datos actualizados. El equipo de certificación revisará tus cambios.");
+    }catch(e){ setMsg("⚠️ No se pudo guardar: "+e.message); }
+    finally{ setGuardando(false); }
+  };
+
+  const etapa=cert.etapa_kanban||"recepcion";
+  const idx=CERT_ETAPAS_ORDEN.indexOf(etapa);
+  const esFinal=etapa==="aceptado"||etapa==="rechazado";
+  const editable=etapa!=="aceptado";
+
+  return (
+    <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",padding:"20px 24px",marginBottom:16}}>
+      <div style={{fontSize:11,color:"#888",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:12}}>🚚 Mi proceso de certificación</div>
+
+      <div style={{display:"inline-flex",alignItems:"center",gap:8,background:esFinal?(etapa==="aceptado"?"#e8f5ec":"#fbeaea"):"#eef2ff",border:"1px solid "+(esFinal?(etapa==="aceptado"?"#b7e0c2":"#f0c4c4"):"#c7d7f9"),borderRadius:20,padding:"7px 16px",marginBottom:10}}>
+        <span style={{fontSize:13.5,fontWeight:800,color:esFinal?(etapa==="aceptado"?"#166534":"#c0392b"):"#1a3a6b"}}>
+          {CERT_ETAPAS_LABEL[etapa]||etapa}{!esFinal&&idx>=0?` · etapa ${idx+1} de 8`:""}
+        </span>
+      </div>
+      {!esFinal&&idx>=0&&(
+        <div style={{display:"flex",gap:4,marginBottom:14}}>
+          {CERT_ETAPAS_ORDEN.map((e,i)=>(
+            <div key={e} title={CERT_ETAPAS_LABEL[e]} style={{flex:1,height:6,borderRadius:3,background:i<=idx?"#F47B20":"#e9edf3"}}/>
+          ))}
+        </div>
+      )}
+
+      <div style={{fontSize:11,color:"#888",fontWeight:700,letterSpacing:1,textTransform:"uppercase",margin:"14px 0 8px"}}>Mis documentos</div>
+      {CERT_DOCS.map(d=>(
+        <div key={d.k} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 0",borderBottom:"1px solid #f0f2f5",flexWrap:"wrap"}}>
+          <span style={{flex:1,minWidth:150,fontSize:13,fontWeight:600,color:"#1a1a1a"}}>{d.l}</span>
+          {cert[d.k]?(
+            <>
+              <a href={cert[d.k]} target="_blank" rel="noreferrer" style={{fontSize:12.5,fontWeight:700,color:"#1a3a6b"}}>Ver</a>
+              {editable&&<label style={{fontSize:12.5,fontWeight:700,color:"#F47B20",cursor:"pointer"}}>
+                {subiendo===d.k?"Subiendo…":"Reemplazar"}
+                <input type="file" accept="image/*,.pdf" style={{display:"none"}} onChange={e=>reemplazarDoc(d,e.target.files[0])}/>
+              </label>}
+              {editable&&<button onClick={()=>eliminarDoc(d)} style={{background:"none",border:"none",color:"#c0392b",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:"'Geist',sans-serif"}}>Eliminar</button>}
+            </>
+          ):(
+            editable?<label style={{fontSize:12.5,fontWeight:700,color:"#fff",background:"#F47B20",borderRadius:8,padding:"7px 14px",cursor:"pointer"}}>
+              {subiendo===d.k?"Subiendo…":"📎 Cargar"}
+              <input type="file" accept="image/*,.pdf" style={{display:"none"}} onChange={e=>reemplazarDoc(d,e.target.files[0])}/>
+            </label>:<span style={{fontSize:12,color:"#aaa"}}>—</span>
+          )}
+        </div>
+      ))}
+
+      {editable&&(
+        <>
+          <div style={{fontSize:11,color:"#888",fontWeight:700,letterSpacing:1,textTransform:"uppercase",margin:"16px 0 8px"}}>Mis datos</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:10}}>
+            {CERT_CAMPOS_EDIT.map(c=>(
+              <div key={c.k}>
+                <div style={{fontSize:10.5,fontWeight:700,color:"#888",marginBottom:3}}>{c.l}</div>
+                <input value={form[c.k]} onChange={e=>setForm(f=>({...f,[c.k]:c.mono?e.target.value.toUpperCase():e.target.value}))}
+                  style={{width:"100%",boxSizing:"border-box",padding:"9px 12px",borderRadius:8,border:"1px solid #e4e7ec",fontSize:13,background:"#fff",fontFamily:c.mono?"monospace":"'Geist',sans-serif"}}/>
+              </div>
+            ))}
+          </div>
+          <div style={{fontSize:11,color:"#999",marginTop:8}}>El correo y la CURP no se pueden modificar — identifican tu proceso. Si tienen un error, contáctanos.</div>
+          <button onClick={guardarDatos} disabled={guardando}
+            style={{width:"100%",marginTop:12,background:"#1a3a6b",color:"#fff",border:"none",borderRadius:10,padding:"12px",fontSize:13.5,fontWeight:700,cursor:"pointer",opacity:guardando?0.6:1,fontFamily:"'Geist',sans-serif"}}>
+            {guardando?"Guardando…":"💾 Guardar mis cambios"}
+          </button>
+        </>
+      )}
+      {msg&&<div style={{marginTop:10,fontSize:12.5,fontWeight:600,color:msg.startsWith("✅")||msg.startsWith("🗑")?"#166534":"#c0392b"}}>{msg}</div>}
+    </div>
+  );
+}
+
 function ViewPostulacion({ data, onVolver }) {
   const {lead,historial}=data;
+  const cert=data.cert||null;
+  if(!lead&&cert){
+    return(
+      <div>
+        <div className="topbar"><span className="logo">Big<span>ticket</span></span></div>
+        <div style={{maxWidth:480,margin:"0 auto",padding:"20px 16px"}}>
+          <button onClick={onVolver} style={{background:"none",border:"none",color:"#888",fontSize:13,cursor:"pointer",marginBottom:16}}>← Volver</button>
+          <SeccionCertificacion cert={cert}/>
+        </div>
+      </div>
+    );
+  }
   const ETAPA_COLOR={"Nuevo Lead":"#3B82F6","Nuevo":"#3B82F6","Contactado":"#8B5CF6","Reunión Agendada":"#F59E0B","Propuesta Enviada":"#F97316","Negociación":"#EC4899","Propuesta Aceptada":"#10B981","Propuesta Rechazada":"#EF4444","Contrato Firmado":"#10B981","Base Datos Leads":"#6B7280","Ganado":"#10B981","Perdido":"#EF4444"};
   const ETAPA_ICON={"Nuevo Lead":"🎯","Nuevo":"🎯","Contactado":"📞","Reunión Agendada":"📅","Propuesta Enviada":"📄","Negociación":"🤝","Propuesta Aceptada":"✅","Propuesta Rechazada":"❌","Contrato Firmado":"📝","Base Datos Leads":"🗃️","Ganado":"✅","Perdido":"❌"};
   const ETAPA_DISPLAY={"Entrevistas y Validaciones":"Validaciones","Postulante Aprobado":"Aprobado","Postulante No Calificado":"No Calificado","Onboarding Pendiente":"Onboarding Pendiente","Contrato No Firmado":"Contrato No Firmado"};
@@ -1320,6 +1472,7 @@ function ViewPostulacion({ data, onVolver }) {
             <span style={{fontSize:13,fontWeight:700,color:etapaColor}}>{lead.etapa||"En revisión"}</span>
           </div>
         </div>
+        {cert&&<SeccionCertificacion cert={cert}/>}
         <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",padding:"20px 24px",marginBottom:16}}>
           <div style={{fontSize:11,color:"#888",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:16}}>Datos de tu postulación</div>
           {[["📅","Postulado el",new Date(lead.created_at).toLocaleDateString("es-CL",{day:"2-digit",month:"long",year:"numeric"})],["📋","Campaña",lead.origen],["📍","País",lead.pais],["📞","Teléfono",lead.telefono],["📧","Correo",lead.email]].filter(([,,v])=>v).map(([icon,k,v])=>(
@@ -4599,12 +4752,20 @@ export default function App() {
       .eq("email",correo)
       .or(`rut.eq.${doc},curp.eq.${doc}`)
       .order("created_at",{ascending:false});
-    if(error||!data||data.length===0){setErrorBusqueda("No encontramos postulaciones con esos datos.");setBuscando(false);return;}
-    if(data.length===1){
+    // Tarjeta del proceso de Certificaciones MX (Kanban) — por correo + CURP
+    const {data:certs}=await sb.from("certificaciones_mx").select("*")
+      .ilike("email",correo).eq("curp",doc)
+      .order("created_at",{ascending:false}).limit(1);
+    const cert=(certs&&certs[0])||null;
+    if((error||!data||data.length===0)&&!cert){setErrorBusqueda("No encontramos postulaciones con esos datos.");setBuscando(false);return;}
+    if(!data||data.length===0){
+      setResultadoBusqueda({lead:null,historial:[],cert});
+    } else if(data.length===1){
       const {data:hist}=await sb.from("lead_historial").select("*").eq("lead_id",data[0].id).order("created_at",{ascending:true});
-      setResultadoBusqueda({lead:data[0],historial:hist||[]});
+      setResultadoBusqueda({lead:data[0],historial:hist||[],cert});
     } else {
       setListaPostulaciones(data);
+      window.__certBusqueda=cert;
     }
     setBuscando(false);
   }
@@ -4612,7 +4773,7 @@ export default function App() {
   async function seleccionarPostulacion(lead) {
     setBuscando(true);
     const {data:hist}=await sb.from("lead_historial").select("*").eq("lead_id",lead.id).order("created_at",{ascending:true});
-    setResultadoBusqueda({lead,historial:hist||[]});
+    setResultadoBusqueda({lead,historial:hist||[],cert:window.__certBusqueda||null});
     setListaPostulaciones(null);
     setBuscando(false);
   }
