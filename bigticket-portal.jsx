@@ -1353,7 +1353,7 @@ function SeccionCertificacion({ cert: certInicial }) {
     const cambios=CERT_CAMPOS_EDIT
       .filter(c=>String(form[c.k]||"").trim()!==String(cert[c.k]||"").trim())
       .map(c=>({tipo:"dato",campo:c.l,antes:cert[c.k]||"—",despues:String(form[c.k]).trim(),k:c.k}));
-    if(!cambios.length){ setMsg("No hay cambios que guardar."); return; }
+    if(!cambios.length){ setMsg("ℹ️ No hay cambios nuevos por guardar — lo que modificaste antes ya fue enviado al equipo (mira el registro de abajo)."); return; }
     setGuardando(true); setMsg("");
     try{
       const patch=Object.fromEntries(cambios.map(c=>[c.k, c.despues]));
@@ -1368,6 +1368,9 @@ function SeccionCertificacion({ cert: certInicial }) {
   const idx=CERT_ETAPAS_ORDEN.indexOf(etapa);
   const esFinal=etapa==="aceptado"||etapa==="rechazado";
   const editable=etapa!=="aceptado";
+  // Cambios escritos pero aún no guardados (contador vivo del botón)
+  const pendientesForm=CERT_CAMPOS_EDIT.filter(c=>String(form[c.k]||"").trim()!==String(cert[c.k]||"").trim()).length;
+  const fmtFH=(x)=>x?new Date(x).toLocaleString("es-MX",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}):"";
 
   return (
     <div style={{background:"#fff",borderRadius:16,border:"0.5px solid #e4e7ec",padding:"20px 24px",marginBottom:16}}>
@@ -1422,12 +1425,29 @@ function SeccionCertificacion({ cert: certInicial }) {
           </div>
           <div style={{fontSize:11,color:"#999",marginTop:8}}>El correo y la CURP no se pueden modificar — identifican tu proceso. Si tienen un error, contáctanos.</div>
           <button onClick={guardarDatos} disabled={guardando}
-            style={{width:"100%",marginTop:12,background:"#1a3a6b",color:"#fff",border:"none",borderRadius:10,padding:"12px",fontSize:13.5,fontWeight:700,cursor:"pointer",opacity:guardando?0.6:1,fontFamily:"'Geist',sans-serif"}}>
-            {guardando?"Guardando…":"💾 Guardar mis cambios"}
+            style={{width:"100%",marginTop:12,background:pendientesForm?"#1a3a6b":"#8ea3c4",color:"#fff",border:"none",borderRadius:10,padding:"12px",fontSize:13.5,fontWeight:700,cursor:"pointer",opacity:guardando?0.6:1,fontFamily:"'Geist',sans-serif"}}>
+            {guardando?"Guardando…":pendientesForm?`💾 Guardar mis cambios (${pendientesForm})`:"💾 Guardar mis cambios"}
           </button>
         </>
       )}
-      {msg&&<div style={{marginTop:10,fontSize:12.5,fontWeight:600,color:msg.startsWith("✅")||msg.startsWith("🗑")?"#166534":"#c0392b"}}>{msg}</div>}
+      {msg&&<div style={{marginTop:10,fontSize:12.5,fontWeight:600,color:msg.startsWith("⚠️")?"#c0392b":msg.startsWith("ℹ️")?"#667085":"#166534"}}>{msg}</div>}
+
+      {/* Registro de cambios YA enviados al equipo — la "marca" de que quedaron registrados */}
+      {(cert.cambios_prospecto||[]).length>0&&(
+        <div style={{marginTop:14,background:"#f8f9fb",border:"1px solid #eef0f4",borderRadius:10,padding:"10px 14px"}}>
+          <div style={{fontSize:10.5,fontWeight:800,color:"#667085",textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>🕓 Cambios enviados al equipo BigTicket</div>
+          {[...cert.cambios_prospecto].slice(-6).reverse().map((c,i)=>(
+            c.tipo==="revision"
+              ?<div key={i} style={{fontSize:12,color:"#166534",padding:"3px 0",fontWeight:700}}>✅ <b>{fmtFH(c.at)}</b> · Cambios leídos y revisados por el analista BigTicket</div>
+              :<div key={i} style={{fontSize:12,color:"#555",padding:"3px 0"}}>
+                <b>{fmtFH(c.at)}</b> · {c.tipo==="documento"?"📎":"✏️"} {c.campo}: {c.accion||`"${c.antes}" → "${c.despues}"`} <span style={{color:"#166534",fontWeight:700}}>✓ registrado</span>
+              </div>
+          ))}
+          <div style={{fontSize:11.5,fontWeight:800,marginTop:8,color:cert.cambios_pendientes?"#b45309":"#166534"}}>
+            {cert.cambios_pendientes?"⏳ Pendientes de revisión por el analista":"✓ Al día — el analista revisó tus últimos cambios"}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1446,8 +1466,8 @@ function ViewPostulacion({ data, onVolver }) {
       </div>
     );
   }
-  const ETAPA_COLOR={"Nuevo Lead":"#3B82F6","Nuevo":"#3B82F6","Contactado":"#8B5CF6","Reunión Agendada":"#F59E0B","Propuesta Enviada":"#F97316","Negociación":"#EC4899","Propuesta Aceptada":"#10B981","Propuesta Rechazada":"#EF4444","Contrato Firmado":"#10B981","Base Datos Leads":"#6B7280","Ganado":"#10B981","Perdido":"#EF4444"};
-  const ETAPA_ICON={"Nuevo Lead":"🎯","Nuevo":"🎯","Contactado":"📞","Reunión Agendada":"📅","Propuesta Enviada":"📄","Negociación":"🤝","Propuesta Aceptada":"✅","Propuesta Rechazada":"❌","Contrato Firmado":"📝","Base Datos Leads":"🗃️","Ganado":"✅","Perdido":"❌"};
+  const ETAPA_COLOR={"Nuevo Lead":"#3B82F6","Nuevo":"#3B82F6","Contactado":"#8B5CF6","Reunión Agendada":"#F59E0B","Propuesta Enviada":"#F97316","Negociación":"#EC4899","Propuesta Aceptada":"#10B981","Propuesta Rechazada":"#EF4444","Contrato Firmado":"#10B981","Base Datos Leads":"#6B7280","Ganado":"#10B981","Perdido":"#EF4444","Cambios leídos y revisados por el analista":"#b45309"};
+  const ETAPA_ICON={"Nuevo Lead":"🎯","Nuevo":"🎯","Contactado":"📞","Reunión Agendada":"📅","Propuesta Enviada":"📄","Negociación":"🤝","Propuesta Aceptada":"✅","Propuesta Rechazada":"❌","Contrato Firmado":"📝","Base Datos Leads":"🗃️","Ganado":"✅","Perdido":"❌","Cambios leídos y revisados por el analista":"⚠️"};
   const ETAPA_DISPLAY={"Entrevistas y Validaciones":"Validaciones","Postulante Aprobado":"Aprobado","Postulante No Calificado":"No Calificado","Onboarding Pendiente":"Onboarding Pendiente","Contrato No Firmado":"Contrato No Firmado"};
   const etapaLabel=(e)=>ETAPA_DISPLAY[e]||e;
   const etapaColor=ETAPA_COLOR[lead.etapa]||"#888";
