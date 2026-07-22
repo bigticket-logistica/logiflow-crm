@@ -3617,7 +3617,7 @@ const DESC_VEHICULO_MX = {
   "Large Van":         "De 5,5 m³ a 12,9 m³. Ejemplos: Nissan Urvan Panel, Ford Transit Custom, RAM ProMaster, Mercedes-Benz Sprinter, Peugeot Manager, Fiat Ducato.",
   "Small + Large Van": "Tienes disponibilidad tanto en Small Van (2,0–5,4 m³) como en Large Van (5,5–12,9 m³).",
 };
-const PUESTOS_MX = ["Driver","Ayudante","Propietario"];
+// (puesto fijo "Propietario" en la inscripción — el select fue eliminado)
 
 async function subirDocumento(file, leadId, nombre) {
   if (!file) return null;
@@ -3714,8 +3714,9 @@ function ViewOnboarding({ lead, onVolver }) {
 
   // Form México
   const [formMX, setFormMX] = useState({
-    puesto: "",
+    puesto: "Propietario",           // fijo: toda inscripción entra como Propietario
     tipo_vehiculo: "",
+    cantidad_vehiculos: "",          // cuántas unidades presentará (las certifica después en su portal)
     url_vehiculo: "",
     nombre: lead.nombre || "",
     apellidos: "",
@@ -3750,15 +3751,13 @@ function ViewOnboarding({ lead, onVolver }) {
     try {
       const payload = esMexico ? {
         pais: "México", lead_id: lead.id, codigo_postulacion: lead.codigo_postulacion,
-        puesto: formMX.puesto, tipos_vehiculo: [formMX.tipo_vehiculo],
+        puesto: "Propietario", tipos_vehiculo: [formMX.tipo_vehiculo],
+        cantidad_vehiculos: formMX.cantidad_vehiculos ? parseInt(formMX.cantidad_vehiculos, 10) : null,
         nombre: formMX.nombre, apellidos: formMX.apellidos, rut: formMX.ine,
-        curp: formMX.curp, rfc: formMX.rfc, licencia: formMX.licencia,
+        curp: formMX.curp, rfc: formMX.rfc,
         telefono: formMX.telefono, email: formMX.email, localidad: formMX.localidad,
         colonia: formMX.colonia, url_ine: formMX.url_ine, url_ine_2: formMX.url_ine_2, url_curp: formMX.url_curp,
-        url_rfc: formMX.url_rfc, url_licencia: formMX.url_licencia,
-        url_vehiculo: formMX.url_vehiculo, url_veh_trasera: formMX.url_veh_trasera,
-        url_veh_lado_izq: formMX.url_veh_lado_izq, url_veh_lado_der: formMX.url_veh_lado_der,
-        url_tarjeta_circulacion: formMX.url_tarjeta_circulacion,
+        url_rfc: formMX.url_rfc,
         acepta_privacidad: formMX.acepta_privacidad, completado: false,
         updated_at: new Date().toISOString(),
       } : {
@@ -3799,14 +3798,14 @@ function ViewOnboarding({ lead, onVolver }) {
             // Cargar avance guardado
             if (esMexico) {
               setFormMX(f => ({...f,
-                puesto: saved.puesto || f.puesto,
+                puesto: "Propietario",
                 tipo_vehiculo: Array.isArray(saved.tipos_vehiculo) ? saved.tipos_vehiculo[0] : (saved.tipos_vehiculo || f.tipo_vehiculo),
+                cantidad_vehiculos: saved.cantidad_vehiculos != null ? String(saved.cantidad_vehiculos) : f.cantidad_vehiculos,
                 nombre: saved.nombre || f.nombre,
                 apellidos: saved.apellidos || f.apellidos,
                 ine: saved.rut || f.ine,
                 curp: saved.curp || f.curp,
                 rfc: saved.rfc || f.rfc,
-                licencia: saved.licencia || f.licencia,
                 telefono: saved.telefono || f.telefono,
                 email: saved.email || f.email,
                 localidad: saved.localidad || f.localidad,
@@ -3867,14 +3866,14 @@ function ViewOnboarding({ lead, onVolver }) {
       pais: "México",
       lead_id: lead.id,
       codigo_postulacion: lead.codigo_postulacion,
-      puesto: formMX.puesto,
+      puesto: "Propietario",
       tipos_vehiculo: [formMX.tipo_vehiculo],
+      cantidad_vehiculos: formMX.cantidad_vehiculos ? parseInt(formMX.cantidad_vehiculos, 10) : null,
       nombre: formMX.nombre,
       apellidos: formMX.apellidos,
       rut: formMX.ine,
       curp: formMX.curp,
       rfc: formMX.rfc,
-      licencia: formMX.licencia,
       telefono: formMX.telefono,
       email: formMX.email,
       localidad: formMX.localidad,
@@ -3883,12 +3882,6 @@ function ViewOnboarding({ lead, onVolver }) {
       url_ine_2: formMX.url_ine_2,
       url_curp: formMX.url_curp,
       url_rfc: formMX.url_rfc,
-      url_licencia: formMX.url_licencia,
-      url_vehiculo: formMX.url_vehiculo,
-      url_veh_trasera: formMX.url_veh_trasera,
-      url_veh_lado_izq: formMX.url_veh_lado_izq,
-      url_veh_lado_der: formMX.url_veh_lado_der,
-      url_tarjeta_circulacion: formMX.url_tarjeta_circulacion,
       acepta_privacidad: formMX.acepta_privacidad,
       completado: true,
       completado_at: new Date().toISOString(),
@@ -3924,8 +3917,8 @@ function ViewOnboarding({ lead, onVolver }) {
     const nuevosErrores = {};
     if (!payload.acepta_privacidad) nuevosErrores.acepta_privacidad = "Debes aceptar las políticas";
     if (esMexico) {
-      if (!formMX.puesto) nuevosErrores.puesto = "Campo obligatorio";
       if (!formMX.tipo_vehiculo) nuevosErrores.tipo_vehiculo = "Campo obligatorio";
+      if (!formMX.cantidad_vehiculos || parseInt(formMX.cantidad_vehiculos, 10) < 1) nuevosErrores.cantidad_vehiculos = "Indica cuántos vehículos presentarás";
       if (!formMX.nombre?.trim()) nuevosErrores.nombre = "Campo obligatorio";
       if (!formMX.apellidos?.trim()) nuevosErrores.apellidos = "Campo obligatorio";
       if (!formMX.ine?.trim()) nuevosErrores.ine = "Campo obligatorio";
@@ -3938,17 +3931,8 @@ function ViewOnboarding({ lead, onVolver }) {
       if (!formMX.url_curp) nuevosErrores.url_curp = "Debes adjuntar tu CURP";
       if (!formMX.url_rfc) nuevosErrores.url_rfc = "Debes adjuntar tu RFC";
       if (!formMX.email?.trim()) nuevosErrores.email = "Campo obligatorio";
-      if (!formMX.colonia?.trim()) {}
-      const conVehiculo = formMX.puesto === 'Driver' || formMX.puesto === 'Propietario';
-      if (conVehiculo) {
-        if (!formMX.licencia?.trim()) nuevosErrores.licencia = "Campo obligatorio";
-        if (!formMX.url_licencia) nuevosErrores.url_licencia = "Debes adjuntar tu licencia";
-        if (!formMX.url_vehiculo)            nuevosErrores.url_vehiculo            = "Foto del vehículo: frente con placas";
-        if (!formMX.url_veh_trasera)         nuevosErrores.url_veh_trasera         = "Foto del vehículo: trasera";
-        if (!formMX.url_veh_lado_izq)        nuevosErrores.url_veh_lado_izq        = "Foto del vehículo: lado izquierdo";
-        if (!formMX.url_veh_lado_der)        nuevosErrores.url_veh_lado_der        = "Foto del vehículo: lado derecho";
-        if (!formMX.url_tarjeta_circulacion) nuevosErrores.url_tarjeta_circulacion = "Adjunta la tarjeta de circulación";
-      }
+      // Licencia y fotos del vehículo YA NO se piden aquí: las unidades se
+      // certifican una a una desde el Portal de Terceros tras la firma.
     } else {
       if (!formCL.tipo_certificacion) nuevosErrores.tipo_certificacion = "Campo obligatorio";
       if (!formCL.posee_inicio_actividades) nuevosErrores.posee_inicio_actividades = "Campo obligatorio";
@@ -4095,11 +4079,13 @@ function ViewOnboarding({ lead, onVolver }) {
               </div>
             )}
 
-            <SelectField errores={errores} setErrores={setErrores} label="Puesto al que postula" campo="puesto" opciones={PUESTOS_MX}
-              value={formMX.puesto} onChange={v => updMX("puesto", v)} required />
-
-            <SelectField errores={errores} setErrores={setErrores} label="Tipo de Vehículo" campo="tipo_vehiculo" opciones={TIPOS_VEHICULO_MX}
-              value={formMX.tipo_vehiculo} onChange={v => updMX("tipo_vehiculo", v)} required />
+            {/* Puesto fijo: Propietario (la selección se eliminó del formulario) */}
+            <div className="two-col">
+              <SelectField errores={errores} setErrores={setErrores} label="Tipo de Vehículo que presentarás" campo="tipo_vehiculo" opciones={TIPOS_VEHICULO_MX}
+                value={formMX.tipo_vehiculo} onChange={v => updMX("tipo_vehiculo", v)} required />
+              <TextField errores={errores} setErrores={setErrores} label="¿Cuántos vehículos presentarás?" campo="cantidad_vehiculos" type="number"
+                value={formMX.cantidad_vehiculos} onChange={v => updMX("cantidad_vehiculos", v)} placeholder="Ej: 2" required />
+            </div>
 
             {/* Imagen de referencia del vehículo */}
             {formMX.tipo_vehiculo && (
@@ -4154,18 +4140,16 @@ function ViewOnboarding({ lead, onVolver }) {
             </div>
             <div className="two-col">
               <TextField errores={errores} setErrores={setErrores} label="RFC" campo="rfc" value={formMX.rfc} onChange={v => updMX("rfc", v)} placeholder="RFC" required />
-              {(formMX.puesto === "Driver" || formMX.puesto === "Propietario") && (
-                <TextField errores={errores} setErrores={setErrores} label="Licencia de Conducir" campo="licencia" value={formMX.licencia} onChange={v => updMX("licencia", v)} placeholder="Número de licencia" required />
-              )}
-            </div>
-            <div className="two-col">
               <TextField errores={errores} setErrores={setErrores} label="Teléfono" campo="telefono" value={formMX.telefono} onChange={v => updMX("telefono", v)} placeholder="+521..." required />
-              <TextField errores={errores} setErrores={setErrores} label="Email" campo="email" type="email" value={formMX.email} onChange={v => updMX("email", v)} placeholder="correo@..." />
             </div>
             <div className="two-col">
+              <TextField errores={errores} setErrores={setErrores} label="Email" campo="email" type="email" value={formMX.email} onChange={v => updMX("email", v)} placeholder="correo@..." required />
               <SelectField errores={errores} setErrores={setErrores} label="Localidad (SVC)" campo="localidad" opciones={ESTADOS_MEXICO}
                 value={formMX.localidad} onChange={v => updMX("localidad", v)} />
+            </div>
+            <div className="two-col">
               <TextField errores={errores} setErrores={setErrores} label="Colonia" campo="colonia" value={formMX.colonia} onChange={v => updMX("colonia", v)} placeholder="Tu colonia" />
+              <div />
             </div>
 
             <div style={{ marginTop: 8, padding: "12px 14px", background: "#f8f9fa", borderRadius: 10, marginBottom: 8 }}>
@@ -4182,29 +4166,8 @@ function ViewOnboarding({ lead, onVolver }) {
               <UploadField label="Adjuntar RFC *" valor={formMX.url_rfc} errores={errores} campo="url_rfc"
                 uploading={uploading.rfc}
                 onChange={e => handleUpload("rfc", e.target.files[0], setFormMX, lead.id)} />
-              {(formMX.puesto === "Driver" || formMX.puesto === "Propietario") && (
-                <>
-                  <UploadField label="Adjuntar Licencia de Conducir *" valor={formMX.url_licencia} errores={errores} campo="url_licencia"
-                    uploading={uploading.licencia}
-                    onChange={e => handleUpload("licencia", e.target.files[0], setFormMX, lead.id)} />
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#1a3a6b", margin: "12px 0 6px" }}>🚚 Fotos del vehículo (todos los lados)</div>
-                  <UploadField label="Frente (con placas visibles) *" valor={formMX.url_vehiculo} errores={errores} campo="url_vehiculo"
-                    uploading={uploading.vehiculo}
-                    onChange={e => handleUpload("vehiculo", e.target.files[0], setFormMX, lead.id)} />
-                  <UploadField label="Trasera *" valor={formMX.url_veh_trasera} errores={errores} campo="url_veh_trasera"
-                    uploading={uploading.veh_trasera}
-                    onChange={e => handleUpload("veh_trasera", e.target.files[0], setFormMX, lead.id)} />
-                  <UploadField label="Lado izquierdo *" valor={formMX.url_veh_lado_izq} errores={errores} campo="url_veh_lado_izq"
-                    uploading={uploading.veh_lado_izq}
-                    onChange={e => handleUpload("veh_lado_izq", e.target.files[0], setFormMX, lead.id)} />
-                  <UploadField label="Lado derecho *" valor={formMX.url_veh_lado_der} errores={errores} campo="url_veh_lado_der"
-                    uploading={uploading.veh_lado_der}
-                    onChange={e => handleUpload("veh_lado_der", e.target.files[0], setFormMX, lead.id)} />
-                  <UploadField label="Tarjeta de circulación *" valor={formMX.url_tarjeta_circulacion} errores={errores} campo="url_tarjeta_circulacion"
-                    uploading={uploading.tarjeta_circulacion}
-                    onChange={e => handleUpload("tarjeta_circulacion", e.target.files[0], setFormMX, lead.id)} />
-                </>
-              )}
+              {/* Licencia y fotos del vehículo eliminadas del formulario de inscripción:
+                  las unidades se certifican una a una desde el Portal de Terceros. */}
             </div>
           </div>
         )}
