@@ -39,23 +39,54 @@ const ETAPAS_CIERRE   = ["Postulante Aprobado","Postulante No Calificado"];
 const ETAPAS_TODAS    = [...ETAPAS_PIPELINE, ...ETAPAS_CIERRE];
 const ETAPAS_BASE_DATOS = ["Base Datos Leads"]; // leads tibios y fríos
 
-// ─── REGLA DEL FLUJO: LAS TARJETAS NO SE MUEVEN A MANO ──────────────────────
-// El Kanban es un ESPEJO del estado real del proceso, no un tablero editable.
-// Mover a mano generaba inconsistencias (leads en Validaciones sin documentos
-// cargados, que nunca generaban tarjeta en Certificaciones).
-const MOTIVO_NO_MANUAL =
-  "Este tablero refleja el estado real del proceso: las tarjetas no se mueven a mano.\n\n" +
-  "Si una tarjeta quedó en la etapa equivocada, avisa a soporte: la corrección se hace con registro en el historial del lead.";
+// ─── QUÉ SE REGISTRA A MANO Y QUÉ ES AUTOMÁTICO ─────────────────────────────
+// Las etapas COMERCIALES las registra el equipo (son decisiones humanas: se
+// envió la propuesta, el prospecto la aceptó o la rechazó).
+// Las etapas de PROCESO son automáticas y no se tocan:
+//   · Proceso Interno de Certificaciones → entra al completar la postulación
+//     (INE + CURP + RFC). Sin documentos no hay certificación posible.
+//   · Postulante Aprobado / No Calificado → los define el cierre de
+//     Certificaciones (Fuente A).
+//   · Propuesta Rechazada → vuelve a Base Datos Leads por antigüedad.
+// Nunca se arrastran tarjetas: el cambio se registra abriendo el detalle.
+const TRANSICIONES_MANUALES = {
+  "Nuevo Lead":                         ["Base Datos Leads", "Propuesta Enviada"],
+  "Base Datos Leads":                   ["Propuesta Enviada"],
+  "Propuesta Enviada":                  ["Propuesta Aceptada", "Propuesta Rechazada"],
+  "Propuesta Aceptada":                 [],
+  "Propuesta Rechazada":                [],
+  "Proceso Interno de Certificaciones": [],
+  "Postulante Aprobado":                [],
+  "Postulante No Calificado":           [],
+};
+// Explicación que ve el usuario cuando la etapa ya no se toca a mano
+const ETAPA_AUTOMATICA = {
+  "Propuesta Aceptada": "Avanza sola cuando el prospecto complete su postulación (INE, CURP y RFC).",
+  "Propuesta Rechazada": "Vuelve a Base Datos Leads automáticamente para recontacto.",
+  "Proceso Interno de Certificaciones": "La controla el flujo de Certificaciones: sale al quedar Aprobado o Rechazado.",
+  "Postulante Aprobado": "Cierre definido por Certificaciones.",
+  "Postulante No Calificado": "Cierre definido por Certificaciones.",
+};
+function puedeRegistrar(desde, hasta) {
+  return (TRANSICIONES_MANUALES[desde] || []).includes(hasta);
+}
+function motivoBloqueo(desde, hasta) {
+  if (ETAPA_AUTOMATICA[desde]) return `"${desde}" no se mueve a mano.\n\n${ETAPA_AUTOMATICA[desde]}`;
+  const ok = TRANSICIONES_MANUALES[desde] || [];
+  if (!ok.length) return `Desde "${desde}" no hay movimientos manuales disponibles.`;
+  return `No se puede pasar de "${desde}" a "${hasta}".\n\nDesde aquí solo: ${ok.join(" · ")}.`;
+}
 
 const ETAPA_CFG = {
-  "Nuevo Lead":          { color:"#3B82F6", icon:"🎯" },
-  "Propuesta Enviada":   { color:"#F97316", icon:"📄" },
-  "Propuesta Aceptada":  { color:"#10B981", icon:"✅" },
-  "Propuesta Rechazada": { color:"#EF4444", icon:"❌" },
-  "Proceso Interno de Certificaciones": { color:"#8B5CF6", icon:"📋" },
-  "Postulante Aprobado":  { color:"#059669", icon:"🏆" },
-  "Postulante No Calificado": { color:"#DC2626", icon:"🚫" },
-  "Base Datos Leads":    { color:"#8B5CF6", icon:"🗄️" },
+  // Paleta corporativa: navy #1a3a6b · naranja #F47B20 · gris para cerrados
+  "Nuevo Lead":                          { color:"#1a3a6b", icon:"◆" },
+  "Base Datos Leads":                    { color:"#7d8fa9", icon:"🗃" },
+  "Propuesta Enviada":                   { color:"#F47B20", icon:"📄" },
+  "Propuesta Aceptada":                  { color:"#1a3a6b", icon:"✓" },
+  "Propuesta Rechazada":                 { color:"#9aa5b1", icon:"—" },
+  "Proceso Interno de Certificaciones":  { color:"#F47B20", icon:"📋" },
+  "Postulante Aprobado":                 { color:"#1a3a6b", icon:"★" },
+  "Postulante No Calificado":            { color:"#9aa5b1", icon:"—" },
 };
 
 const CANAL_CFG = {
@@ -783,7 +814,7 @@ const Pipeline = ({ leads, onSelect, onEtapaChange }) => {
   return (
     <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
       <div style={{fontSize:10,color:"#aaaaaa",textAlign:"center",padding:"4px 0 8px",flexShrink:0}}>
-        🔒 Las tarjetas no se mueven a mano · Clic en una tarjeta para ver su detalle
+        Clic en una tarjeta para ver su detalle · las etapas de certificación avanzan solas
       </div>
       <div style={{flex:1,overflowX:"auto",overflowY:"hidden"}}>
         <div style={{display:"flex",gap:10,minWidth:"fit-content",height:"100%"}}>
@@ -1093,14 +1124,25 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest, onDeleteRequ
           </div>
         </div>
         <div style={{marginTop:12,display:"flex",gap:8,alignItems:"center"}}>
-          {/* Etapa en SOLO LECTURA: el avance lo hacen los procesos automáticos */}
-          <div title="El avance de etapa es automático"
-            style={{flex:1,background:"#ffffff",color:etapaCfg.color,border:`1px solid ${etapaCfg.color}44`,borderRadius:8,padding:"7px 12px",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:6}}>
-            <span style={{fontSize:11}}>🔒</span> {etapa}
-          </div>
+          {/* Etapas comerciales: se registran aquí. Etapas de proceso: solo lectura. */}
+          {(TRANSICIONES_MANUALES[etapa]||[]).length>0 ? (
+            <select value={etapa} onChange={e=>onEtapaChangeRequest&&onEtapaChangeRequest(lead,e.target.value)}
+              style={{flex:1,background:"#ffffff",color:etapaCfg.color,border:`1px solid ${etapaCfg.color}44`,borderRadius:8,padding:"7px 12px",fontSize:12,cursor:"pointer",fontWeight:600}}>
+              <option value={etapa}>{etapa}</option>
+              {TRANSICIONES_MANUALES[etapa].map(e=><option key={e} value={e}>→ {e}</option>)}
+            </select>
+          ) : (
+            <div title={ETAPA_AUTOMATICA[etapa]||"Etapa controlada por el proceso"}
+              style={{flex:1,background:"#ffffff",color:etapaCfg.color,border:`1px solid ${etapaCfg.color}44`,borderRadius:8,padding:"7px 12px",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:6}}>
+              <span style={{fontSize:11}}>🔒</span> {etapa}
+            </div>
+          )}
           {saving&&<span style={{fontSize:10,color:"#3B82F6"}}>Guardando...</span>}
           {saved&&<span style={{fontSize:10,color:"#10B981"}}>✓ Guardado</span>}
         </div>
+        {ETAPA_AUTOMATICA[etapa]&&(
+          <div style={{marginTop:6,fontSize:10,color:"#cbd5e1"}}>🔒 {ETAPA_AUTOMATICA[etapa]}</div>
+        )}
 
       </div>
       <div style={{display:"flex",background:"#1a3a6b",borderBottom:"1px solid #e4e7ec",flexShrink:0}}>
@@ -2374,8 +2416,15 @@ export default function App() {
   // Los movimientos manuales están deshabilitados: el tablero es un espejo del
   // estado real. Se conserva el handler como candado por si alguna vista intenta
   // cambiar la etapa desde el navegador.
+  // Solo se registran las etapas comerciales; las de proceso son automáticas.
   const handleEtapaChange=(lead,nuevaEtapa)=>{
-    setBloqueoModal({titulo:"Las tarjetas no se mueven a mano",mensaje:MOTIVO_NO_MANUAL});
+    const etapaActual=NORM(lead.etapa);
+    if(etapaActual===nuevaEtapa) return;
+    if(!puedeRegistrar(etapaActual,nuevaEtapa)){
+      setBloqueoModal({titulo:"Movimiento no disponible",mensaje:motivoBloqueo(etapaActual,nuevaEtapa)});
+      return;
+    }
+    setConfirmModal({lead,nuevaEtapa,etapaActual});
   };
 
   const confirmarCambioEtapa=async()=>{
