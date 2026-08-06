@@ -39,6 +39,35 @@ const ETAPAS_CIERRE   = ["Postulante Aprobado","Postulante No Calificado"];
 const ETAPAS_TODAS    = [...ETAPAS_PIPELINE, ...ETAPAS_CIERRE];
 const ETAPAS_BASE_DATOS = ["Base Datos Leads"]; // leads tibios y fríos
 
+// ─── REGLAS DEL FLUJO ────────────────────────────────────────────────────────
+// Las tarjetas no se mueven a dedo: cada etapa solo permite los pasos válidos.
+// Motivo: se detectaron leads llevados a "Entrevistas y Validaciones" sin haber
+// completado la postulación (sin INE/CURP/RFC), por lo que nunca generaban
+// tarjeta en Certificaciones y quedaban en un limbo.
+const TRANSICIONES = {
+  "Nuevo Lead":                 ["Propuesta Enviada", "Base Datos Leads", "Postulante No Calificado"],
+  "Base Datos Leads":           ["Propuesta Enviada", "Postulante No Calificado"],
+  "Propuesta Enviada":          ["Propuesta Aceptada", "Propuesta Rechazada", "Base Datos Leads"],
+  "Propuesta Aceptada":         ["Entrevistas y Validaciones", "Postulante No Calificado"],
+  "Propuesta Rechazada":        ["Base Datos Leads"],
+  "Entrevistas y Validaciones": ["Postulante Aprobado", "Postulante No Calificado"],
+  "Postulante Aprobado":        [],
+  "Postulante No Calificado":   ["Base Datos Leads"],
+};
+// Etapas que exigen postulación completa (INE + CURP + RFC en onboarding)
+const ETAPAS_EXIGEN_DOCS = ["Entrevistas y Validaciones"];
+
+function transicionPermitida(desde, hasta) {
+  const permitidas = TRANSICIONES[desde];
+  if (!permitidas) return true;              // etapa desconocida: no se bloquea
+  return permitidas.includes(hasta);
+}
+function motivoBloqueo(desde, hasta) {
+  const permitidas = TRANSICIONES[desde] || [];
+  if (!permitidas.length) return `"${desde}" es una etapa final: la tarjeta ya no se mueve desde aquí.`;
+  return `No se puede pasar de "${desde}" a "${hasta}". Desde aquí solo: ${permitidas.join(" · ")}.`;
+}
+
 const ETAPA_CFG = {
   "Nuevo Lead":          { color:"#3B82F6", icon:"🎯" },
   "Propuesta Enviada":   { color:"#F97316", icon:"📄" },
@@ -739,13 +768,14 @@ const LeadCard = ({ lead, onSelect, onDragStart }) => {
   );
 };
 
-const KanbanCol = ({ etapa, leads, onSelect, onDragStart, onDrop, isDragOver, setDragOver }) => {
+const KanbanCol = ({ etapa, leads, onSelect, onDragStart, onDrop, isDragOver, setDragOver, etapaOrigen }) => {
+  const permitida = !etapaOrigen || etapaOrigen === etapa || transicionPermitida(etapaOrigen, etapa);
   const cfg=ETAPA_CFG[etapa]||{color:"#888888",icon:"•"};
   return (
     <div style={{width:ETAPAS_CIERRE.includes(etapa)?280:etapa==="Nuevo Lead"?160:245,flexShrink:0,display:"flex",flexDirection:"column",height:"100%"}}
-      onDragOver={e=>{e.preventDefault();setDragOver(etapa);}}
+      onDragOver={e=>{if(!permitida)return;e.preventDefault();setDragOver(etapa);}}
       onDragLeave={()=>setDragOver(null)}
-      onDrop={e=>{onDrop(e,etapa);setDragOver(null);}}>
+      onDrop={e=>{if(!permitida){setDragOver(null);return;}onDrop(e,etapa);setDragOver(null);}}>
       <div style={{padding:"8px 12px",background:"#ffffff",borderRadius:"10px 10px 0 0",flexShrink:0,
         borderBottom:`2px solid ${isDragOver?cfg.color:"#888888"}`,
         display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -771,7 +801,13 @@ const Pipeline = ({ leads, onSelect, onEtapaChange }) => {
   const [dragLead,setDragLead]=useState(null);
   const [dragOver,setDragOver]=useState(null);
   const handleDragStart=(e,lead)=>{setDragLead(lead);e.dataTransfer.effectAllowed="move";};
-  const handleDrop=async(e,nuevaEtapa)=>{e.preventDefault();if(!dragLead||dragLead.etapa===nuevaEtapa)return;await onEtapaChange(dragLead,nuevaEtapa);setDragLead(null);};
+  const handleDrop=async(e,nuevaEtapa)=>{
+    e.preventDefault();
+    if(!dragLead||dragLead.etapa===nuevaEtapa){setDragLead(null);return;}
+    // El flujo manda: si el paso no es válido, onEtapaChange lo rechaza y avisa
+    await onEtapaChange(dragLead,nuevaEtapa);
+    setDragLead(null);
+  };
   const normalizarEtapa=(e)=>{
     if(!e) return "Nuevo Lead";
     const mapa={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};
@@ -781,13 +817,13 @@ const Pipeline = ({ leads, onSelect, onEtapaChange }) => {
   return (
     <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
       <div style={{fontSize:10,color:"#aaaaaa",textAlign:"center",padding:"4px 0 8px",flexShrink:0}}>
-        💡 Arrastra tarjetas entre columnas · O haz clic para abrir el detalle
+        💡 Arrastra solo a las etapas válidas del flujo · Clic para abrir el detalle
       </div>
       <div style={{flex:1,overflowX:"auto",overflowY:"hidden"}}>
         <div style={{display:"flex",gap:10,minWidth:"fit-content",height:"100%"}}>
-          {ETAPAS_PIPELINE.map(e=><KanbanCol key={e} etapa={e} leads={lpe(e)} onSelect={onSelect} onDragStart={handleDragStart} onDrop={handleDrop} isDragOver={dragOver===e} setDragOver={setDragOver}/>)}
+          {ETAPAS_PIPELINE.map(e=><KanbanCol key={e} etapa={e} leads={lpe(e)} onSelect={onSelect} onDragStart={handleDragStart} onDrop={handleDrop} isDragOver={dragOver===e} setDragOver={setDragOver} etapaOrigen={dragLead?normalizarEtapa(dragLead.etapa):null}/>)}
           <div style={{width:2,background:"linear-gradient(to bottom,transparent,#aaaaaa,transparent)",borderRadius:4,flexShrink:0,margin:"0 4px"}}/>
-          {ETAPAS_CIERRE.map(e=><KanbanCol key={e} etapa={e} leads={lpe(e)} onSelect={onSelect} onDragStart={handleDragStart} onDrop={handleDrop} isDragOver={dragOver===e} setDragOver={setDragOver}/>)}
+          {ETAPAS_CIERRE.map(e=><KanbanCol key={e} etapa={e} leads={lpe(e)} onSelect={onSelect} onDragStart={handleDragStart} onDrop={handleDrop} isDragOver={dragOver===e} setDragOver={setDragOver} etapaOrigen={dragLead?normalizarEtapa(dragLead.etapa):null}/>)}
         </div>
       </div>
     </div>
@@ -1097,11 +1133,16 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest, onDeleteRequ
         <div style={{marginTop:12,display:"flex",gap:8,alignItems:"center"}}>
           <select value={etapa} onChange={e=>handleEtapaChange(e.target.value)}
             style={{flex:1,background:"#ffffff",color:etapaCfg.color,border:`1px solid ${etapaCfg.color}44`,borderRadius:8,padding:"7px 12px",fontSize:12,cursor:"pointer",fontWeight:600}}>
-            {ETAPAS_TODAS.map(e=><option key={e}>{e}</option>)}
+            {/* Solo se ofrecen los pasos válidos del flujo desde la etapa actual */}
+            <option value={etapa}>{etapa}</option>
+            {(TRANSICIONES[etapa]||ETAPAS_TODAS.filter(x=>x!==etapa)).map(e=><option key={e} value={e}>→ {e}</option>)}
           </select>
           {saving&&<span style={{fontSize:10,color:"#3B82F6"}}>Guardando...</span>}
           {saved&&<span style={{fontSize:10,color:"#10B981"}}>✓ Guardado</span>}
         </div>
+        {Array.isArray(TRANSICIONES[etapa])&&TRANSICIONES[etapa].length===0&&(
+          <div style={{marginTop:6,fontSize:10,color:"#cbd5e1"}}>🔒 Etapa final del flujo — la tarjeta ya no se mueve desde aquí.</div>
+        )}
       </div>
       <div style={{display:"flex",background:"#1a3a6b",borderBottom:"1px solid #e4e7ec",flexShrink:0}}>
         {[["info","📋 Datos"],["score","⭐ Score"],["timeline","🕐 Historial"],["postulacion","📝 Información"],["comentarios","💬 Comentarios"],["preguntas","❓ Preguntas Prospecto"]].map(([id,label])=>(
@@ -2369,11 +2410,44 @@ export default function App() {
   const NORM=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
 
   const [confirmModal,setConfirmModal]=useState(null); // {lead, nuevaEtapa}
+  const [bloqueoModal,setBloqueoModal]=useState(null);  // {titulo, mensaje} — movimiento rechazado por el flujo
   const [deleteModal,setDeleteModal]=useState(null);   // {lead}
 
-  const handleEtapaChange=(lead,nuevaEtapa)=>{
+  const handleEtapaChange=async(lead,nuevaEtapa)=>{
     const etapaActual=NORM(lead.etapa);
     if(etapaActual===nuevaEtapa) return;
+
+    // Regla 1 · el paso debe existir en el flujo
+    if(!transicionPermitida(etapaActual,nuevaEtapa)){
+      setBloqueoModal({titulo:"Movimiento no permitido",mensaje:motivoBloqueo(etapaActual,nuevaEtapa)});
+      return;
+    }
+
+    // Regla 2 · pasar a Validaciones exige la postulación completa
+    if(ETAPAS_EXIGEN_DOCS.includes(nuevaEtapa)){
+      try{
+        const {data}=await supabase.from("onboarding_terceros")
+          .select("id,url_ine,url_curp,url_rfc,pais").eq("lead_id",lead.id).maybeSingle();
+        const falta=[];
+        if(!data) falta.push("no completó el formulario de postulación");
+        else{
+          if(!data.url_ine) falta.push("INE");
+          if(!data.url_curp) falta.push("CURP");
+          if(!data.url_rfc) falta.push("RFC");
+          if(data.pais!=="México") falta.push('país distinto de "México"');
+        }
+        if(falta.length){
+          setBloqueoModal({
+            titulo:"Falta la postulación completa",
+            mensaje:`Para pasar a "${nuevaEtapa}" el prospecto debe haber completado su postulación con INE, CURP y RFC.\n\nPendiente: ${falta.join(" · ")}.\n\nEnvíale el link del portal de prospección y la tarjeta avanzará cuando cargue sus documentos.`,
+          });
+          return;
+        }
+      }catch(e){
+        setBloqueoModal({titulo:"No se pudo verificar la postulación",mensaje:e.message});
+        return;
+      }
+    }
     setConfirmModal({lead,nuevaEtapa,etapaActual});
   };
 
@@ -2670,6 +2744,20 @@ export default function App() {
 
       {selectedLead&&<LeadPanel lead={selectedLead} onClose={()=>setSelectedLead(null)} onUpdate={handleLeadUpdate} onEtapaChangeRequest={handleEtapaChange} onDeleteRequest={handleEliminarLead}/>}
       {showAlertas&&<AlertasPopup leads={leads} onClose={()=>setShowAlertas(false)} onVerLead={(lead)=>{setSelectedLead(lead);setSeccion(lead.tipo_postulacion==="libre"?"libre":"campana");}}/>}
+      {bloqueoModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300}}
+          onClick={()=>setBloqueoModal(null)}>
+          <div onClick={e=>e.stopPropagation()}
+            style={{background:"#fff",borderRadius:14,padding:"22px 24px",maxWidth:460,boxShadow:"0 20px 60px rgba(0,0,0,.35)"}}>
+            <div style={{fontSize:15,fontWeight:800,color:"#c0392b",marginBottom:8}}>🔒 {bloqueoModal.titulo}</div>
+            <div style={{fontSize:13,color:"#334155",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{bloqueoModal.mensaje}</div>
+            <button onClick={()=>setBloqueoModal(null)}
+              style={{marginTop:16,width:"100%",background:"#1a3a6b",color:"#fff",border:"none",borderRadius:9,padding:"11px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
       {confirmModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:400}}>
           <div style={{background:"#ffffff",borderRadius:14,padding:28,width:400,boxShadow:"0 20px 60px rgba(0,0,0,.3)"}}>
