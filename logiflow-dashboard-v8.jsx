@@ -34,46 +34,25 @@ const sb = {
 };
 
 // ─── CONSTANTES ───────────────────────────────────────────────────────────────
-const ETAPAS_PIPELINE = ["Nuevo Lead","Propuesta Enviada","Propuesta Aceptada","Propuesta Rechazada","Entrevistas y Validaciones"];
+const ETAPAS_PIPELINE = ["Nuevo Lead","Propuesta Enviada","Propuesta Aceptada","Propuesta Rechazada","Proceso Interno de Certificaciones"];
 const ETAPAS_CIERRE   = ["Postulante Aprobado","Postulante No Calificado"];
 const ETAPAS_TODAS    = [...ETAPAS_PIPELINE, ...ETAPAS_CIERRE];
 const ETAPAS_BASE_DATOS = ["Base Datos Leads"]; // leads tibios y fríos
 
-// ─── REGLAS DEL FLUJO ────────────────────────────────────────────────────────
-// Las tarjetas no se mueven a dedo: cada etapa solo permite los pasos válidos.
-// Motivo: se detectaron leads llevados a "Entrevistas y Validaciones" sin haber
-// completado la postulación (sin INE/CURP/RFC), por lo que nunca generaban
-// tarjeta en Certificaciones y quedaban en un limbo.
-const TRANSICIONES = {
-  "Nuevo Lead":                 ["Propuesta Enviada", "Base Datos Leads", "Postulante No Calificado"],
-  "Base Datos Leads":           ["Propuesta Enviada", "Postulante No Calificado"],
-  "Propuesta Enviada":          ["Propuesta Aceptada", "Propuesta Rechazada", "Base Datos Leads"],
-  "Propuesta Aceptada":         ["Entrevistas y Validaciones", "Postulante No Calificado"],
-  "Propuesta Rechazada":        ["Base Datos Leads"],
-  "Entrevistas y Validaciones": ["Postulante Aprobado", "Postulante No Calificado"],
-  "Postulante Aprobado":        [],
-  "Postulante No Calificado":   ["Base Datos Leads"],
-};
-// Etapas que exigen postulación completa (INE + CURP + RFC en onboarding)
-const ETAPAS_EXIGEN_DOCS = ["Entrevistas y Validaciones"];
-
-function transicionPermitida(desde, hasta) {
-  const permitidas = TRANSICIONES[desde];
-  if (!permitidas) return true;              // etapa desconocida: no se bloquea
-  return permitidas.includes(hasta);
-}
-function motivoBloqueo(desde, hasta) {
-  const permitidas = TRANSICIONES[desde] || [];
-  if (!permitidas.length) return `"${desde}" es una etapa final: la tarjeta ya no se mueve desde aquí.`;
-  return `No se puede pasar de "${desde}" a "${hasta}". Desde aquí solo: ${permitidas.join(" · ")}.`;
-}
+// ─── REGLA DEL FLUJO: LAS TARJETAS NO SE MUEVEN A MANO ──────────────────────
+// El Kanban es un ESPEJO del estado real del proceso, no un tablero editable.
+// Mover a mano generaba inconsistencias (leads en Validaciones sin documentos
+// cargados, que nunca generaban tarjeta en Certificaciones).
+const MOTIVO_NO_MANUAL =
+  "Este tablero refleja el estado real del proceso: las tarjetas no se mueven a mano.\n\n" +
+  "Si una tarjeta quedó en la etapa equivocada, avisa a soporte: la corrección se hace con registro en el historial del lead.";
 
 const ETAPA_CFG = {
   "Nuevo Lead":          { color:"#3B82F6", icon:"🎯" },
   "Propuesta Enviada":   { color:"#F97316", icon:"📄" },
   "Propuesta Aceptada":  { color:"#10B981", icon:"✅" },
   "Propuesta Rechazada": { color:"#EF4444", icon:"❌" },
-  "Entrevistas y Validaciones": { color:"#8B5CF6", icon:"🎤" },
+  "Proceso Interno de Certificaciones": { color:"#8B5CF6", icon:"📋" },
   "Postulante Aprobado":  { color:"#059669", icon:"🏆" },
   "Postulante No Calificado": { color:"#DC2626", icon:"🚫" },
   "Base Datos Leads":    { color:"#8B5CF6", icon:"🗄️" },
@@ -721,12 +700,12 @@ const ConfigScoreView = () => {
 };
 
 // ─── LEAD CARD ────────────────────────────────────────────────────────────────
-const LeadCard = ({ lead, onSelect, onDragStart }) => {
+const LeadCard = ({ lead, onSelect }) => {
   const cfg=ETAPA_CFG[lead.etapa]||{color:"#888888"};
   // Tiene pregunta sin responder si llegó pregunta del prospecto pero el analista aún no contestó
   const tienePreguntaPendiente = !!(lead.preguntas_prospecto && lead.preguntas_prospecto.trim()) && !lead.respuesta_analista_preguntas;
   return (
-    <div draggable onDragStart={(e)=>onDragStart(e,lead)} onClick={()=>onSelect(lead)}
+    <div onClick={()=>onSelect(lead)}
       style={{
         background: tienePreguntaPendiente ? "#fffbeb" : "#ffffff",
         border:"1px solid #e4e7ec",
@@ -768,28 +747,25 @@ const LeadCard = ({ lead, onSelect, onDragStart }) => {
   );
 };
 
-const KanbanCol = ({ etapa, leads, onSelect, onDragStart, onDrop, isDragOver, setDragOver, etapaOrigen }) => {
-  const permitida = !etapaOrigen || etapaOrigen === etapa || transicionPermitida(etapaOrigen, etapa);
+const KanbanCol = ({ etapa, leads, onSelect }) => {
   const cfg=ETAPA_CFG[etapa]||{color:"#888888",icon:"•"};
   return (
     <div style={{width:ETAPAS_CIERRE.includes(etapa)?280:etapa==="Nuevo Lead"?160:245,flexShrink:0,display:"flex",flexDirection:"column",height:"100%"}}
-      onDragOver={e=>{if(!permitida)return;e.preventDefault();setDragOver(etapa);}}
-      onDragLeave={()=>setDragOver(null)}
-      onDrop={e=>{if(!permitida){setDragOver(null);return;}onDrop(e,etapa);setDragOver(null);}}>
+>
       <div style={{padding:"8px 12px",background:"#ffffff",borderRadius:"10px 10px 0 0",flexShrink:0,
-        borderBottom:`2px solid ${isDragOver?cfg.color:"#888888"}`,
+        borderBottom:`2px solid ${cfg.color}`,
         display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <span style={{fontSize:10,fontWeight:800,color:isDragOver?cfg.color:"#888888",textTransform:"uppercase",letterSpacing:1}}>{cfg.icon} {etapa}</span>
+        <span style={{fontSize:10,fontWeight:800,color:cfg.color,textTransform:"uppercase",letterSpacing:1}}>{cfg.icon} {etapa}</span>
         <span style={{fontSize:10,fontWeight:800,background:cfg.color+"22",color:cfg.color,padding:"2px 8px",borderRadius:20}}>{leads.length}</span>
       </div>
-      <div style={{flex:1,overflowY:"auto",background:isDragOver?cfg.color+"08":"#f0f2f5",borderRadius:"0 0 10px 10px",
+      <div style={{flex:1,overflowY:"auto",background:"#f0f2f5",borderRadius:"0 0 10px 10px",
         padding:8,display:"flex",flexDirection:"column",gap:7,minHeight:120,
-        border:isDragOver?`1px dashed ${cfg.color}44`:"1px solid transparent"}}>
-        {leads.map(lead=><LeadCard key={lead.id} lead={lead} onSelect={onSelect} onDragStart={onDragStart}/>)}
+        border:"1px solid transparent"}}>
+        {leads.map(lead=><LeadCard key={lead.id} lead={lead} onSelect={onSelect}/>)}
         {leads.length===0&&(
           <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",
-            color:isDragOver?cfg.color:"#888888",fontSize:12,minHeight:80}}>
-            {isDragOver?"Soltar aquí":"Sin leads"}
+            color:"#888888",fontSize:12,minHeight:80}}>
+            {"Sin leads"}
           </div>
         )}
       </div>
@@ -798,32 +774,22 @@ const KanbanCol = ({ etapa, leads, onSelect, onDragStart, onDrop, isDragOver, se
 };
 
 const Pipeline = ({ leads, onSelect, onEtapaChange }) => {
-  const [dragLead,setDragLead]=useState(null);
-  const [dragOver,setDragOver]=useState(null);
-  const handleDragStart=(e,lead)=>{setDragLead(lead);e.dataTransfer.effectAllowed="move";};
-  const handleDrop=async(e,nuevaEtapa)=>{
-    e.preventDefault();
-    if(!dragLead||dragLead.etapa===nuevaEtapa){setDragLead(null);return;}
-    // El flujo manda: si el paso no es válido, onEtapaChange lo rechaza y avisa
-    await onEtapaChange(dragLead,nuevaEtapa);
-    setDragLead(null);
-  };
   const normalizarEtapa=(e)=>{
     if(!e) return "Nuevo Lead";
-    const mapa={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};
+    const mapa={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones","proceso interno de certificaciones":"Proceso Interno de Certificaciones","base datos leads":"Base Datos Leads"};
     return mapa[e.toLowerCase().trim()]||e;
   };
   const lpe=(etapa)=>leads.filter(l=>normalizarEtapa(l.etapa)===etapa);
   return (
     <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
       <div style={{fontSize:10,color:"#aaaaaa",textAlign:"center",padding:"4px 0 8px",flexShrink:0}}>
-        💡 Arrastra solo a las etapas válidas del flujo · Clic para abrir el detalle
+        🔒 Las tarjetas no se mueven a mano · Clic en una tarjeta para ver su detalle
       </div>
       <div style={{flex:1,overflowX:"auto",overflowY:"hidden"}}>
         <div style={{display:"flex",gap:10,minWidth:"fit-content",height:"100%"}}>
-          {ETAPAS_PIPELINE.map(e=><KanbanCol key={e} etapa={e} leads={lpe(e)} onSelect={onSelect} onDragStart={handleDragStart} onDrop={handleDrop} isDragOver={dragOver===e} setDragOver={setDragOver} etapaOrigen={dragLead?normalizarEtapa(dragLead.etapa):null}/>)}
+          {ETAPAS_PIPELINE.map(e=><KanbanCol key={e} etapa={e} leads={lpe(e)} onSelect={onSelect}/>)}
           <div style={{width:2,background:"linear-gradient(to bottom,transparent,#aaaaaa,transparent)",borderRadius:4,flexShrink:0,margin:"0 4px"}}/>
-          {ETAPAS_CIERRE.map(e=><KanbanCol key={e} etapa={e} leads={lpe(e)} onSelect={onSelect} onDragStart={handleDragStart} onDrop={handleDrop} isDragOver={dragOver===e} setDragOver={setDragOver} etapaOrigen={dragLead?normalizarEtapa(dragLead.etapa):null}/>)}
+          {ETAPAS_CIERRE.map(e=><KanbanCol key={e} etapa={e} leads={lpe(e)} onSelect={onSelect}/>)}
         </div>
       </div>
     </div>
@@ -834,7 +800,7 @@ const Pipeline = ({ leads, onSelect, onEtapaChange }) => {
 const KPIsView = ({ leads }) => {
   const [descargando,setDescargando]=useState(false);
   const reporteRef=useRef(null);
-  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
+  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones","proceso interno de certificaciones":"Proceso Interno de Certificaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
 
   const descargarPDF=async()=>{
     if(!reporteRef.current) return;
@@ -1102,11 +1068,7 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest, onDeleteRequ
     };
     fetchResp();
   },[lead.id]);
-  const handleEtapaChange=async(newEtapa)=>{
-    const etapaActual=etapa;
-    if(etapaActual===newEtapa) return;
-    onEtapaChangeRequest&&onEtapaChangeRequest(lead,newEtapa);
-  };
+
   const etapaCfg=ETAPA_CFG[etapa]||{color:"#888888"};
   const scoreColor=getScoreColor(lead.score||0, lead.clasificacion);
   return (
@@ -1131,18 +1093,15 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest, onDeleteRequ
           </div>
         </div>
         <div style={{marginTop:12,display:"flex",gap:8,alignItems:"center"}}>
-          <select value={etapa} onChange={e=>handleEtapaChange(e.target.value)}
-            style={{flex:1,background:"#ffffff",color:etapaCfg.color,border:`1px solid ${etapaCfg.color}44`,borderRadius:8,padding:"7px 12px",fontSize:12,cursor:"pointer",fontWeight:600}}>
-            {/* Solo se ofrecen los pasos válidos del flujo desde la etapa actual */}
-            <option value={etapa}>{etapa}</option>
-            {(TRANSICIONES[etapa]||ETAPAS_TODAS.filter(x=>x!==etapa)).map(e=><option key={e} value={e}>→ {e}</option>)}
-          </select>
+          {/* Etapa en SOLO LECTURA: el avance lo hacen los procesos automáticos */}
+          <div title="El avance de etapa es automático"
+            style={{flex:1,background:"#ffffff",color:etapaCfg.color,border:`1px solid ${etapaCfg.color}44`,borderRadius:8,padding:"7px 12px",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:6}}>
+            <span style={{fontSize:11}}>🔒</span> {etapa}
+          </div>
           {saving&&<span style={{fontSize:10,color:"#3B82F6"}}>Guardando...</span>}
           {saved&&<span style={{fontSize:10,color:"#10B981"}}>✓ Guardado</span>}
         </div>
-        {Array.isArray(TRANSICIONES[etapa])&&TRANSICIONES[etapa].length===0&&(
-          <div style={{marginTop:6,fontSize:10,color:"#cbd5e1"}}>🔒 Etapa final del flujo — la tarjeta ya no se mueve desde aquí.</div>
-        )}
+
       </div>
       <div style={{display:"flex",background:"#1a3a6b",borderBottom:"1px solid #e4e7ec",flexShrink:0}}>
         {[["info","📋 Datos"],["score","⭐ Score"],["timeline","🕐 Historial"],["postulacion","📝 Información"],["comentarios","💬 Comentarios"],["preguntas","❓ Preguntas Prospecto"]].map(([id,label])=>(
@@ -1197,7 +1156,6 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest, onDeleteRequ
                     )}
                     <div>
                       <div style={{fontSize:13,fontWeight:800,color:"#1a3a6b"}}>{lead.tipo_vehiculo}</div>
-                      {lead.pipefy_card_id&&<div style={{fontSize:10,color:"#888",marginTop:2}}>Tarjeta Pipefy: {lead.pipefy_card_id}</div>}
                     </div>
                   </div>
                 )}
@@ -1553,7 +1511,7 @@ const KPIsCampanaView = ({ leads }) => {
   const [campanaFiltro,setCampanaFiltro]=useState("todas");
   const [descargando,setDescargando]=useState(false);
   const reporteRef=useRef(null);
-  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
+  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones","proceso interno de certificaciones":"Proceso Interno de Certificaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
 
   const descargarPDF=async()=>{
     if(!reporteRef.current) return;
@@ -1598,7 +1556,7 @@ const KPIsCampanaView = ({ leads }) => {
   );
 
   const pct=(n)=>total>0?Math.round((n/total)*100):0;
-  const propAceptadas=leadsFiltered.filter(l=>["Propuesta Aceptada","Entrevistas y Validaciones","Postulante Aprobado","Postulante No Calificado"].includes(norm(l.etapa))).length;
+  const propAceptadas=leadsFiltered.filter(l=>["Propuesta Aceptada","Proceso Interno de Certificaciones","Postulante Aprobado","Postulante No Calificado"].includes(norm(l.etapa))).length;
   const propRechazadas=leadsFiltered.filter(l=>norm(l.etapa)==="Propuesta Rechazada").length;
   const contratosFirmados=leadsFiltered.filter(l=>norm(l.etapa)==="Postulante Aprobado").length;
   const contratosNoFirmados=leadsFiltered.filter(l=>norm(l.etapa)==="Postulante No Calificado").length;
@@ -1750,7 +1708,7 @@ const EmbudoView = ({ leads }) => {
     finally { setDescargandoXLS(false); }
   };
 
-  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
+  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones","proceso interno de certificaciones":"Proceso Interno de Certificaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
 
   const campanas = [...new Set(leads.filter(l=>l.campana_id&&l.origen).map(l=>l.origen.replace("Campaña: ","")))].filter(Boolean).sort();
 
@@ -1771,7 +1729,7 @@ const EmbudoView = ({ leads }) => {
   }).length;
   const validacion   = leadsFiltered.filter(l => {
     const e = norm(l.etapa);
-    return ["Postulante Aprobado","Postulante No Calificado","Entrevistas y Validaciones","Onboarding Pendiente"].includes(e) ||
+    return ["Postulante Aprobado","Postulante No Calificado","Proceso Interno de Certificaciones","Onboarding Pendiente"].includes(e) ||
       (l.onboarding_completado === true);
   }).length;
   const aprobados    = leadsFiltered.filter(l => norm(l.etapa) === "Postulante Aprobado").length;
@@ -2171,7 +2129,7 @@ const ReporteCampanaView = ({ leads }) => {
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 const DashboardMetrics = ({ leads }) => {
-  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
+  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones","proceso interno de certificaciones":"Proceso Interno de Certificaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
   const hoy=new Date();hoy.setHours(0,0,0,0);
   const nuevosHoy=leads.filter(l=>l.created_at&&new Date(l.created_at)>=hoy).length;
   const scorePromedio=leads.length?Math.round(leads.reduce((a,l)=>a+(l.score||0),0)/leads.length):0;
@@ -2276,7 +2234,7 @@ const HORAS_OLVIDADO=24;
 const HORAS_ESTANCADO=48;
 
 const calcAlertas=(leads)=>{
-  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
+  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones","proceso interno de certificaciones":"Proceso Interno de Certificaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
   const ahora=Date.now();
   const olvidados=[];
   const estancados=[];
@@ -2389,7 +2347,7 @@ export default function App() {
   const alertasMostradas=useRef(false);
 
   const fetchLeads=async()=>{
-    const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
+    const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones","proceso interno de certificaciones":"Proceso Interno de Certificaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
     try{const data=await sb.from("leads").select("*",{order:"created_at.desc"});
       if(Array.isArray(data)){
         const normalized=data.map(l=>({...l,etapa:norm(l.etapa)}));
@@ -2407,48 +2365,17 @@ export default function App() {
 
   useEffect(()=>{fetchLeads();refreshInterval.current=setInterval(fetchLeads,30000);return()=>clearInterval(refreshInterval.current);},[]);
 
-  const NORM=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Entrevistas y Validaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
+  const NORM=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones","proceso interno de certificaciones":"Proceso Interno de Certificaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
 
   const [confirmModal,setConfirmModal]=useState(null); // {lead, nuevaEtapa}
   const [bloqueoModal,setBloqueoModal]=useState(null);  // {titulo, mensaje} — movimiento rechazado por el flujo
   const [deleteModal,setDeleteModal]=useState(null);   // {lead}
 
-  const handleEtapaChange=async(lead,nuevaEtapa)=>{
-    const etapaActual=NORM(lead.etapa);
-    if(etapaActual===nuevaEtapa) return;
-
-    // Regla 1 · el paso debe existir en el flujo
-    if(!transicionPermitida(etapaActual,nuevaEtapa)){
-      setBloqueoModal({titulo:"Movimiento no permitido",mensaje:motivoBloqueo(etapaActual,nuevaEtapa)});
-      return;
-    }
-
-    // Regla 2 · pasar a Validaciones exige la postulación completa
-    if(ETAPAS_EXIGEN_DOCS.includes(nuevaEtapa)){
-      try{
-        const {data}=await supabase.from("onboarding_terceros")
-          .select("id,url_ine,url_curp,url_rfc,pais").eq("lead_id",lead.id).maybeSingle();
-        const falta=[];
-        if(!data) falta.push("no completó el formulario de postulación");
-        else{
-          if(!data.url_ine) falta.push("INE");
-          if(!data.url_curp) falta.push("CURP");
-          if(!data.url_rfc) falta.push("RFC");
-          if(data.pais!=="México") falta.push('país distinto de "México"');
-        }
-        if(falta.length){
-          setBloqueoModal({
-            titulo:"Falta la postulación completa",
-            mensaje:`Para pasar a "${nuevaEtapa}" el prospecto debe haber completado su postulación con INE, CURP y RFC.\n\nPendiente: ${falta.join(" · ")}.\n\nEnvíale el link del portal de prospección y la tarjeta avanzará cuando cargue sus documentos.`,
-          });
-          return;
-        }
-      }catch(e){
-        setBloqueoModal({titulo:"No se pudo verificar la postulación",mensaje:e.message});
-        return;
-      }
-    }
-    setConfirmModal({lead,nuevaEtapa,etapaActual});
+  // Los movimientos manuales están deshabilitados: el tablero es un espejo del
+  // estado real. Se conserva el handler como candado por si alguna vista intenta
+  // cambiar la etapa desde el navegador.
+  const handleEtapaChange=(lead,nuevaEtapa)=>{
+    setBloqueoModal({titulo:"Las tarjetas no se mueven a mano",mensaje:MOTIVO_NO_MANUAL});
   };
 
   const confirmarCambioEtapa=async()=>{
