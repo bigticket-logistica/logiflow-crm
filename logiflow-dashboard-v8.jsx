@@ -34,7 +34,8 @@ const sb = {
 };
 
 // ─── CONSTANTES ───────────────────────────────────────────────────────────────
-// VERSION v10 · Stand By Certificaciones + colores corporativos + sin arrastre
+// VERSION v11 · Alertas reformuladas (por vencer · sin gestión · duplicados)
+// v10 · Stand By Certificaciones + colores corporativos + sin arrastre
 const ETAPAS_PIPELINE = ["Nuevo Lead","Propuesta Enviada","Propuesta Aceptada","Propuesta Rechazada","Proceso Interno de Certificaciones"];
 const ETAPAS_CIERRE   = ["Stand By Certificaciones","Postulante Aprobado","Postulante No Calificado"];
 const ETAPAS_TODAS    = [...ETAPAS_PIPELINE, ...ETAPAS_CIERRE];
@@ -2275,103 +2276,148 @@ const TablaLeads = ({ leads, onSelect }) => (
 );
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
-const ETAPAS_MONITOR=["Nuevo Lead","Propuesta Enviada","Propuesta Aceptada","Propuesta Rechazada"];
-const HORAS_OLVIDADO=24;
-const HORAS_ESTANCADO=48;
+// ─── SISTEMA DE ALERTAS ───────────────────────────────────────────────────────
+// Solo se vigilan las etapas donde la gestión humana cambia el resultado.
+// "Propuesta Rechazada" quedó fuera: un job la limpia sola cada hora.
+// Los umbrales están alineados con la política de barrido: a los 10 días sin
+// avanzar, el lead vuelve a Base Datos Leads. Por eso se avisa ANTES (día 8),
+// para tener margen de rescate.
+const ETAPAS_MONITOR = ["Nuevo Lead", "Propuesta Enviada", "Propuesta Aceptada"];
+const DIAS_BARRIDO     = 10;   // debe coincidir con el barrido a Base Datos
+const DIAS_POR_VENCER  = 8;    // aviso con 2 días de margen
+const HORAS_SIN_GESTION = 72;  // 3 días sin ninguna interacción
 
-const calcAlertas=(leads)=>{
-  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones","proceso interno de certificaciones":"Proceso Interno de Certificaciones","stand by certificaciones":"Stand By Certificaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
-  const ahora=Date.now();
-  const olvidados=[];
-  const estancados=[];
-  leads.forEach(l=>{
-    if(!ETAPAS_MONITOR.includes(norm(l.etapa))) return;
-    const hsSinTocar=(ahora-new Date(l.updated_at||l.created_at))/3600000;
-    const hsEnEtapa =(ahora-new Date(l.created_at))/3600000;
-    if(hsSinTocar>=HORAS_OLVIDADO)  olvidados.push({...l,horas:Math.floor(hsSinTocar)});
-    else if(hsEnEtapa>=HORAS_ESTANCADO) estancados.push({...l,horas:Math.floor(hsEnEtapa)});
-  });
-  return{olvidados,estancados};
+const normEtapaAlerta = (e) => {
+  if (!e) return "Nuevo Lead";
+  const m = {"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead",
+    "contactado":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada",
+    "propuesta rechazada":"Propuesta Rechazada","postulante aprobado":"Postulante Aprobado",
+    "postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones",
+    "proceso interno de certificaciones":"Proceso Interno de Certificaciones",
+    "stand by certificaciones":"Stand By Certificaciones","base datos leads":"Base Datos Leads"};
+  return m[e.toLowerCase().trim()] || e;
 };
 
-const AlertasPopup=({leads,onClose,onVerLead})=>{
-  const {olvidados,estancados}=calcAlertas(leads);
-  const total=olvidados.length+estancados.length;
-  if(total===0) return null;
-  return(
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300}}>
-      <div style={{background:"#ffffff",borderRadius:16,width:560,maxHeight:"80vh",display:"flex",flexDirection:"column",boxShadow:"0 20px 60px rgba(0,0,0,.3)"}}>
-        {/* Header */}
-        <div style={{padding:"20px 24px",borderBottom:"1px solid #f0f2f5",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+const calcAlertas = (leads) => {
+  const ahora = Date.now();
+  const porVencer = [], sinGestion = [], duplicados = [];
+
+  // Duplicados: misma persona (correo o teléfono) en más de un lead activo
+  const activos = leads.filter(l => ETAPAS_MONITOR.includes(normEtapaAlerta(l.etapa))
+                                 || normEtapaAlerta(l.etapa) === "Proceso Interno de Certificaciones");
+  const porClave = {};
+  activos.forEach(l => {
+    [String(l.email || "").toLowerCase().trim(),
+     String(l.telefono || "").replace(/[^\d]/g, "").slice(-10)]
+      .filter(k => k && k.length > 4)
+      .forEach(k => { (porClave[k] = porClave[k] || []).push(l); });
+  });
+  const yaVisto = new Set();
+  Object.values(porClave).forEach(grupo => {
+    if (grupo.length < 2) return;
+    const clave = grupo.map(g => g.id).sort().join("|");
+    if (yaVisto.has(clave)) return;
+    yaVisto.add(clave);
+    duplicados.push({ ...grupo[0], repeticiones: grupo.length, hermanos: grupo.slice(1) });
+  });
+
+  leads.forEach(l => {
+    const etapa = normEtapaAlerta(l.etapa);
+    if (!ETAPAS_MONITOR.includes(etapa)) return;
+    const dias = Math.floor((ahora - new Date(l.updated_at || l.created_at)) / 86400000);
+    const horas = Math.floor((ahora - new Date(l.updated_at || l.created_at)) / 3600000);
+    if (dias >= DIAS_POR_VENCER) porVencer.push({ ...l, dias, restan: Math.max(0, DIAS_BARRIDO - dias), etapaNorm: etapa });
+    else if (horas >= HORAS_SIN_GESTION) sinGestion.push({ ...l, horas, dias, etapaNorm: etapa });
+  });
+
+  porVencer.sort((a, b) => b.dias - a.dias);
+  sinGestion.sort((a, b) => b.horas - a.horas);
+  return { porVencer, sinGestion, duplicados };
+};
+
+const AlertasPopup = ({ leads, onClose, onVerLead }) => {
+  const { porVencer, sinGestion, duplicados } = calcAlertas(leads);
+  const total = porVencer.length + sinGestion.length + duplicados.length;
+  if (total === 0) return null;
+
+  const Fila = ({ l, derecha, subtitulo, color }) => (
+    <div onClick={() => onVerLead && onVerLead(l)}
+      style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:10,
+        background:"#fff", border:`1px solid ${color}33`, borderLeft:`3px solid ${color}`,
+        borderRadius:9, padding:"10px 13px", marginBottom:7, cursor:"pointer" }}>
+      <div style={{ minWidth:0 }}>
+        <div style={{ fontSize:13, fontWeight:800, color:"#1a1a1a", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{l.nombre || "Sin nombre"}</div>
+        <div style={{ fontSize:11, color:"#888" }}>{subtitulo}</div>
+      </div>
+      <div style={{ textAlign:"right", flexShrink:0 }}>{derecha}</div>
+    </div>
+  );
+
+  const Titulo = ({ icono, texto, color, n }) => (
+    <div style={{ fontSize:10, fontWeight:800, color, letterSpacing:1.4, textTransform:"uppercase", marginBottom:9 }}>
+      {icono} {texto} ({n})
+    </div>
+  );
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.55)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:300 }}>
+      <div style={{ background:"#fff", borderRadius:16, width:600, maxHeight:"82vh", display:"flex", flexDirection:"column", boxShadow:"0 20px 60px rgba(0,0,0,.3)" }}>
+        <div style={{ padding:"20px 24px", borderBottom:"1px solid #f0f2f5", display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
           <div>
-            <div style={{fontSize:18,fontWeight:900,color:"#1a1a1a",fontFamily:"'Outfit',sans-serif"}}>
-              🔔 Alertas del CRM
-            </div>
-            <div style={{fontSize:12,color:"#888888",marginTop:2}}>
-              {total} lead{total!==1?"s":""} requiere{total===1?"":"n"} atención
+            <div style={{ fontSize:18, fontWeight:900, color:"#1a1a1a", fontFamily:"'Outfit',sans-serif" }}>🔔 Alertas del CRM</div>
+            <div style={{ fontSize:12, color:"#888", marginTop:2 }}>
+              {total} {total === 1 ? "alerta" : "alertas"} · clic en una fila para abrir el lead
             </div>
           </div>
-          <button onClick={onClose} style={{background:"#f0f2f5",border:"none",borderRadius:8,width:34,height:34,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",color:"#666666"}}>×</button>
+          <button onClick={onClose} style={{ background:"#f0f2f5", border:"none", borderRadius:8, width:34, height:34, cursor:"pointer", fontSize:18, color:"#666" }}>×</button>
         </div>
-        {/* Contenido */}
-        <div style={{overflow:"auto",padding:"16px 24px",display:"flex",flexDirection:"column",gap:16}}>
-          {olvidados.length>0&&(
+
+        <div style={{ overflow:"auto", padding:"16px 24px", display:"flex", flexDirection:"column", gap:18 }}>
+          {porVencer.length > 0 && (
             <div>
-              <div style={{fontSize:10,fontWeight:800,color:"#EF4444",letterSpacing:1.5,textTransform:"uppercase",marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
-                <div style={{width:8,height:8,borderRadius:"50%",background:"#EF4444"}}/>
-                Leads olvidados — sin tocar hace más de {HORAS_OLVIDADO}h ({olvidados.length})
-              </div>
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {olvidados.map(l=>(
-                  <div key={l.id} onClick={()=>{onVerLead(l);onClose();}}
-                    style={{background:"#fff5f5",border:"1px solid #fca5a5",borderRadius:10,padding:"10px 14px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",transition:"all .15s"}}
-                    onMouseOver={e=>e.currentTarget.style.background="#fee2e2"}
-                    onMouseOut={e=>e.currentTarget.style.background="#fff5f5"}>
-                    <div>
-                      <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a"}}>{l.nombre||"Sin nombre"}</div>
-                      <div style={{fontSize:11,color:"#888888",marginTop:2}}>{l.empresa||"Sin empresa"} · {ETAPA_CFG[l.etapa||"Nuevo Lead"]?.icon} {l.etapa||"Nuevo Lead"}</div>
-                    </div>
-                    <div style={{textAlign:"right",flexShrink:0}}>
-                      <div style={{fontSize:13,fontWeight:800,color:"#EF4444"}}>{l.horas}h</div>
-                      <div style={{fontSize:10,color:"#888888"}}>sin gestión</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <Titulo icono="🔴" texto={`Por vencer — vuelven a Base Datos a los ${DIAS_BARRIDO} días`} color="#EF4444" n={porVencer.length} />
+              {porVencer.map(l => (
+                <Fila key={l.id} l={l} color="#EF4444"
+                  subtitulo={`${l.etapaNorm} · ${l.dias} días sin avanzar`}
+                  derecha={<>
+                    <div style={{ fontSize:13, fontWeight:800, color:"#EF4444" }}>{l.restan === 0 ? "hoy" : `${l.restan} d`}</div>
+                    <div style={{ fontSize:9.5, color:"#888" }}>{l.restan === 0 ? "se mueve" : "de margen"}</div>
+                  </>} />
+              ))}
             </div>
           )}
-          {estancados.length>0&&(
+
+          {sinGestion.length > 0 && (
             <div>
-              <div style={{fontSize:10,fontWeight:800,color:"#F59E0B",letterSpacing:1.5,textTransform:"uppercase",marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
-                <div style={{width:8,height:8,borderRadius:"50%",background:"#F59E0B"}}/>
-                Leads estancados — más de {HORAS_ESTANCADO}h en la misma etapa ({estancados.length})
-              </div>
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {estancados.map(l=>(
-                  <div key={l.id} onClick={()=>{onVerLead(l);onClose();}}
-                    style={{background:"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:"10px 14px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",transition:"all .15s"}}
-                    onMouseOver={e=>e.currentTarget.style.background="#fef3c7"}
-                    onMouseOut={e=>e.currentTarget.style.background="#fffbeb"}>
-                    <div>
-                      <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a"}}>{l.nombre||"Sin nombre"}</div>
-                      <div style={{fontSize:11,color:"#888888",marginTop:2}}>{l.empresa||"Sin empresa"} · {ETAPA_CFG[l.etapa||"Nuevo Lead"]?.icon} {l.etapa||"Nuevo Lead"}</div>
-                    </div>
-                    <div style={{textAlign:"right",flexShrink:0}}>
-                      <div style={{fontSize:13,fontWeight:800,color:"#F59E0B"}}>{l.horas}h</div>
-                      <div style={{fontSize:10,color:"#888888"}}>en esta etapa</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <Titulo icono="🟠" texto={`Sin gestión hace más de ${HORAS_SIN_GESTION} h`} color="#F47B20" n={sinGestion.length} />
+              {sinGestion.map(l => (
+                <Fila key={l.id} l={l} color="#F47B20"
+                  subtitulo={`${l.etapaNorm} · sin interacción`}
+                  derecha={<>
+                    <div style={{ fontSize:13, fontWeight:800, color:"#F47B20" }}>{l.horas}h</div>
+                    <div style={{ fontSize:9.5, color:"#888" }}>{l.dias} d</div>
+                  </>} />
+              ))}
+            </div>
+          )}
+
+          {duplicados.length > 0 && (
+            <div>
+              <Titulo icono="🟣" texto="Posibles duplicados — misma persona en varios leads" color="#7c3aed" n={duplicados.length} />
+              {duplicados.map(l => (
+                <Fila key={l.id} l={l} color="#7c3aed"
+                  subtitulo={`${l.email || l.telefono || "—"} · ${l.repeticiones} postulaciones`}
+                  derecha={<>
+                    <div style={{ fontSize:13, fontWeight:800, color:"#7c3aed" }}>×{l.repeticiones}</div>
+                    <div style={{ fontSize:9.5, color:"#888" }}>revisar</div>
+                  </>} />
+              ))}
             </div>
           )}
         </div>
-        {/* Footer */}
-        <div style={{padding:"14px 24px",borderTop:"1px solid #f0f2f5",flexShrink:0,display:"flex",justifyContent:"flex-end"}}>
-          <button onClick={onClose}
-            style={{background:"#1a3a6b",color:"white",border:"none",borderRadius:8,padding:"9px 20px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>
-            Entendido, cerrar
-          </button>
+
+        <div style={{ padding:"14px 24px", borderTop:"1px solid #f0f2f5", flexShrink:0 }}>
+          <button onClick={onClose} style={{ width:"100%", background:"#1a3a6b", color:"#fff", border:"none", borderRadius:9, padding:"12px", fontSize:13, fontWeight:800, cursor:"pointer" }}>Entendido, cerrar</button>
         </div>
       </div>
     </div>
@@ -2399,8 +2445,8 @@ export default function App() {
         const normalized=data.map(l=>({...l,etapa:norm(l.etapa)}));
         setLeads(normalized);setLastUpdate(new Date());setError(null);
         if(!alertasMostradas.current){
-          const {olvidados,estancados}=calcAlertas(normalized);
-          if(olvidados.length+estancados.length>0){setShowAlertas(true);}
+          const {porVencer,sinGestion,duplicados}=calcAlertas(normalized);
+          if(porVencer.length+sinGestion.length+duplicados.length>0){setShowAlertas(true);}
           alertasMostradas.current=true;
         }
       }
@@ -2692,7 +2738,7 @@ export default function App() {
             </div>
           </div>
           <div style={{background:"#dcfce7",border:"1px solid #86efac",borderRadius:7,padding:"5px 10px",fontSize:10,color:"#166534",fontWeight:700}}>⚡ N8N Activo</div>
-          {(()=>{const {olvidados,estancados}=calcAlertas(leads);const total=olvidados.length+estancados.length;return total>0?(
+          {(()=>{const {porVencer,sinGestion,duplicados}=calcAlertas(leads);const total=porVencer.length+sinGestion.length+duplicados.length;return total>0?(
             <button onClick={()=>setShowAlertas(true)} style={{position:"relative",background:"#EF444422",border:"1px solid #EF444466",borderRadius:7,padding:"5px 10px",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
               🔔
               <span style={{position:"absolute",top:-5,right:-5,background:"#EF4444",color:"white",borderRadius:"50%",width:16,height:16,fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center"}}>{total}</span>
