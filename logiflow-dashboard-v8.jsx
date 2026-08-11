@@ -34,8 +34,9 @@ const sb = {
 };
 
 // ─── CONSTANTES ───────────────────────────────────────────────────────────────
+// VERSION v10 · Stand By Certificaciones + colores corporativos + sin arrastre
 const ETAPAS_PIPELINE = ["Nuevo Lead","Propuesta Enviada","Propuesta Aceptada","Propuesta Rechazada","Proceso Interno de Certificaciones"];
-const ETAPAS_CIERRE   = ["Postulante Aprobado","Postulante No Calificado"];
+const ETAPAS_CIERRE   = ["Stand By Certificaciones","Postulante Aprobado","Postulante No Calificado"];
 const ETAPAS_TODAS    = [...ETAPAS_PIPELINE, ...ETAPAS_CIERRE];
 const ETAPAS_BASE_DATOS = ["Base Datos Leads"]; // leads tibios y fríos
 
@@ -56,6 +57,7 @@ const TRANSICIONES_MANUALES = {
   "Propuesta Aceptada":                 [],
   "Propuesta Rechazada":                [],
   "Proceso Interno de Certificaciones": [],
+  "Stand By Certificaciones":           [],
   "Postulante Aprobado":                [],
   "Postulante No Calificado":           [],
 };
@@ -64,6 +66,7 @@ const ETAPA_AUTOMATICA = {
   "Propuesta Aceptada": "Avanza sola cuando el prospecto complete su postulación (INE, CURP y RFC).",
   "Propuesta Rechazada": "Vuelve a Base Datos Leads automáticamente para recontacto.",
   "Proceso Interno de Certificaciones": "La controla el flujo de Certificaciones: sale al quedar Aprobado o Rechazado.",
+  "Stand By Certificaciones": "Prospecto válido que aún no se requiere. Certificaciones puede reactivar su flujo en cualquier momento.",
   "Postulante Aprobado": "Cierre definido por Certificaciones.",
   "Postulante No Calificado": "Cierre definido por Certificaciones.",
 };
@@ -85,6 +88,7 @@ const ETAPA_CFG = {
   "Propuesta Aceptada":                  { color:"#1a3a6b", icon:"✓" },
   "Propuesta Rechazada":                 { color:"#9aa5b1", icon:"—" },
   "Proceso Interno de Certificaciones":  { color:"#F47B20", icon:"📋" },
+  "Stand By Certificaciones":            { color:"#F47B20", icon:"⏸" },
   "Postulante Aprobado":                 { color:"#1a3a6b", icon:"★" },
   "Postulante No Calificado":            { color:"#9aa5b1", icon:"—" },
 };
@@ -807,7 +811,7 @@ const KanbanCol = ({ etapa, leads, onSelect }) => {
 const Pipeline = ({ leads, onSelect, onEtapaChange }) => {
   const normalizarEtapa=(e)=>{
     if(!e) return "Nuevo Lead";
-    const mapa={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones","proceso interno de certificaciones":"Proceso Interno de Certificaciones","base datos leads":"Base Datos Leads"};
+    const mapa={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones","proceso interno de certificaciones":"Proceso Interno de Certificaciones","stand by certificaciones":"Stand By Certificaciones","base datos leads":"Base Datos Leads"};
     return mapa[e.toLowerCase().trim()]||e;
   };
   const lpe=(etapa)=>leads.filter(l=>normalizarEtapa(l.etapa)===etapa);
@@ -831,7 +835,7 @@ const Pipeline = ({ leads, onSelect, onEtapaChange }) => {
 const KPIsView = ({ leads }) => {
   const [descargando,setDescargando]=useState(false);
   const reporteRef=useRef(null);
-  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones","proceso interno de certificaciones":"Proceso Interno de Certificaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
+  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones","proceso interno de certificaciones":"Proceso Interno de Certificaciones","stand by certificaciones":"Stand By Certificaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
 
   const descargarPDF=async()=>{
     if(!reporteRef.current) return;
@@ -1553,7 +1557,7 @@ const KPIsCampanaView = ({ leads }) => {
   const [campanaFiltro,setCampanaFiltro]=useState("todas");
   const [descargando,setDescargando]=useState(false);
   const reporteRef=useRef(null);
-  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones","proceso interno de certificaciones":"Proceso Interno de Certificaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
+  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones","proceso interno de certificaciones":"Proceso Interno de Certificaciones","stand by certificaciones":"Stand By Certificaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
 
   const descargarPDF=async()=>{
     if(!reporteRef.current) return;
@@ -1750,7 +1754,7 @@ const EmbudoView = ({ leads }) => {
     finally { setDescargandoXLS(false); }
   };
 
-  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones","proceso interno de certificaciones":"Proceso Interno de Certificaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
+  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones","proceso interno de certificaciones":"Proceso Interno de Certificaciones","stand by certificaciones":"Stand By Certificaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
 
   const campanas = [...new Set(leads.filter(l=>l.campana_id&&l.origen).map(l=>l.origen.replace("Campaña: ","")))].filter(Boolean).sort();
 
@@ -2171,7 +2175,7 @@ const ReporteCampanaView = ({ leads }) => {
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 const DashboardMetrics = ({ leads }) => {
-  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones","proceso interno de certificaciones":"Proceso Interno de Certificaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
+  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones","proceso interno de certificaciones":"Proceso Interno de Certificaciones","stand by certificaciones":"Stand By Certificaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
   const hoy=new Date();hoy.setHours(0,0,0,0);
   const nuevosHoy=leads.filter(l=>l.created_at&&new Date(l.created_at)>=hoy).length;
   const scorePromedio=leads.length?Math.round(leads.reduce((a,l)=>a+(l.score||0),0)/leads.length):0;
@@ -2276,7 +2280,7 @@ const HORAS_OLVIDADO=24;
 const HORAS_ESTANCADO=48;
 
 const calcAlertas=(leads)=>{
-  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones","proceso interno de certificaciones":"Proceso Interno de Certificaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
+  const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones","proceso interno de certificaciones":"Proceso Interno de Certificaciones","stand by certificaciones":"Stand By Certificaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
   const ahora=Date.now();
   const olvidados=[];
   const estancados=[];
@@ -2389,7 +2393,7 @@ export default function App() {
   const alertasMostradas=useRef(false);
 
   const fetchLeads=async()=>{
-    const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones","proceso interno de certificaciones":"Proceso Interno de Certificaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
+    const norm=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones","proceso interno de certificaciones":"Proceso Interno de Certificaciones","stand by certificaciones":"Stand By Certificaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
     try{const data=await sb.from("leads").select("*",{order:"created_at.desc"});
       if(Array.isArray(data)){
         const normalized=data.map(l=>({...l,etapa:norm(l.etapa)}));
@@ -2407,7 +2411,7 @@ export default function App() {
 
   useEffect(()=>{fetchLeads();refreshInterval.current=setInterval(fetchLeads,30000);return()=>clearInterval(refreshInterval.current);},[]);
 
-  const NORM=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones","proceso interno de certificaciones":"Proceso Interno de Certificaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
+  const NORM=(e)=>{if(!e)return"Nuevo Lead";const m={"nuevo lead":"Nuevo Lead","nuevo":"Nuevo Lead","new":"Nuevo Lead","postulante":"Nuevo Lead","contactado":"Base Datos Leads","reunión agendada":"Base Datos Leads","reunion agendada":"Base Datos Leads","negociación":"Base Datos Leads","negociacion":"Base Datos Leads","propuesta enviada":"Propuesta Enviada","propuesta aceptada":"Propuesta Aceptada","propuesta rechazada":"Propuesta Rechazada","contrato firmado":"Postulante Aprobado","contrato no firmado":"Postulante No Calificado","ganado":"Postulante Aprobado","perdido":"Postulante No Calificado","postulante aprobado":"Postulante Aprobado","postulante no calificado":"Postulante No Calificado","entrevistas y validaciones":"Proceso Interno de Certificaciones","proceso interno de certificaciones":"Proceso Interno de Certificaciones","stand by certificaciones":"Stand By Certificaciones","base datos leads":"Base Datos Leads"};return m[e.toLowerCase().trim()]||e;};
 
   const [confirmModal,setConfirmModal]=useState(null); // {lead, nuevaEtapa}
   const [bloqueoModal,setBloqueoModal]=useState(null);  // {titulo, mensaje} — movimiento rechazado por el flujo
