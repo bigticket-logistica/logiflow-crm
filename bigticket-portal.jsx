@@ -495,7 +495,6 @@ const ESTADOS_MEXICO = [
   "SMX9  Granjas México, Iztacalco",
   "SMX10  Vallejo",
   "SMX11 Outlets Punta Norte",
-  "SCQ1 Colima",
   "STX1 Tlaxcala",
   "SHP1 Pachuca",
   "SCY1 Celaya",
@@ -1468,7 +1467,7 @@ function ViewPostulacion({ data, onVolver }) {
   }
   const ETAPA_COLOR={"Nuevo Lead":"#3B82F6","Nuevo":"#3B82F6","Contactado":"#8B5CF6","Reunión Agendada":"#F59E0B","Propuesta Enviada":"#F97316","Negociación":"#EC4899","Propuesta Aceptada":"#10B981","Propuesta Rechazada":"#EF4444","Contrato Firmado":"#10B981","Base Datos Leads":"#6B7280","Ganado":"#10B981","Perdido":"#EF4444","Cambios leídos y revisados por el analista":"#b45309"};
   const ETAPA_ICON={"Nuevo Lead":"🎯","Nuevo":"🎯","Contactado":"📞","Reunión Agendada":"📅","Propuesta Enviada":"📄","Negociación":"🤝","Propuesta Aceptada":"✅","Propuesta Rechazada":"❌","Contrato Firmado":"📝","Base Datos Leads":"🗃️","Ganado":"✅","Perdido":"❌","Cambios leídos y revisados por el analista":"⚠️"};
-  const ETAPA_DISPLAY={"Entrevistas y Validaciones":"Validaciones","Postulante Aprobado":"Aprobado","Postulante No Calificado":"No Calificado","Onboarding Pendiente":"Onboarding Pendiente","Contrato No Firmado":"Contrato No Firmado"};
+  const ETAPA_DISPLAY={"Proceso Interno de Certificaciones":"En certificación","Stand By Certificaciones":"En espera de asignación","Entrevistas y Validaciones":"En certificación","Postulante Aprobado":"Aprobado","Postulante No Calificado":"No Calificado","Onboarding Pendiente":"Onboarding Pendiente","Contrato No Firmado":"Contrato No Firmado"};
   const etapaLabel=(e)=>ETAPA_DISPLAY[e]||e;
   const etapaColor=ETAPA_COLOR[lead.etapa]||"#888";
   // Construir historial completo incluyendo etapa inicial
@@ -2808,7 +2807,7 @@ function CentrosMxAdmin() {
     "SMX3 Lomas de Santo Domingo Reacomodo","SMX4 Bondojito","SMX5 Iztapalapa",
     "SMX6 Industrial Tlaxcoapan","SMX7 Cuajimalpa","SMX8 Los Héroes Tecámac / Ojo de agua",
     "SMX9  Granjas México, Iztacalco","SMX10  Vallejo","SMX11 Outlets Punta Norte",
-    "SCQ1 Colima","STX1 Tlaxcala","SHP1 Pachuca","SCY1 Celaya","SLT1 Toluca",
+    "STX1 Tlaxcala","SHP1 Pachuca","SCY1 Celaya","SLT1 Toluca",
     "SPV1 Puebla","SVR1 Veracruz","SVH1 Villahermosa","SQR1 Querétaro",
   ];
   const [centros,setCentros]=useState(()=>{
@@ -3553,7 +3552,7 @@ function OnboardingLogin({ onIngresar, onVolver }) {
     }
 
     // Buscar leads con etapa válida para onboarding
-    const validos=data.filter(d=>["Propuesta Aceptada","Contrato Firmado","Contrato No Firmado","Onboarding Pendiente","Entrevistas y Validaciones","Postulante Aprobado","Postulante No Calificado"].includes(d.etapa));
+    const validos=data.filter(d=>["Propuesta Aceptada","Contrato Firmado","Contrato No Firmado","Onboarding Pendiente","Proceso Interno de Certificaciones","Stand By Certificaciones","Entrevistas y Validaciones","Postulante Aprobado","Postulante No Calificado"].includes(d.etapa));
     if(validos.length===0){
       setError(`Tu postulación está en etapa "${data[0].etapa}". El formulario se habilitará cuando el equipo Bigticket te lo indique.`);
       setCargando(false);return;
@@ -3963,7 +3962,8 @@ function ViewOnboarding({ lead, onVolver }) {
       const { error: dbErr } = await sb.from("onboarding_terceros")
         .upsert(dbPayload, { onConflict: "codigo_postulacion" });
       if (dbErr) throw dbErr;
-      await sb.from("leads").update({ etapa: "Entrevistas y Validaciones" }).eq("id", lead.id);
+      await sb.from("leads").update({ etapa: "Proceso Interno de Certificaciones" }).eq("id", lead.id);
+      // (etapa renombrada: antes "Entrevistas y Validaciones")
       // Notificar N8N
       try {
         await fetch("https://bigticket2026.app.n8n.cloud/webhook/onboarding-completado", {
@@ -4776,7 +4776,7 @@ export default function App() {
           const camp=campaigns.find(c=>c.id===l.campana_id);
           const esPos=["Propuesta Aceptada","Contrato Firmado","Postulante Aprobado"].includes(l.etapa);
           const esNeg=["Propuesta Rechazada","Postulante No Calificado"].includes(l.etapa);
-          const etapaTexto={"Entrevistas y Validaciones":"Validaciones","Postulante Aprobado":"Aprobado","Postulante No Calificado":"No Calificado"}[l.etapa]||l.etapa;
+          const etapaTexto={"Proceso Interno de Certificaciones":"En certificación","Stand By Certificaciones":"En espera de asignación","Entrevistas y Validaciones":"En certificación","Postulante Aprobado":"Aprobado","Postulante No Calificado":"No Calificado"}[l.etapa]||l.etapa;
           return(
             <div key={l.id} onClick={()=>seleccionarPostulacion(l)}
               style={{background:"#fff",border:"0.5px solid #e4e7ec",borderRadius:12,padding:"16px 18px",marginBottom:10,cursor:"pointer"}}
@@ -4839,3 +4839,4 @@ function OnboardingApp() {
     </>
   );
 }
+
