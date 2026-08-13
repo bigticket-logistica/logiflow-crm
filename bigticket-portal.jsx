@@ -86,6 +86,18 @@ function calcClasificacion(score, scoreMax) {
   if (pct >= 40) return "Tibio";
   return "Frío";
 }
+// ─── ENTRADA AL FLUJO COMERCIAL ─────────────────────────────────────────────
+// Caliente y Tibio entran al flujo normal (reciben propuesta).
+// Frío queda en Base Datos Leads para recontacto futuro.
+// Chile queda fuera del flujo automático hasta que exista su proceso propio.
+function entraAlFlujo(clasificacion, pais) {
+  if ((pais || "").trim() === "Chile") return false;
+  return clasificacion === "Caliente" || clasificacion === "Tibio";
+}
+function etapaInicial(clasificacion, pais) {
+  return entraAlFlujo(clasificacion, pais) ? "Propuesta Enviada" : "Base Datos Leads";
+}
+
 function calcScoreRespuestas(vars, respuestas) {
   return vars.reduce((total, v) => {
     const r = respuestas[v.id];
@@ -589,7 +601,7 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
         pais: op,
         score,
         clasificacion,
-        etapa: clasificacion==="Caliente"?"Propuesta Enviada":"Base Datos Leads",
+        etapa: etapaInicial(clasificacion, op),
         origen: isLibre?"Postulación libre":`Campaña: ${camp?.nombre||""}`,
         campana_id: camp?.id||null,
         campana_nombre: camp?.nombre||null,
@@ -606,7 +618,7 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
         nombre:form.nombre,empresa:form.empresa||null,telefono:form.telefono,email:form.email||null,
         rut: (form.pais_form||op)==='México' ? null : (form.rut||null),
         curp: (form.pais_form||op)==='México' ? (form.rut||null) : null,
-        canal,pais:form.pais_form||op,score,clasificacion,etapa:clasificacion==="Caliente"?"Propuesta Enviada":"Base Datos Leads",
+        canal,pais:form.pais_form||op,score,clasificacion,etapa:etapaInicial(clasificacion, form.pais_form||op),
         origen:isLibre?"Postulación libre":`Campaña: ${camp?.nombre||""}`,
         campana_id:camp?.id||null,fuente_contacto:form.fuente_contacto||null,
         tipo_postulacion:isLibre?"libre":"campaña",
@@ -723,7 +735,7 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
       }
 
       // 3. Si es caliente, notificar a N8N para enviar WhatsApp de propuesta
-      if(clasificacion==="Caliente"&&lead.id){
+      if(entraAlFlujo(clasificacion, form.pais_form||op)&&lead.id){
         try {
           await fetch("https://bigticket2026.app.n8n.cloud/webhook/propuesta-enviada", {
             method: "POST", mode: "no-cors",
