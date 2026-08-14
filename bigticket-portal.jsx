@@ -359,7 +359,8 @@ function AdminPaises({ usuario }) {
 
   const cargar=async()=>{
     try{
-      const data=await sb.from("portal_paises").select("*",{order:"pais.asc"});
+      const {data,error}=await sb.from("portal_paises").select("*").order("pais");
+      if(error) throw new Error(error.message);
       setRows(data||[]);
     }catch(e){ setMsg({ok:false,t:"No se pudo cargar (¿falta correr paises_bloqueo.sql?): "+e.message}); setRows([]); }
   };
@@ -368,9 +369,10 @@ function AdminPaises({ usuario }) {
   const cambiar=async(pais,habilitado,mensaje)=>{
     setGuardando(pais); setMsg(null);
     try{
-      await sb.from("portal_paises").update(
-        {habilitado,mensaje:mensaje||null,actualizado_por:usuario,actualizado_at:new Date().toISOString()},
-        `pais=eq.${encodeURIComponent(pais)}`);
+      const {error}=await sb.from("portal_paises")
+        .update({habilitado,mensaje:mensaje||null,actualizado_por:usuario,actualizado_at:new Date().toISOString()})
+        .eq("pais",pais);
+      if(error) throw new Error(error.message);
       await cargar();
       setMsg({ok:true,t:habilitado?`✅ ${pais} abierto: ya se pueden postular.`:`🚧 ${pais} cerrado: no se aceptan postulaciones.`});
     }catch(e){ setMsg({ok:false,t:"No se pudo guardar: "+e.message}); }
@@ -429,7 +431,7 @@ function ViewCountry({ onSelect, busqCorreo, setBusqCorreo, busqDoc, setBusqDoc,
   const [avisoCerrado,setAvisoCerrado]=useState(null);
   useEffect(()=>{(async()=>{
     try{
-      const data=await sb.from("portal_paises").select("*");
+      const {data}=await sb.from("portal_paises").select("*");
       const m={}; (data||[]).forEach(r=>{m[r.pais]=r;});
       setEstadoPaises(m);
     }catch(e){ /* abierto por defecto */ }
