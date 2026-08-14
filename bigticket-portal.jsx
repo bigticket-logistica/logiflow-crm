@@ -349,19 +349,123 @@ function ScoreFieldBuilder({ field, onUpdate, onRemove, usedVariables }) {
   );
 }
 
+// ─── ADMIN · Apertura de postulaciones por país ──────────────────────────────
+// Permite cerrar un país (ej. Chile mientras se prepara su flujo) sin desplegar
+// código: el selector del portal deja de aceptar postulaciones de ese país.
+function AdminPaises({ usuario }) {
+  const [rows,setRows]=useState(null);
+  const [guardando,setGuardando]=useState(null);
+  const [msg,setMsg]=useState(null);
+
+  const cargar=async()=>{
+    try{
+      const data=await sb.from("portal_paises").select("*",{order:"pais.asc"});
+      setRows(data||[]);
+    }catch(e){ setMsg({ok:false,t:"No se pudo cargar (¿falta correr paises_bloqueo.sql?): "+e.message}); setRows([]); }
+  };
+  useEffect(()=>{cargar();},[]);
+
+  const cambiar=async(pais,habilitado,mensaje)=>{
+    setGuardando(pais); setMsg(null);
+    try{
+      await sb.from("portal_paises").update(
+        {habilitado,mensaje:mensaje||null,actualizado_por:usuario,actualizado_at:new Date().toISOString()},
+        `pais=eq.${encodeURIComponent(pais)}`);
+      await cargar();
+      setMsg({ok:true,t:habilitado?`✅ ${pais} abierto: ya se pueden postular.`:`🚧 ${pais} cerrado: no se aceptan postulaciones.`});
+    }catch(e){ setMsg({ok:false,t:"No se pudo guardar: "+e.message}); }
+    finally{ setGuardando(null); }
+  };
+
+  if(rows===null) return <div className="empty">Cargando…</div>;
+
+  return (
+    <div>
+      <div className="sec-title" style={{marginBottom:6}}>Apertura de postulaciones por país</div>
+      <div style={{fontSize:12.5,color:"#666",marginBottom:16,lineHeight:1.6}}>
+        Al cerrar un país, su bandera queda marcada como <b>PRÓXIMAMENTE</b> en el portal y nadie puede
+        postular. Los prospectos ven el mensaje que definas aquí. El cambio es inmediato, sin desplegar nada.
+      </div>
+      {rows.map(r=>(
+        <div key={r.pais} className="camp-row" style={{flexDirection:"column",alignItems:"flex-start",gap:10}}>
+          <div style={{display:"flex",width:"100%",alignItems:"center",gap:12}}>
+            <img src={(PAISES[r.pais]||{}).bandera} alt={r.pais} style={{width:38,height:26,objectFit:"cover",borderRadius:3}}/>
+            <div style={{flex:1}}>
+              <div style={{fontSize:14,fontWeight:700,color:"#1a1a1a"}}>{r.pais}</div>
+              <div style={{fontSize:11,color:"#888"}}>
+                {r.habilitado?"Abierto — recibiendo postulaciones":"Cerrado — no se aceptan postulaciones"}
+                {r.actualizado_por?` · último cambio: ${r.actualizado_por}`:""}
+              </div>
+            </div>
+            <span style={{fontSize:10,fontWeight:800,padding:"4px 10px",borderRadius:12,
+              background:r.habilitado?"#e8f5ec":"#fff4e5",color:r.habilitado?"#166534":"#b45309"}}>
+              {r.habilitado?"ABIERTO":"CERRADO"}
+            </span>
+            <button onClick={()=>cambiar(r.pais,!r.habilitado,r.mensaje)} disabled={guardando===r.pais}
+              style={{background:r.habilitado?"#fff":"#166534",color:r.habilitado?"#c0392b":"#fff",
+                border:r.habilitado?"1.5px solid #f0c4c4":"none",borderRadius:8,padding:"9px 14px",
+                fontSize:12.5,fontWeight:700,cursor:"pointer",opacity:guardando===r.pais?0.6:1}}>
+              {guardando===r.pais?"Guardando…":r.habilitado?"🚧 Cerrar":"▶ Abrir"}
+            </button>
+          </div>
+          <div style={{width:"100%"}}>
+            <span className="field-label">Mensaje que verá el prospecto si está cerrado</span>
+            <textarea defaultValue={r.mensaje||""} rows={2}
+              onBlur={e=>{ if(e.target.value!==(r.mensaje||"")) cambiar(r.pais,r.habilitado,e.target.value); }}
+              placeholder="Las postulaciones para este país estarán disponibles próximamente."
+              style={{width:"100%",boxSizing:"border-box",border:"1px solid #e4e7ec",borderRadius:8,padding:"9px 11px",fontSize:13}}/>
+          </div>
+        </div>
+      ))}
+      {msg&&<div style={{marginTop:12,fontSize:13,fontWeight:600,color:msg.ok?"#166534":"#c0392b"}}>{msg.t}</div>}
+    </div>
+  );
+}
+
 function ViewCountry({ onSelect, busqCorreo, setBusqCorreo, busqDoc, setBusqDoc, buscarPostulacion, buscando, errorBusqueda, onAdmin }) {
+  // Estado de apertura por país (tabla portal_paises, editable desde el panel admin).
+  // Si la consulta falla, se asume abierto para no bloquear la captación por un error.
+  const [estadoPaises,setEstadoPaises]=useState({});
+  const [avisoCerrado,setAvisoCerrado]=useState(null);
+  useEffect(()=>{(async()=>{
+    try{
+      const data=await sb.from("portal_paises").select("*");
+      const m={}; (data||[]).forEach(r=>{m[r.pais]=r;});
+      setEstadoPaises(m);
+    }catch(e){ /* abierto por defecto */ }
+  })();},[]);
+  const paisAbierto=(k)=>!estadoPaises[k] || estadoPaises[k].habilitado !== false;
   return (
     <div>
       <div className="topbar">
         <span className="logo">Big<span>ticket</span></span>
         <button className="btn-gw" onClick={onAdmin}>Admin ⚙</button>
+        {avisoCerrado&&(
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:400,padding:20}}
+            onClick={()=>setAvisoCerrado(null)}>
+            <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:14,padding:"24px 26px",maxWidth:420,textAlign:"center"}}>
+              <div style={{fontSize:34,marginBottom:8}}>🚧</div>
+              <div style={{fontSize:16,fontWeight:800,color:"#1a1a1a",marginBottom:8}}>Postulaciones no disponibles</div>
+              <div style={{fontSize:13.5,color:"#555",lineHeight:1.6}}>
+                {avisoCerrado.mensaje||"Las postulaciones para este país estarán disponibles próximamente."}
+              </div>
+              <button onClick={()=>setAvisoCerrado(null)}
+                style={{marginTop:18,width:"100%",background:"#1a3a6b",color:"#fff",border:"none",borderRadius:9,padding:"12px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Entendido</button>
+            </div>
+          </div>
+        )}
       </div>
       <div className="pg" style={{maxWidth:440,paddingTop:48}}>
         <div className="sec-title" style={{textAlign:"center",marginBottom:6}}>Selecciona tu operación</div>
         <div className="sec-sub" style={{textAlign:"center"}}>¿En qué país trabajarás?</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:32}}>
           {Object.entries(PAISES).map(([key,p])=>(
-            <div key={key} className="country-card" onClick={()=>onSelect(key)}>
+            <div key={key} className="country-card"
+              onClick={()=>{ if(paisAbierto(key)) onSelect(key); else setAvisoCerrado(estadoPaises[key]); }}
+              style={paisAbierto(key)?undefined:{opacity:.55,cursor:"not-allowed",position:"relative"}}>
+              {!paisAbierto(key)&&(
+                <div style={{position:"absolute",top:8,right:8,background:"#fff4e5",border:"1px solid #fcd9b6",color:"#b45309",borderRadius:6,padding:"2px 7px",fontSize:9,fontWeight:800}}>PRÓXIMAMENTE</div>
+              )}
               <img src={p.bandera} alt={p.label} style={{width:64,height:44,objectFit:"cover",borderRadius:4,margin:"0 auto 12px",display:"block"}} onError={e=>{e.target.style.display="none";e.target.nextSibling.style.display="block";}}/>
               <span style={{fontSize:40,display:"none",marginBottom:8}}>{p.emoji}</span>
               <div style={{fontSize:15,fontWeight:600,color:"#1a1a1a"}}>{p.label}</div>
@@ -2041,11 +2145,12 @@ function AdminPanel({ onClose, onLogout, campaigns, setCampaigns }) {
         </div>
       </div>
       <div className="admin-nav">
-        {[["camps","Campañas"],["nueva","Nueva campaña"],["postulaciones","Postulaciones"],["vehiculos","🚗 Vehículos"],["canales","Canales"],["centros_mx","Centros México"],["biggy","🤖 Biggy"],["feedback","📋 Feedback"]].map(([k,l])=>(
+        {[["camps","Campañas"],["paises","🌎 Países"],["nueva","Nueva campaña"],["postulaciones","Postulaciones"],["vehiculos","🚗 Vehículos"],["canales","Canales"],["centros_mx","Centros México"],["biggy","🤖 Biggy"],["feedback","📋 Feedback"]].map(([k,l])=>(
           <button key={k} className={`nav-btn ${tab===k?"active":""}`} onClick={()=>setTab(k)}>{l}</button>
         ))}
       </div>
       <div className="pg">
+        {tab==="paises"&&<AdminPaises usuario={sessionStorage.getItem("admin_user")||""}/>}
         {tab==="camps"&&(
           <div>
             <div className="sec-title" style={{marginBottom:16}}>Campañas creadas</div>
@@ -4851,4 +4956,3 @@ function OnboardingApp() {
     </>
   );
 }
-
