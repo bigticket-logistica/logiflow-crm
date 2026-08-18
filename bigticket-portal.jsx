@@ -4506,8 +4506,17 @@ function ViewPropuesta() {
     if(!lead) return;
     setEnviando(true);
     const nuevaEtapa=decision==="si"?"Propuesta Aceptada":"Propuesta Rechazada";
-    await sb.from("leads").update({etapa:nuevaEtapa,respuesta_propuesta:decision}).eq("id",lead.id);
-    await sb.from("lead_historial").insert({lead_id:lead.id,etapa_anterior:lead.etapa,etapa_nueva:nuevaEtapa});
+    // Una sola transaccion: mueve la etapa y escribe el historial juntos.
+    // Antes eran dos llamadas y no se revisaba el error: si el UPDATE se
+    // revertia (el trigger de bitacora fallaba con el rol anon), el
+    // historial igual quedaba escrito y al prospecto se le mostraba
+    // "propuesta aceptada" sin que su lead hubiera avanzado.
+    const {data:res,error:errResp}=await sb.rpc("responder_propuesta",{p_lead_id:lead.id,p_decision:decision});
+    if(errResp||!res||res.ok===false){
+      setEnviando(false);
+      alert("No pudimos registrar tu respuesta. Por favor intenta de nuevo o escribenos.\n\nDetalle: "+((errResp&&errResp.message)||(res&&res.error)||"error desconocido"));
+      return;
+    }
     // Si acepta → notificar a N8N para enviar WhatsApp con link de onboarding
     if(decision==="si"){
       try{
