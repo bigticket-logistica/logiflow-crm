@@ -1001,6 +1001,18 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest, onDeleteRequ
   const [savingComentarios,setSavingComentarios]=useState(false);
   const [savedComentarios,setSavedComentarios]=useState(false);
   // Respuesta del analista a las preguntas del prospecto (envío por WhatsApp via N8N)
+  // Links que el analista suele necesitar al responder: la propuesta de ESTE
+  // candidato y el formulario de incorporación. Antes había que pedirle al
+  // prospecto que buscara un WhatsApp viejo — ahí se perdían leads.
+  const URL_PORTAL_BASE = "https://bigticket-portal.vercel.app";
+  const linkPropuesta = `${URL_PORTAL_BASE}?lead=${lead.id}&propuesta=1`;
+  const linkFormulario = `${URL_PORTAL_BASE}?onboarding=1`;
+  const [copiadoLink,setCopiadoLink]=useState(null);
+  const copiarLink=(cual,url)=>{
+    navigator.clipboard?.writeText(url);
+    setCopiadoLink(cual);
+    setTimeout(()=>setCopiadoLink(null),1800);
+  };
   const [respuestaAnalista,setRespuestaAnalista]=useState(lead.respuesta_analista_preguntas||"");
   const [enviandoRespuesta,setEnviandoRespuesta]=useState(false);
   const [respuestaEnviada,setRespuestaEnviada]=useState(!!lead.respuesta_analista_preguntas);
@@ -1446,6 +1458,45 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest, onDeleteRequ
                       style={{background:"#eef2ff",color:"#1a3a6b",border:"1px solid #c7d2fe",borderRadius:8,padding:"6px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
                       📋 Copiar preguntas
                     </button>
+                  </div>
+
+                  {/* Links listos para pegar en la respuesta */}
+                  <div style={{marginTop:12,background:"#f8fafc",border:"1px solid #e4e7ec",borderRadius:10,padding:"11px 13px"}}>
+                    <div style={{fontSize:10,fontWeight:800,color:"#555",letterSpacing:.8,textTransform:"uppercase",marginBottom:8}}>
+                      🔗 Links para el mensaje
+                    </div>
+                    {[
+                      ["propuesta","💼 Propuesta de este candidato",linkPropuesta,"Personalizado — abre su propuesta directo"],
+                      ["formulario","📋 Formulario de incorporación",linkFormulario,"Mismo para todos — se identifica adentro"],
+                    ].map(([k,titulo,url,nota])=>(
+                      <div key={k} style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",padding:"7px 0",borderTop:k==="formulario"?"1px solid #eef0f3":"none"}}>
+                        <div style={{flex:1,minWidth:170}}>
+                          <div style={{fontSize:12,fontWeight:700,color:"#1a3a6b"}}>{titulo}</div>
+                          <div style={{fontSize:10.5,color:"#98a2b3",wordBreak:"break-all"}}>{url}</div>
+                          <div style={{fontSize:10,color:"#b0b7c3",fontStyle:"italic"}}>{nota}</div>
+                        </div>
+                        <button onClick={()=>copiarLink(k,url)}
+                          style={{background:copiadoLink===k?"#dcfce7":"#eef2ff",color:copiadoLink===k?"#16a34a":"#1a3a6b",
+                            border:`1px solid ${copiadoLink===k?"#86efac":"#c7d2fe"}`,borderRadius:8,padding:"6px 12px",
+                            fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
+                          {copiadoLink===k?"✓ Copiado":"⧉ Copiar"}
+                        </button>
+                        {!respuestaEnviada&&(
+                          <button onClick={()=>setRespuestaAnalista(prev=>{
+                              const base=(prev||"").trimEnd();
+                              const linea=(k==="propuesta"?"Aquí tu propuesta: ":"Completa tu formulario aquí: ")+url;
+                              return base?`${base}\n\n${linea}`:linea;
+                            })}
+                          style={{background:"#1a3a6b",color:"#fff",border:"none",borderRadius:8,padding:"6px 12px",
+                            fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
+                          + Insertar
+                        </button>
+                        )}
+                      </div>
+                    ))}
+                    <div style={{fontSize:10,color:"#98a2b3",marginTop:6}}>
+                      «Insertar» agrega el link al final de tu respuesta. Ojo con el límite de 600 caracteres.
+                    </div>
                   </div>
 
                   {/* Bloque de respuesta del analista — envío automático por WhatsApp */}
@@ -2825,4 +2876,5 @@ export default function App() {
     </div>
   );
 }
+
 
