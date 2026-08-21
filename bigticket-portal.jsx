@@ -3847,10 +3847,15 @@ function ViewOnboarding({ lead, onVolver }) {
     localidad: lead.region_estado || "",
     colonia: "",
     acepta_privacidad: false,
+    // Figura jurídica: cambia qué documentos se exigen. Una persona moral
+    // acredita su existencia con el acta constitutiva; una física, no.
+    figura_juridica: "",          // "fisica" | "moral"
+    razon_social: "",             // solo moral
     url_ine: "",
     url_ine_2: "",
     url_curp: "",
     url_rfc: "",
+    url_acta_constitutiva: "",    // solo moral
     url_licencia: "",
     url_veh_trasera: "",
     url_veh_lado_izq: "",
@@ -3876,6 +3881,8 @@ function ViewOnboarding({ lead, onVolver }) {
         telefono: formMX.telefono, email: formMX.email, localidad: formMX.localidad,
         colonia: formMX.colonia, url_ine: formMX.url_ine, url_ine_2: formMX.url_ine_2, url_curp: formMX.url_curp,
         url_rfc: formMX.url_rfc,
+        figura_juridica: formMX.figura_juridica, razon_social: formMX.razon_social,
+        url_acta_constitutiva: formMX.url_acta_constitutiva,
         acepta_privacidad: formMX.acepta_privacidad, completado: false,
         updated_at: new Date().toISOString(),
       } : {
@@ -3928,10 +3935,13 @@ function ViewOnboarding({ lead, onVolver }) {
                 email: saved.email || f.email,
                 localidad: saved.localidad || f.localidad,
                 colonia: saved.colonia || f.colonia,
+                figura_juridica: saved.figura_juridica || "",
+                razon_social: saved.razon_social || "",
                 url_ine: saved.url_ine || "",
                 url_ine_2: saved.url_ine_2 || "",
                 url_curp: saved.url_curp || "",
                 url_rfc: saved.url_rfc || "",
+                url_acta_constitutiva: saved.url_acta_constitutiva || "",
                 url_licencia: saved.url_licencia || "",
                 url_vehiculo: saved.url_vehiculo || "",
                 url_veh_trasera: saved.url_veh_trasera || "",
@@ -4000,6 +4010,9 @@ function ViewOnboarding({ lead, onVolver }) {
       url_ine_2: formMX.url_ine_2,
       url_curp: formMX.url_curp,
       url_rfc: formMX.url_rfc,
+      figura_juridica: formMX.figura_juridica,
+      razon_social: formMX.razon_social,
+      url_acta_constitutiva: formMX.url_acta_constitutiva,
       acepta_privacidad: formMX.acepta_privacidad,
       completado: true,
       completado_at: new Date().toISOString(),
@@ -4048,6 +4061,13 @@ function ViewOnboarding({ lead, onVolver }) {
       if (!formMX.url_ine_2) nuevosErrores.url_ine_2 = "Debes adjuntar el reverso de tu INE";
       if (!formMX.url_curp) nuevosErrores.url_curp = "Debes adjuntar tu CURP";
       if (!formMX.url_rfc) nuevosErrores.url_rfc = "Debes adjuntar tu RFC";
+      if (!formMX.figura_juridica) nuevosErrores.figura_juridica = "Indica si eres persona física o moral";
+      if (formMX.figura_juridica === "moral") {
+        // La moral acredita su existencia y a quien la representa: sin acta
+        // no hay con quién firmar el contrato.
+        if (!formMX.razon_social?.trim()) nuevosErrores.razon_social = "Campo obligatorio para persona moral";
+        if (!formMX.url_acta_constitutiva) nuevosErrores.url_acta_constitutiva = "Debes adjuntar el acta constitutiva";
+      }
       if (!formMX.email?.trim()) nuevosErrores.email = "Campo obligatorio";
       // Licencia y fotos del vehículo YA NO se piden aquí: las unidades se
       // certifican una a una desde el Portal de Terceros tras la firma.
@@ -4271,6 +4291,41 @@ function ViewOnboarding({ lead, onVolver }) {
               <div />
             </div>
 
+            {/* Figura jurídica: define qué documentos se piden más abajo */}
+            <div style={{ marginTop: 8, padding: "12px 14px", background: "#eef2ff", border: "1px solid #c7d7f9", borderRadius: 10, marginBottom: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#1a3a6b", marginBottom: 4 }}>🏛️ ¿Cómo estás constituido? *</div>
+              <div style={{ fontSize: 11.5, color: "#5b6b85", marginBottom: 10 }}>
+                Esto define los documentos que necesitamos y a nombre de quién se emite el contrato.
+              </div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {[["fisica", "👤 Persona física", "con actividad empresarial"],
+                  ["moral", "🏢 Persona moral", "sociedad constituida"]].map(([val, tit, sub]) => {
+                  const on = formMX.figura_juridica === val;
+                  return (
+                    <button key={val} type="button"
+                      onClick={() => { updMX("figura_juridica", val); setErrores(p => ({ ...p, figura_juridica: "" })); }}
+                      style={{ flex: 1, minWidth: 150, textAlign: "left", cursor: "pointer",
+                        background: on ? "#1a3a6b" : "#fff", color: on ? "#fff" : "#333",
+                        border: `1.5px solid ${on ? "#1a3a6b" : (errores.figura_juridica ? "#fca5a5" : "#d0d5dd")}`,
+                        borderRadius: 10, padding: "11px 14px", fontFamily: "'Geist',sans-serif" }}>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>{tit}</div>
+                      <div style={{ fontSize: 11, opacity: on ? .85 : .6 }}>{sub}</div>
+                    </button>
+                  );
+                })}
+              </div>
+              {errores.figura_juridica && (
+                <div style={{ fontSize: 11.5, color: "#c0392b", marginTop: 6 }}>{errores.figura_juridica}</div>
+              )}
+              {formMX.figura_juridica === "moral" && (
+                <div style={{ marginTop: 12 }}>
+                  <TextField errores={errores} setErrores={setErrores} label="Razón social *" campo="razon_social"
+                    value={formMX.razon_social} onChange={v => updMX("razon_social", v)}
+                    placeholder="Ej. Transportes del Bajío S.A. de C.V." />
+                </div>
+              )}
+            </div>
+
             <div style={{ marginTop: 8, padding: "12px 14px", background: "#f8f9fa", borderRadius: 10, marginBottom: 8 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", marginBottom: 10 }}>📎 Documentos requeridos</div>
               <UploadField label="Adjuntar INE (frente) *" valor={formMX.url_ine} errores={errores} campo="url_ine"
@@ -4285,6 +4340,19 @@ function ViewOnboarding({ lead, onVolver }) {
               <UploadField label="Adjuntar RFC *" valor={formMX.url_rfc} errores={errores} campo="url_rfc"
                 uploading={uploading.rfc}
                 onChange={e => handleUpload("rfc", e.target.files[0], setFormMX, lead.id)} />
+              {/* Solo persona moral: acredita la sociedad y sus facultades */}
+              {formMX.figura_juridica === "moral" && (
+                <>
+                  <UploadField label="Adjuntar acta constitutiva *" valor={formMX.url_acta_constitutiva}
+                    errores={errores} campo="url_acta_constitutiva"
+                    uploading={uploading.acta_constitutiva}
+                    onChange={e => handleUpload("acta_constitutiva", e.target.files[0], setFormMX, lead.id)} />
+                  <div style={{ fontSize: 11, color: "#5b6b85", marginTop: -4, marginBottom: 8, lineHeight: 1.5 }}>
+                    Documento completo con sello del Registro Público. Si el poder del representante
+                    está en un instrumento aparte, adjúntalo también aquí (puedes subir un PDF con ambos).
+                  </div>
+                </>
+              )}
               {/* Licencia y fotos del vehículo eliminadas del formulario de inscripción:
                   las unidades se certifican una a una desde el Portal de Terceros. */}
             </div>
@@ -4506,17 +4574,8 @@ function ViewPropuesta() {
     if(!lead) return;
     setEnviando(true);
     const nuevaEtapa=decision==="si"?"Propuesta Aceptada":"Propuesta Rechazada";
-    // Una sola transaccion: mueve la etapa y escribe el historial juntos.
-    // Antes eran dos llamadas y no se revisaba el error: si el UPDATE se
-    // revertia (el trigger de bitacora fallaba con el rol anon), el
-    // historial igual quedaba escrito y al prospecto se le mostraba
-    // "propuesta aceptada" sin que su lead hubiera avanzado.
-    const {data:res,error:errResp}=await sb.rpc("responder_propuesta",{p_lead_id:lead.id,p_decision:decision});
-    if(errResp||!res||res.ok===false){
-      setEnviando(false);
-      alert("No pudimos registrar tu respuesta. Por favor intenta de nuevo o escribenos.\n\nDetalle: "+((errResp&&errResp.message)||(res&&res.error)||"error desconocido"));
-      return;
-    }
+    await sb.from("leads").update({etapa:nuevaEtapa,respuesta_propuesta:decision}).eq("id",lead.id);
+    await sb.from("lead_historial").insert({lead_id:lead.id,etapa_anterior:lead.etapa,etapa_nueva:nuevaEtapa});
     // Si acepta → notificar a N8N para enviar WhatsApp con link de onboarding
     if(decision==="si"){
       try{
