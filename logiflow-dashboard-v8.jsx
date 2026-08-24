@@ -1002,8 +1002,7 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest, onDeleteRequ
   const [savedComentarios,setSavedComentarios]=useState(false);
   // Respuesta del analista a las preguntas del prospecto (envío por WhatsApp via N8N)
   // Links que el analista suele necesitar al responder: la propuesta de ESTE
-  // candidato y el formulario de incorporación. Antes había que pedirle al
-  // prospecto que buscara un WhatsApp viejo — ahí se perdían leads.
+  // candidato y el formulario de incorporación.
   const URL_PORTAL_BASE = "https://bigticket-portal.vercel.app";
   const linkPropuesta = `${URL_PORTAL_BASE}?lead=${lead.id}&propuesta=1`;
   const linkFormulario = `${URL_PORTAL_BASE}?onboarding=1`;
@@ -1013,6 +1012,36 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest, onDeleteRequ
     setCopiadoLink(cual);
     setTimeout(()=>setCopiadoLink(null),1800);
   };
+
+  // Reenvío de la propuesta por WhatsApp: dispara el mismo webhook que usa
+  // el portal al postular, así que pasa por la normalización del teléfono
+  // del flujo 04 (521 + 10 dígitos en México).
+  const [reenviando,setReenviando]=useState(false);
+  const reenviarPropuesta=async()=>{
+    const dig=String(lead.telefono||"").replace(/\D/g,"");
+    const esCL=String(lead.pais||"").toLowerCase().includes("chi");
+    const largo=esCL?8:10;
+    if(dig.length<largo){
+      alert(`El teléfono de este lead está incompleto: "${lead.telefono||"vacío"}".\n\nSe necesitan ${largo} dígitos. Corrígelo antes de reenviar.`);
+      return;
+    }
+    if(!confirm(`¿Reenviar la propuesta a ${lead.nombre}?\n\nWhatsApp: ${(esCL?"+569":"+521")+dig.slice(-largo)}\n\nLe llegará la plantilla con el link de su propuesta.`))return;
+    setReenviando(true);
+    try{
+      const resp=await fetch("https://bigticket2026.app.n8n.cloud/webhook/propuesta-enviada",{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          nombre:lead.nombre, telefono:lead.telefono, pais:lead.pais||"México",
+          campana_nombre:lead.origen||"Postulación libre",
+          clasificacion:lead.clasificacion, lead_id:lead.id,
+        }),
+      });
+      if(!resp.ok)throw new Error("el servicio de WhatsApp no respondió ("+resp.status+")");
+      alert("📲 Propuesta reenviada.\n\nEl mensaje sale en unos 30 segundos (el flujo tiene una espera).\nSi no llega, revisa la ejecución del flujo 04 en n8n.");
+    }catch(e){ alert("No se pudo reenviar: "+e.message); }
+    finally{ setReenviando(false); }
+  };
+
   const [respuestaAnalista,setRespuestaAnalista]=useState(lead.respuesta_analista_preguntas||"");
   const [enviandoRespuesta,setEnviandoRespuesta]=useState(false);
   const [respuestaEnviada,setRespuestaEnviada]=useState(!!lead.respuesta_analista_preguntas);
@@ -1170,6 +1199,25 @@ const LeadPanel = ({ lead, onClose, onUpdate, onEtapaChangeRequest, onDeleteRequ
       <div style={{flex:1,overflow:"auto",padding:16}}>
         {tab==="info"&&(
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            <div style={{background:"#fff8ef",border:"1px solid #fcd9b6",borderRadius:10,padding:14}}>
+              <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                <div style={{flex:1,minWidth:200}}>
+                  <div style={{fontSize:12.5,fontWeight:800,color:"#b45309"}}>📲 Reenviar propuesta por WhatsApp</div>
+                  <div style={{fontSize:11.5,color:"#8a6d3b",lineHeight:1.5}}>
+                    Vuelve a enviarle la plantilla con el link de su propuesta.
+                  </div>
+                  <div style={{fontSize:11,color:"#98a2b3",marginTop:3,fontFamily:"monospace"}}>
+                    {lead.telefono||"— sin teléfono —"}
+                  </div>
+                </div>
+                <button onClick={reenviarPropuesta} disabled={reenviando}
+                  style={{background:"#F47B20",color:"#fff",border:"none",borderRadius:9,padding:"11px 18px",
+                    fontSize:12.5,fontWeight:800,cursor:reenviando?"wait":"pointer",opacity:reenviando?0.6:1,whiteSpace:"nowrap"}}>
+                  {reenviando?"Enviando…":"📲 Reenviar propuesta"}
+                </button>
+              </div>
+            </div>
+
             <div style={{background:"#ffffff",border:"1px solid #e4e7ec",borderRadius:10,padding:14}}>
               <div style={{fontSize:10,fontWeight:800,color:"#555555",letterSpacing:1,marginBottom:10,textTransform:"uppercase"}}>Datos de contacto</div>
               {lead.codigo_postulacion&&(
