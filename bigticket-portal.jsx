@@ -625,6 +625,43 @@ const ESTADOS_MEXICO = [
 ];
 
 const PREFIJOS = { "Chile": "+569", "México": "+521" };
+// Dígitos LOCALES que se piden en cada país (sin el prefijo).
+const LARGO_TEL = { "Chile": 8, "México": 10 };
+
+// El teléfono se escribía libre y entraban formatos que WhatsApp acepta
+// pero nunca entrega: Meta responde "accepted" y descarta en silencio.
+// Aquí el prefijo es fijo (no editable) y solo se teclean los dígitos.
+function TelefonoInput({ pais, valor, onChange, error }) {
+  const pre = PREFIJOS[pais] || "+521";
+  const largo = LARGO_TEL[pais] || 10;
+  // Del valor guardado (prefijo + local) se muestran solo los locales.
+  const soloDigitos = String(valor || "").replace(/\D/g, "");
+  const preDig = pre.replace(/\D/g, "");
+  let local = soloDigitos.startsWith(preDig) ? soloDigitos.slice(preDig.length) : soloDigitos;
+  local = local.slice(-largo);
+  const set = (txt) => {
+    const d = String(txt).replace(/\D/g, "").slice(0, largo);
+    onChange(d ? pre + d : "");
+  };
+  const completo = local.length === largo;
+  return (
+    <>
+      <div style={{ display: "flex", alignItems: "stretch", border: error ? "1.5px solid #ef4444" : "1px solid #e4e7ec",
+        borderRadius: 8, overflow: "hidden", background: error ? "#fff5f5" : "#f8f9fa" }}>
+        <span style={{ display: "flex", alignItems: "center", padding: "10px 12px", background: "#eef2f7",
+          borderRight: "1px solid #e4e7ec", fontSize: 14, fontWeight: 700, color: "#1a3a6b", whiteSpace: "nowrap" }}>{pre}</span>
+        <input value={local} onChange={(e) => set(e.target.value)} inputMode="numeric"
+          placeholder={"0".repeat(largo)} maxLength={largo}
+          style={{ flex: 1, border: "none", outline: "none", background: "transparent",
+            padding: "10px 12px", fontSize: 14, letterSpacing: 1, fontFamily: "monospace" }} />
+        {completo && <span style={{ display: "flex", alignItems: "center", paddingRight: 12, color: "#16a34a", fontWeight: 800 }}>✓</span>}
+      </div>
+      <div style={{ fontSize: 11, color: local && !completo ? "#b45309" : "#98a2b3", marginTop: 4 }}>
+        {local.length}/{largo} dígitos · sin el {pre}, solo tu número
+      </div>
+    </>
+  );
+}
 
 function ViewForm({ camp, canal, op, onBack, onSuccess }) {
   const [form,setForm]=useState({nombre:"",empresa:"",rut:"",telefono:PREFIJOS[op]||"+569",email:"",fuente_contacto:"",pais_form:op||"Chile",region_estado:"",url_vehiculo:""});
@@ -656,7 +693,15 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
   function validarCampos() {
     const errs={};
     if(!form.nombre.trim())          errs.nombre="Campo obligatorio";
-    if(!form.telefono.trim()||form.telefono===PREFIJOS[form.pais_form]||form.telefono===PREFIJOS[op]) errs.telefono="Campo obligatorio";
+    {
+      const paisTel = isLibre ? form.pais_form : op;
+      const largoTel = LARGO_TEL[paisTel] || 10;
+      const preDig = (PREFIJOS[paisTel] || "+521").replace(/\D/g, "");
+      const dig = String(form.telefono || "").replace(/\D/g, "");
+      const localTel = dig.startsWith(preDig) ? dig.slice(preDig.length) : dig;
+      if (!localTel) errs.telefono = "Campo obligatorio";
+      else if (localTel.length !== largoTel) errs.telefono = `Deben ser ${largoTel} dígitos (van ${localTel.length})`;
+    }
     if(!form.email.trim())           errs.email="Campo obligatorio";
     if(!form.region_estado)          errs.region_estado="Campo obligatorio";
     if(!form.fuente_contacto)        errs.fuente_contacto="Campo obligatorio";
@@ -966,8 +1011,8 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
               </div>
               <div className={`field-row${errores.telefono?" campo-error":""}`}>
                 <span className="field-label">Teléfono WhatsApp *</span>
-                <input value={form.telefono} onChange={e=>{setForm({...form,telefono:e.target.value});setErrores(p=>({...p,telefono:""}));}}
-                  placeholder={op==="México"?"+521 ...":"+569 ..."}/>
+                <TelefonoInput pais={op} valor={form.telefono} error={!!errores.telefono}
+                  onChange={v=>{setForm({...form,telefono:v});setErrores(p=>({...p,telefono:""}));}} />
                 {errores.telefono&&<div className="error-msg">{errores.telefono}</div>}
               </div>
             </div>
@@ -978,8 +1023,8 @@ function ViewForm({ camp, canal, op, onBack, onSuccess }) {
             <div className="two-col">
               <div className={`field-row${errores.telefono?" campo-error":""}`}>
                 <span className="field-label">Teléfono WhatsApp *</span>
-                <input value={form.telefono} onChange={e=>{setForm({...form,telefono:e.target.value});setErrores(p=>({...p,telefono:""}));}}
-                  placeholder={form.pais_form==="México"?"+521 ...":"+569 ..."}/>
+                <TelefonoInput pais={form.pais_form} valor={form.telefono} error={!!errores.telefono}
+                  onChange={v=>{setForm({...form,telefono:v});setErrores(p=>({...p,telefono:""}));}} />
                 {errores.telefono&&<div className="error-msg">{errores.telefono}</div>}
               </div>
               <div className="field-row">
